@@ -1,0 +1,44 @@
+#!/bin/sh
+set -eu
+
+FIXTURE_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+
+case "$1" in
+  --version)
+    printf '%s\n' "gh version fixture"
+    ;;
+  auth)
+    exit 0
+    ;;
+  pr)
+    case "$2" in
+      view)
+        case " $* " in
+          *" --jq "*) printf '%s\n' "head-sha" ;;
+          *) cat "$FIXTURE_DIR/pr.json" ;;
+        esac
+        ;;
+      diff)
+        cat "$FIXTURE_DIR/pr.patch"
+        ;;
+      *) exit 2 ;;
+    esac
+    ;;
+  api)
+    case " $* " in
+      *"/git/blobs/1111111"*) cat "$FIXTURE_DIR/retry.old.txt" ;;
+      *"/git/blobs/2222222"*) cat "$FIXTURE_DIR/retry.new.txt" ;;
+      *"/git/blobs/3333333"*) cat "$FIXTURE_DIR/config.old.txt" ;;
+      *"/git/blobs/4444444"*) cat "$FIXTURE_DIR/config.new.txt" ;;
+      *)
+        if [ -n "${REVIEWONATOR_PUBLISH_CAPTURE:-}" ]; then
+          cat > "$REVIEWONATOR_PUBLISH_CAPTURE"
+        else
+          cat >/dev/null
+        fi
+        printf '%s\n' '{"id":99,"html_url":"https://github.com/acme/widgets/pull/42#pullrequestreview-99","state":"CHANGES_REQUESTED"}'
+        ;;
+    esac
+    ;;
+  *) exit 2 ;;
+esac

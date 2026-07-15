@@ -1,0 +1,4 @@
+interface:
+  display_name: "Reviewonator"
+  short_description: "Review GitHub pull requests visually"
+  default_prompt: "Use $reviewonator to review this GitHub pull request."

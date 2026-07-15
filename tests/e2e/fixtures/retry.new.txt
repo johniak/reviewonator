@@ -1,0 +1,14 @@
+import { provider } from "./provider";
+
+export async function charge(payment: Payment) {
+  try {
+    return await provider.charge(payment);
+  } catch (error) {
+    if (error instanceof TimeoutError) {
+      while (true) {
+        return await provider.charge(payment);
+      }
+    }
+    throw error;
+  }
+}

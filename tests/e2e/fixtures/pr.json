@@ -1,0 +1,32 @@
+{
+  "additions": 8,
+  "author": { "login": "octocat" },
+  "baseRefName": "main",
+  "baseRefOid": "base-sha",
+  "body": "Adds resilient retries around payment provider timeouts.",
+  "changedFiles": 2,
+  "commits": [
+    {
+      "oid": "head-sha",
+      "messageHeadline": "Retry payments after provider timeouts",
+      "committedDate": "2026-07-14T12:00:00Z",
+      "authors": [{ "login": "octocat" }]
+    },
+    {
+      "oid": "second-sha",
+      "messageHeadline": "Add retry configuration",
+      "committedDate": "2026-07-14T12:15:00Z",
+      "authors": [{ "login": "octocat" }]
+    }
+  ],
+  "deletions": 1,
+  "files": [
+    { "path": "src/payments/retry.ts", "additions": 6, "deletions": 1 },
+    { "path": "src/config.ts", "additions": 2, "deletions": 0 }
+  ],
+  "headRefName": "payment-retries",
+  "headRefOid": "head-sha",
+  "number": 42,
+  "title": "Make payment retries resilient",
+  "url": "https://github.com/acme/widgets/pull/42"
+}

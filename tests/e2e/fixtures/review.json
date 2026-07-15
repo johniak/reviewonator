@@ -1,0 +1,35 @@
+{
+  "version": 2,
+  "prUrl": "https://github.com/acme/widgets/pull/42",
+  "summary": "The implementation is close, but the new retry path can execute the same payment twice after a network timeout.",
+  "recommendation": "REQUEST_CHANGES",
+  "comments": [
+    {
+      "id": "S1",
+      "type": "line",
+      "severity": "bug",
+      "path": "src/payments/retry.ts",
+      "line": 8,
+      "side": "RIGHT",
+      "body": "A timeout does not prove that the provider rejected the charge. Retrying here without a stable idempotency key can create a second successful payment. Reuse the same key across all attempts.",
+      "reviewerExplanation": "Co: Wszystkie próby muszą używać tego samego klucza idempotencji. Dlaczego: Timeout może wystąpić po przyjęciu płatności, więc ponowienie bez klucza może obciążyć klienta drugi raz."
+    },
+    {
+      "id": "S2",
+      "type": "line",
+      "severity": "warning",
+      "path": "src/payments/retry.ts",
+      "line": 9,
+      "side": "RIGHT",
+      "body": "This retry has no upper bound. A persistent provider failure will keep a worker occupied indefinitely. Add a configured attempt limit and surface the terminal failure.",
+      "reviewerExplanation": "Co: Pętla ponowień potrzebuje konfigurowalnego limitu prób. Dlaczego: Trwała awaria providera pozostawi workera zajętego bez końca i może zablokować obsługę kolejnych zadań."
+    },
+    {
+      "id": "G1",
+      "type": "general",
+      "severity": "suggestion",
+      "body": "Add an integration test for a timeout that happens after the provider accepted the charge.",
+      "reviewerExplanation": "Co: Należy przetestować timeout występujący już po przyjęciu płatności. Dlaczego: To scenariusz, który ujawnia ryzyko podwójnego obciążenia i nie jest pokryty zwykłym testem nieudanej próby."
+    }
+  ]
+}

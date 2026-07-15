@@ -1,0 +1,9 @@
+import { provider } from "./provider";
+
+export async function charge(payment: Payment) {
+  try {
+    return await provider.charge(payment);
+  } catch (error) {
+    throw error;
+  }
+}
