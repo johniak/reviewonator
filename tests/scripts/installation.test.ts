@@ -68,6 +68,8 @@ describe("release packaging", () => {
       "./THIRD_PARTY_NOTICES.md",
       "./third-party-licenses/pierre-diffs-Apache-2.0.txt",
       "./third-party-licenses/lucide-react-ISC-and-MIT.txt",
+      "./third-party-licenses/react-markdown-MIT.txt",
+      "./third-party-licenses/remark-gfm-MIT.txt",
     ]));
     expect(await readFile(`${archive}.sha256`, "utf8")).toContain("reviewonator-linux-x64.tar.gz");
   });

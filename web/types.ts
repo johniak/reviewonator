@@ -1,10 +1,12 @@
 import type { PullRequest } from "../src/domain/pull-request";
+import type { PullRequestDiscussionItem } from "../src/domain/discussion";
 import type { ReviewComment, ReviewDocument, ReviewEvent } from "../src/domain/review";
 
 export type SessionSnapshot = {
   pullRequest: PullRequest;
   patch: string;
   review: ReviewDocument;
+  discussion: PullRequestDiscussionItem[];
   fileUrls: Record<string, string>;
 };
 

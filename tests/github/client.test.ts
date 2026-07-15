@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { GitHubClient } from "../../src/github/client";
 import type { CommandResult, CommandRunner } from "../../src/platform/command";
-import { patch, pullRequest, review } from "../fixtures";
+import { discussion, patch, pullRequest, review } from "../fixtures";
 
 class RecordingRunner implements CommandRunner {
   readonly calls: Array<{ command: string; args: string[]; input?: string }> = [];
@@ -29,11 +29,53 @@ describe("GitHubClient", () => {
   });
 
   it("loads real PR fields and the complete patch through gh", async () => {
-    const runner = new RecordingRunner([success(JSON.stringify(pullRequest)), success(patch)]);
+    const runner = new RecordingRunner([
+      success(JSON.stringify(pullRequest)),
+      success(patch),
+      success(JSON.stringify([[
+        {
+          id: 10,
+          user: { login: "maintainer", avatar_url: "https://avatars.githubusercontent.com/u/1?v=4" },
+          body: "Could we add a **regression test** for this?",
+          created_at: "2026-07-14T12:20:00Z",
+          html_url: `${pullRequest.url}#issuecomment-10`,
+        },
+      ]])),
+      success(JSON.stringify([[
+        {
+          id: 11,
+          user: { login: "reviewer", avatar_url: null },
+          body: "The behavior still needs one correction.",
+          state: "CHANGES_REQUESTED",
+          submitted_at: "2026-07-14T12:25:00Z",
+          html_url: `${pullRequest.url}#pullrequestreview-11`,
+        },
+      ]])),
+      success(JSON.stringify([[
+        {
+          id: 12,
+          user: { login: "reviewer", avatar_url: null },
+          body: "This value should not be hard-coded.",
+          created_at: "2026-07-14T12:26:00Z",
+          html_url: `${pullRequest.url}#discussion_r12`,
+          path: "src/example.ts",
+          line: 2,
+          original_line: 2,
+          side: "RIGHT",
+          original_side: "RIGHT",
+          position: 1,
+        },
+      ]])),
+    ]);
     const loaded = await new GitHubClient(runner).loadPullRequest(pullRequest.url);
-    expect(loaded).toEqual({ pullRequest, patch });
+    expect(loaded).toEqual({ pullRequest, patch, discussion });
     expect(runner.calls[0].args.slice(0, 3)).toEqual(["pr", "view", pullRequest.url]);
     expect(runner.calls[1].args).toEqual(["pr", "diff", pullRequest.url, "--patch"]);
+    expect(runner.calls.slice(2).map(({ args }) => args)).toEqual([
+      ["api", "--paginate", "--slurp", "repos/acme/widgets/issues/42/comments"],
+      ["api", "--paginate", "--slurp", "repos/acme/widgets/pulls/42/reviews"],
+      ["api", "--paginate", "--slurp", "repos/acme/widgets/pulls/42/comments"],
+    ]);
   });
 
   it("publishes one atomic GitHub review with selected inline comments", async () => {

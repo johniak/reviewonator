@@ -1,5 +1,6 @@
 import { parsePatchFiles } from "@pierre/diffs";
 import { buildFileUrl, type PullRequest } from "../domain/pull-request";
+import type { PullRequestDiscussionItem } from "../domain/discussion";
 import {
   publishRequestSchema,
   revisionRequestSchema,
@@ -29,6 +30,7 @@ export class ReviewSession {
     readonly patch: string,
     readonly review: ReviewDocument,
     private readonly github: GitHubGateway,
+    readonly discussion: PullRequestDiscussionItem[] = [],
   ) {
     this.resultPromise = new Promise((resolve) => {
       this.resolveResult = resolve;
@@ -48,6 +50,7 @@ export class ReviewSession {
       pullRequest: this.pullRequest,
       patch: this.patch,
       review: this.review,
+      discussion: this.discussion,
       fileUrls: Object.fromEntries(
         this.pullRequest.files.map((file) => [file.path, buildFileUrl(this.pullRequest, file.path)]),
       ),

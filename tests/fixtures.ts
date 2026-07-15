@@ -1,4 +1,5 @@
 import type { PullRequest } from "../src/domain/pull-request";
+import type { PullRequestDiscussionItem } from "../src/domain/discussion";
 import type { ReviewDocument } from "../src/domain/review";
 
 export const prUrl = "https://github.com/acme/widgets/pull/42";
@@ -36,6 +37,37 @@ export const pullRequest: PullRequest = {
   title: "Return the correct answer",
   url: prUrl,
 };
+
+export const discussion: PullRequestDiscussionItem[] = [
+  {
+    id: "conversation-10",
+    kind: "conversation",
+    author: { login: "maintainer", avatarUrl: "https://avatars.githubusercontent.com/u/1?v=4" },
+    body: "Could we add a **regression test** for this?",
+    createdAt: "2026-07-14T12:20:00Z",
+    url: `${prUrl}#issuecomment-10`,
+  },
+  {
+    id: "review-11",
+    kind: "review",
+    author: { login: "reviewer" },
+    body: "The behavior still needs one correction.",
+    createdAt: "2026-07-14T12:25:00Z",
+    url: `${prUrl}#pullrequestreview-11`,
+    state: "CHANGES_REQUESTED",
+  },
+  {
+    id: "inline-12",
+    kind: "inline",
+    author: { login: "reviewer" },
+    body: "This value should not be hard-coded.",
+    createdAt: "2026-07-14T12:26:00Z",
+    url: `${prUrl}#discussion_r12`,
+    path: "src/example.ts",
+    line: 2,
+    side: "RIGHT",
+  },
+];
 
 export const review: ReviewDocument = {
   version: 2,

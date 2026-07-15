@@ -1,0 +1,9 @@
+[[
+  {
+    "id": 10,
+    "user": { "login": "maintainer", "avatar_url": null },
+    "body": "Could we add a **regression test** for the timeout path?",
+    "created_at": "2026-07-14T12:20:00Z",
+    "html_url": "https://github.com/acme/widgets/pull/42#issuecomment-10"
+  }
+]]

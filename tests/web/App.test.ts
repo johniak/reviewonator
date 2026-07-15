@@ -7,11 +7,11 @@ import type { GitHubGateway, LoadedPullRequest, PublishedReview } from "../../sr
 import { createApp } from "../../src/server/app";
 import { ReviewSession } from "../../src/server/session";
 import { App, buildPublishBody, CompletionScreen, describeFilePath } from "../../web/App";
-import { patch, pullRequest, review } from "../fixtures";
+import { discussion, patch, pullRequest, review } from "../fixtures";
 
 class AppGateway implements GitHubGateway {
   async verifyPrerequisites() {}
-  async loadPullRequest(): Promise<LoadedPullRequest> { return { pullRequest, patch }; }
+  async loadPullRequest(): Promise<LoadedPullRequest> { return { pullRequest, patch, discussion }; }
   async getHeadSha() { return pullRequest.headRefOid; }
   async loadFileContext() { return { oldContent: "export function answer() {\n  return 41;\n}", newContent: "export function answer() {\n  const answer = 42;\n  return answer;\n}" }; }
   async publishReview(_pr: PullRequest, _request: PublishRequest, _comments: ReviewComment[]): Promise<PublishedReview> {
@@ -48,7 +48,7 @@ describe("GitHub review body", () => {
   });
 
   it("starts with every proposed comment excluded", async () => {
-    const session = new ReviewSession(pullRequest, patch, review, new AppGateway());
+    const session = new ReviewSession(pullRequest, patch, review, new AppGateway(), discussion);
     const serverApp = createApp({ html: "<html></html>", favicon: "<svg></svg>", token: "secret", session });
     vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
       const value = input instanceof Request ? input.url : input.toString();
@@ -73,6 +73,28 @@ describe("GitHub review body", () => {
       "href",
       pullRequest.url,
     );
+    expect(screen.getByRole("tab", { name: "PR discussion 3" })).toBeVisible();
+  });
+
+  it("shows existing conversation, review, and inline comments in the discussion tab", async () => {
+    const session = new ReviewSession(pullRequest, patch, review, new AppGateway(), discussion);
+    const serverApp = createApp({ html: "<html></html>", favicon: "<svg></svg>", token: "secret", session });
+    vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+      const value = input instanceof Request ? input.url : input.toString();
+      const url = new URL(value, "http://reviewonator.local");
+      return serverApp.request(`${url.pathname}${url.search}`, init);
+    });
+    window.location.hash = "secret";
+    render(createElement(App));
+
+    fireEvent.click(await screen.findByRole("tab", { name: "PR discussion 3" }));
+
+    expect(screen.getByRole("heading", { name: "Existing discussion" })).toBeVisible();
+    expect(screen.getByText("maintainer")).toBeVisible();
+    expect(screen.getByText("regression test")).toBeVisible();
+    expect(screen.getByText("Requested changes")).toBeVisible();
+    expect(screen.getByRole("button", { name: "src/example.ts:2" })).toBeVisible();
+    expect(screen.getAllByRole("link", { name: /Open .* comment on GitHub/ })).toHaveLength(3);
   });
 });
 

@@ -11,7 +11,7 @@ class FakeGitHub implements GitHubGateway {
   contextCalls = 0;
 
   async verifyPrerequisites() {}
-  async loadPullRequest(): Promise<LoadedPullRequest> { return { pullRequest, patch }; }
+  async loadPullRequest(): Promise<LoadedPullRequest> { return { pullRequest, patch, discussion: [] }; }
   async getHeadSha() { return this.headSha; }
   async loadFileContext() {
     this.contextCalls += 1;

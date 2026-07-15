@@ -84,6 +84,7 @@ describe("Reviewonator CLI end-to-end", () => {
     const { baseUrl, token } = await process.ready;
     const session = await authenticatedFetch(baseUrl, token, "/api/session");
     expect(session.status).toBe(200);
+    expect((await session.json()).discussion).toHaveLength(3);
 
     const revision = await authenticatedFetch(baseUrl, token, "/api/revision", {
       method: "POST",

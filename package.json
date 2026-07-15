@@ -1,6 +1,6 @@
 {
   "name": "reviewonator",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A local human-in-the-loop interface for AI-generated GitHub pull request reviews.",
   "private": true,
   "license": "MIT",
@@ -40,6 +40,8 @@
     "lucide-react": "^1.24.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.6.0",
     "zod": "^4.4.3"
   },

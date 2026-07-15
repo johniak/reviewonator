@@ -1,0 +1,10 @@
+[[
+  {
+    "id": 11,
+    "user": { "login": "security-reviewer", "avatar_url": null },
+    "body": "The retry behavior still needs one correction before merge.",
+    "state": "CHANGES_REQUESTED",
+    "submitted_at": "2026-07-14T12:25:00Z",
+    "html_url": "https://github.com/acme/widgets/pull/42#pullrequestreview-11"
+  }
+]]

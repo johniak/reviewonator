@@ -20,6 +20,7 @@ import type { ReviewComment, ReviewEvent } from "../src/domain/review";
 import { api } from "./api";
 import { DiffPanel, fileSectionId } from "./components/DiffPanel";
 import { PublishDialog } from "./components/PublishDialog";
+import { PullRequestDiscussion } from "./components/PullRequestDiscussion";
 import { commentCardId, ReviewCommentCard } from "./components/ReviewCommentCard";
 import { ReviewFindingNavigation } from "./components/ReviewFindingNavigation";
 import type { SessionSnapshot } from "./types";
@@ -43,6 +44,7 @@ export function App() {
   const [publishing, setPublishing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [completion, setCompletion] = useState<Completion | null>(null);
+  const [panelTab, setPanelTab] = useState<"review" | "discussion">("review");
 
   useEffect(() => {
     api.loadSession()
@@ -255,34 +257,63 @@ export function App() {
         </main>
 
         <aside className="review-panel">
-          <section className="review-summary">
-            <span className="eyebrow">Claude's assessment</span>
-            <h2>Review summary</h2>
-            <p>{review.summary}</p>
-            <div className="recommendation">
-              <MessageSquareText size={16} />
-              Recommended decision
-              <strong>{formatEvent(review.recommendation)}</strong>
-            </div>
-          </section>
+          <div className="review-panel-tabs" role="tablist" aria-label="Review panel">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={panelTab === "review"}
+              className={panelTab === "review" ? "active" : ""}
+              onClick={() => setPanelTab("review")}
+            >
+              Proposed review <span>{comments.length}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={panelTab === "discussion"}
+              className={panelTab === "discussion" ? "active" : ""}
+              onClick={() => setPanelTab("discussion")}
+            >
+              PR discussion <span>{session.discussion.length}</span>
+            </button>
+          </div>
 
-          <section className="general-comments">
-            <div className="section-title-row">
-              <h3>General comments</h3>
-              <span>{generalComments.length}</span>
-            </div>
-            {generalComments.length === 0 ? (
-              <p className="muted-copy">Claude did not add any general comments.</p>
-            ) : generalComments.map((comment) => (
-              <ReviewCommentCard
-                key={comment.id}
-                comment={comment}
-                compact
-                focused={comment.id === focusedCommentId}
-                {...actions}
-              />
-            ))}
-          </section>
+          <div className="review-panel-content">
+            {panelTab === "review" ? (
+              <>
+                <section className="review-summary">
+                  <span className="eyebrow">Claude's assessment</span>
+                  <h2>Review summary</h2>
+                  <p>{review.summary}</p>
+                  <div className="recommendation">
+                    <MessageSquareText size={16} />
+                    Recommended decision
+                    <strong>{formatEvent(review.recommendation)}</strong>
+                  </div>
+                </section>
+
+                <section className="general-comments">
+                  <div className="section-title-row">
+                    <h3>General comments</h3>
+                    <span>{generalComments.length}</span>
+                  </div>
+                  {generalComments.length === 0 ? (
+                    <p className="muted-copy">Claude did not add any general comments.</p>
+                  ) : generalComments.map((comment) => (
+                    <ReviewCommentCard
+                      key={comment.id}
+                      comment={comment}
+                      compact
+                      focused={comment.id === focusedCommentId}
+                      {...actions}
+                    />
+                  ))}
+                </section>
+              </>
+            ) : (
+              <PullRequestDiscussion items={session.discussion} onSelectFile={selectFile} />
+            )}
+          </div>
 
           <footer className="review-actions-panel">
             <div className="selection-summary">

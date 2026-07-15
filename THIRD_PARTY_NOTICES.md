@@ -12,6 +12,8 @@ Notable direct runtime dependencies include:
 | `hono` | MIT | <https://hono.dev/> |
 | `lucide-react` | ISC, with icons derived from Feather under MIT | <https://lucide.dev/> |
 | `react` and `react-dom` | MIT | <https://react.dev/> |
+| `react-markdown` | MIT | <https://github.com/remarkjs/react-markdown> |
+| `remark-gfm` | MIT | <https://github.com/remarkjs/remark-gfm> |
 | `tailwind-merge` | MIT | <https://github.com/dcastil/tailwind-merge> |
 | `zod` | MIT | <https://zod.dev/> |
 

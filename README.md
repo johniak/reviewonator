@@ -15,6 +15,7 @@ The first integration targets Claude Code. The data format and application bound
 ## Why Reviewonator?
 
 - Review findings appear next to the exact changed lines, with clearly visible severity levels.
+- Read existing conversation comments, submitted reviews, and inline review comments without leaving the diff workspace.
 - Browse one file at a time or scroll through all changed files.
 - Switch between unified and side-by-side diffs.
 - Expand context beyond the patch without exposing a GitHub token to the browser.

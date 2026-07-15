@@ -1,10 +1,12 @@
 import { pullRequestSchema, parsePullRequestUrl, type PullRequest } from "../domain/pull-request";
+import { parsePullRequestDiscussion, type PullRequestDiscussionItem } from "../domain/discussion";
 import type { PublishRequest, ReviewComment } from "../domain/review";
 import type { CommandRunner } from "../platform/command";
 
 export type LoadedPullRequest = {
   pullRequest: PullRequest;
   patch: string;
+  discussion: PullRequestDiscussionItem[];
 };
 
 export type PublishedReview = {
@@ -46,17 +48,31 @@ export class GitHubClient implements GitHubGateway {
   }
 
   async loadPullRequest(prUrl: string): Promise<LoadedPullRequest> {
+    const repository = parsePullRequestUrl(prUrl);
     const fields = [
       "additions", "author", "baseRefName", "baseRefOid", "body", "changedFiles", "commits",
       "deletions", "files", "headRefName", "headRefOid", "number", "title", "url",
     ].join(",");
-    const [metadata, patch] = await Promise.all([
+    const [metadata, patch, conversation, reviews, inline] = await Promise.all([
       this.runGh(["pr", "view", prUrl, "--json", fields], "Could not load pull request metadata."),
       this.runGh(["pr", "diff", prUrl, "--patch"], "Could not load the pull request diff."),
+      this.loadDiscussionPage(
+        `repos/${repository.owner}/${repository.name}/issues/${repository.number}/comments`,
+        "Could not load pull request conversation comments.",
+      ),
+      this.loadDiscussionPage(
+        `repos/${repository.owner}/${repository.name}/pulls/${repository.number}/reviews`,
+        "Could not load existing pull request reviews.",
+      ),
+      this.loadDiscussionPage(
+        `repos/${repository.owner}/${repository.name}/pulls/${repository.number}/comments`,
+        "Could not load inline pull request comments.",
+      ),
     ]);
     return {
       pullRequest: pullRequestSchema.parse(JSON.parse(metadata.stdout)),
       patch: patch.stdout,
+      discussion: parsePullRequestDiscussion(conversation.stdout, reviews.stdout, inline.stdout),
     };
   }
 
@@ -121,6 +137,10 @@ export class GitHubClient implements GitHubGateway {
       throw new Error(`${errorMessage}${detail ? ` ${detail}` : ""}`);
     }
     return result;
+  }
+
+  private loadDiscussionPage(endpoint: string, errorMessage: string) {
+    return this.runGh(["api", "--paginate", "--slurp", endpoint], errorMessage);
   }
 
   private async loadFileVersion(

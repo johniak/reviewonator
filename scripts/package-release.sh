@@ -70,6 +70,8 @@ copy_dependency_license "hono" "LICENSE" "hono-MIT.txt"
 copy_dependency_license "lucide-react" "LICENSE" "lucide-react-ISC-and-MIT.txt"
 copy_dependency_license "react" "LICENSE" "react-MIT.txt"
 copy_dependency_license "react-dom" "LICENSE" "react-dom-MIT.txt"
+copy_dependency_license "react-markdown" "license" "react-markdown-MIT.txt"
+copy_dependency_license "remark-gfm" "license" "remark-gfm-MIT.txt"
 copy_dependency_license "tailwind-merge" "LICENSE.md" "tailwind-merge-MIT.txt"
 copy_dependency_license "zod" "LICENSE" "zod-MIT.txt"
 

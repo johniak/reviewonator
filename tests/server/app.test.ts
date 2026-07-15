@@ -4,11 +4,11 @@ import type { PublishRequest, ReviewComment } from "../../src/domain/review";
 import type { GitHubGateway, LoadedPullRequest, PublishedReview } from "../../src/github/client";
 import { createApp } from "../../src/server/app";
 import { ReviewSession } from "../../src/server/session";
-import { patch, pullRequest, review } from "../fixtures";
+import { discussion, patch, pullRequest, review } from "../fixtures";
 
 class AppGitHub implements GitHubGateway {
   async verifyPrerequisites() {}
-  async loadPullRequest(): Promise<LoadedPullRequest> { return { pullRequest, patch }; }
+  async loadPullRequest(): Promise<LoadedPullRequest> { return { pullRequest, patch, discussion }; }
   async getHeadSha() { return pullRequest.headRefOid; }
   async loadFileContext() { return { oldContent: "old file", newContent: "new file" }; }
   async publishReview(_pr: PullRequest, _request: PublishRequest, _comments: ReviewComment[]): Promise<PublishedReview> {
@@ -17,7 +17,7 @@ class AppGitHub implements GitHubGateway {
 }
 
 function testApp() {
-  const session = new ReviewSession(pullRequest, patch, review, new AppGitHub());
+  const session = new ReviewSession(pullRequest, patch, review, new AppGitHub(), discussion);
   return { app: createApp({ html: "<html>Reviewonator</html>", favicon: "<svg>R</svg>", token: "secret", session }), session };
 }
 
@@ -47,6 +47,8 @@ describe("Reviewonator HTTP API", () => {
     const response = await app.request("/api/session", { headers: { authorization: "Bearer secret" } });
     expect(response.status).toBe(200);
     expect((await response.json()).review.comments).toHaveLength(2);
+    expect((await (await app.request("/api/session", { headers: { authorization: "Bearer secret" } })).json()).discussion)
+      .toHaveLength(3);
   });
 
   it("rejects a publication without explicit confirmation", async () => {
