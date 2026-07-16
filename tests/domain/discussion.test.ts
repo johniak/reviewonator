@@ -62,4 +62,29 @@ describe("pull request discussion", () => {
     expect(discussion).toHaveLength(1);
     expect(discussion[0]).toMatchObject({ body: "", state: "APPROVED" });
   });
+
+  it("accepts current inline comments when GitHub omits original_side", () => {
+    const discussion = parsePullRequestDiscussion("[[]]", "[[]]", JSON.stringify([[
+      {
+        id: 3_588_389_185,
+        user: { login: "reviewer", avatar_url: null },
+        body: "Inline comment",
+        created_at: "2026-07-16T09:00:00Z",
+        html_url: "https://github.com/acme/widgets/pull/42#discussion_r3588389185",
+        path: "src/components/SelectFilter.tsx",
+        line: 35,
+        original_line: 35,
+        side: "RIGHT",
+        position: 10,
+      },
+    ]]));
+
+    expect(discussion).toHaveLength(1);
+    expect(discussion[0]).toMatchObject({
+      id: "inline-3588389185",
+      path: "src/components/SelectFilter.tsx",
+      line: 35,
+      side: "RIGHT",
+    });
+  });
 });

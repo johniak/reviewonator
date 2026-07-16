@@ -32,7 +32,7 @@ const inlineCommentSchema = z.object({
   line: z.number().nullable(),
   original_line: z.number().nullable(),
   side: z.string().nullable(),
-  original_side: z.string().nullable(),
+  original_side: z.string().nullable().optional(),
   position: z.number().nullable().optional(),
   in_reply_to_id: z.number().optional(),
 });
