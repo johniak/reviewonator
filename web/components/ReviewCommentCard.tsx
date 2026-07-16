@@ -5,12 +5,14 @@ import { SeverityBadge } from "./SeverityBadge";
 
 type Props = CommentActions & {
   comment: ReviewComment;
+  reviewerLanguage?: string;
   compact?: boolean;
   focused?: boolean;
 };
 
 export function ReviewCommentCard({
   comment,
+  reviewerLanguage = "English",
   compact = false,
   focused = false,
   selectedIds,
@@ -36,9 +38,9 @@ export function ReviewCommentCard({
       <div className="reviewer-explanation">
         <div className="reviewer-explanation-heading">
           <span><EyeOff aria-hidden="true" size={13} /> For reviewer only</span>
-          <small>Private · Polish</small>
+          <small>Private · {reviewerLanguage}</small>
         </div>
-        <p lang="pl">{comment.reviewerExplanation}</p>
+        <p>{comment.reviewerExplanation}</p>
       </div>
       <div className="comment-actions">
         <button

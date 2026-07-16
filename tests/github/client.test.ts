@@ -70,7 +70,8 @@ describe("GitHubClient", () => {
     const loaded = await new GitHubClient(runner).loadPullRequest(pullRequest.url);
     expect(loaded).toEqual({ pullRequest, patch, discussion });
     expect(runner.calls[0].args.slice(0, 3)).toEqual(["pr", "view", pullRequest.url]);
-    expect(runner.calls[1].args).toEqual(["pr", "diff", pullRequest.url, "--patch"]);
+    expect(runner.calls[1].args).toEqual(["pr", "diff", pullRequest.url, "--color", "never"]);
+    expect(runner.calls[1].args).not.toContain("--patch");
     expect(runner.calls.slice(2).map(({ args }) => args)).toEqual([
       ["api", "--paginate", "--slurp", "repos/acme/widgets/issues/42/comments"],
       ["api", "--paginate", "--slurp", "repos/acme/widgets/pulls/42/reviews"],
@@ -112,22 +113,43 @@ describe("GitHubClient", () => {
     const runner = new RecordingRunner([success("old contents"), success("new contents")]);
     const context = await new GitHubClient(runner).loadFileContext(pullRequest, {
       path: "src/example.ts",
-      oldObjectId: "1111111",
-      newObjectId: "2222222",
+      oldObjectId: "1111111111111111111111111111111111111111",
+      newObjectId: "2222222222222222222222222222222222222222",
     });
 
     expect(context).toEqual({ oldContent: "old contents", newContent: "new contents" });
     expect(runner.calls.map(({ args }) => args)).toEqual([
       [
         "api", "-H", "Accept: application/vnd.github.raw+json", "--cache", "1h",
-        "repos/acme/widgets/git/blobs/1111111",
+        "repos/acme/widgets/git/blobs/1111111111111111111111111111111111111111",
       ],
       [
         "api", "-H", "Accept: application/vnd.github.raw+json", "--cache", "1h",
-        "repos/acme/widgets/git/blobs/2222222",
+        "repos/acme/widgets/git/blobs/2222222222222222222222222222222222222222",
       ],
     ]);
     expect(runner.calls.flatMap(({ args }) => args)).not.toContain("auth");
+  });
+
+  it("loads abbreviated diff object ids through the contents endpoint", async () => {
+    const runner = new RecordingRunner([success("old contents"), success("new contents")]);
+    const context = await new GitHubClient(runner).loadFileContext(pullRequest, {
+      path: "src/example file.ts",
+      oldObjectId: "11111111111",
+      newObjectId: "22222222222",
+    });
+
+    expect(context).toEqual({ oldContent: "old contents", newContent: "new contents" });
+    expect(runner.calls.map(({ args }) => args)).toEqual([
+      [
+        "api", "-H", "Accept: application/vnd.github.raw+json", "--cache", "1h",
+        "repos/acme/widgets/contents/src/example%20file.ts?ref=base-sha",
+      ],
+      [
+        "api", "-H", "Accept: application/vnd.github.raw+json", "--cache", "1h",
+        "repos/acme/widgets/contents/src/example%20file.ts?ref=head-sha",
+      ],
+    ]);
   });
 
   it("surfaces gh stderr without hiding the actionable failure", async () => {

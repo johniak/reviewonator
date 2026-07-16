@@ -12,6 +12,10 @@ Reviewonator turns an AI-generated pull request review into a focused, local rev
 
 The first integration targets Claude Code. The data format and application boundary are designed so other agents, including Codex, can be added later.
 
+<p align="center">
+  <img src="docs/assets/reviewonator-demo.jpg" width="1280" alt="Reviewonator showing AI review findings alongside a pull request diff">
+</p>
+
 ## Why Reviewonator?
 
 - Review findings appear next to the exact changed lines, with clearly visible severity levels.
@@ -53,6 +57,8 @@ cd reviewonator
 ./scripts/install.sh
 ```
 
+The installer asks which language Claude should use for comments published to GitHub and which language it should use for private reviewer notes. Both default to English.
+
 When a local build is not present, the installer downloads the latest binary for your platform from GitHub Releases. It installs:
 
 - the executable in `~/.local/bin/reviewonator`;
@@ -63,8 +69,12 @@ Make sure `~/.local/bin` is on your `PATH`. Custom locations are supported:
 ```sh
 ./scripts/install.sh \
   --bin-dir "$HOME/bin" \
-  --skill-dir "$HOME/.claude/skills"
+  --skill-dir "$HOME/.claude/skills" \
+  --comment-language English \
+  --reviewer-language English
 ```
+
+The language flags, or the `REVIEWONATOR_COMMENT_LANGUAGE` and `REVIEWONATOR_REVIEWER_LANGUAGE` environment variables, make non-interactive installations deterministic.
 
 To install from a source checkout instead:
 

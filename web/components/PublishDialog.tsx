@@ -8,6 +8,7 @@ import { SeverityBadge } from "./SeverityBadge";
 type Props = {
   open: boolean;
   comments: ReviewComment[];
+  reviewerLanguage?: string;
   initialBody: string;
   initialEvent: ReviewEvent;
   publishing: boolean;
@@ -25,6 +26,7 @@ const eventLabels: Record<ReviewEvent, { label: string; description: string }> =
 export function PublishDialog({
   open,
   comments,
+  reviewerLanguage = "English",
   initialBody,
   initialEvent,
   publishing,
@@ -93,7 +95,7 @@ export function PublishDialog({
               </div>
               <p className="private-content-note">
                 <EyeOff aria-hidden="true" size={14} />
-                Private Polish explanations are excluded from this GitHub review.
+                Private {reviewerLanguage} explanations are excluded from this GitHub review.
               </p>
               {comments.length === 0 ? (
                 <p className="muted-copy">No inline or general comments are selected.</p>

@@ -4,12 +4,14 @@ set -eu
 BIN_DIR=${REVIEWONATOR_BIN_DIR:-"$HOME/.local/bin"}
 SKILL_ROOT=${REVIEWONATOR_SKILL_DIR:-"$HOME/.claude/skills"}
 REPOSITORY=${REVIEWONATOR_REPOSITORY:-}
+COMMENT_LANGUAGE=${REVIEWONATOR_COMMENT_LANGUAGE:-}
+REVIEWER_LANGUAGE=${REVIEWONATOR_REVIEWER_LANGUAGE:-}
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 PROJECT_DIR=$(dirname "$SCRIPT_DIR")
 TEMP_DIR=""
 
 usage() {
-  printf '%s\n' "Usage: install.sh [--bin-dir DIR] [--skill-dir DIR] [--repository OWNER/REPO]"
+  printf '%s\n' "Usage: install.sh [--bin-dir DIR] [--skill-dir DIR] [--repository OWNER/REPO] [--comment-language LANGUAGE] [--reviewer-language LANGUAGE]"
 }
 
 while [ "$#" -gt 0 ]; do
@@ -17,6 +19,8 @@ while [ "$#" -gt 0 ]; do
     --bin-dir) BIN_DIR=$2; shift 2 ;;
     --skill-dir) SKILL_ROOT=$2; shift 2 ;;
     --repository) REPOSITORY=$2; shift 2 ;;
+    --comment-language) COMMENT_LANGUAGE=$2; shift 2 ;;
+    --reviewer-language) REVIEWER_LANGUAGE=$2; shift 2 ;;
     --help|-h) usage; exit 0 ;;
     *) printf 'Unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
   esac
@@ -26,6 +30,25 @@ if ! command -v gh >/dev/null 2>&1; then
   printf '%s\n' "GitHub CLI is required. Install it from https://cli.github.com/" >&2
   exit 1
 fi
+
+choose_language() {
+  prompt=$1
+  default=$2
+  configured=$3
+  if [ -n "$configured" ]; then
+    printf '%s' "$configured"
+    return
+  fi
+  answer=""
+  if [ -t 0 ] || [ "${REVIEWONATOR_INTERACTIVE:-}" = "1" ]; then
+    printf '%s [%s]: ' "$prompt" "$default" >&2
+    IFS= read -r answer || answer=""
+  fi
+  printf '%s' "${answer:-$default}"
+}
+
+COMMENT_LANGUAGE=$(choose_language "Language for comments published to GitHub" "English" "$COMMENT_LANGUAGE")
+REVIEWER_LANGUAGE=$(choose_language "Language for private reviewer notes" "English" "$REVIEWER_LANGUAGE")
 
 cleanup() {
   if [ -n "$TEMP_DIR" ] && [ -d "$TEMP_DIR" ]; then
@@ -104,10 +127,19 @@ install -m 755 "$BINARY_SOURCE" "$BIN_PATH"
 printf '%s\n' "Installed by Reviewonator" > "$BIN_MARKER"
 if [ -d "$SKILL_PATH" ]; then rm -rf "$SKILL_PATH"; fi
 cp -R "$SKILL_SOURCE" "$SKILL_PATH"
+mkdir -p "$SKILL_PATH/references"
+{
+  printf '%s\n\n' "# Review languages"
+  printf -- '- Write public pull request comments and the review summary in %s.\n' "$COMMENT_LANGUAGE"
+  printf -- '- Write private reviewer explanations in %s.\n' "$REVIEWER_LANGUAGE"
+  printf '%s\n' '- Use natural equivalents of `What:` and `Why:` in the reviewer-note language.'
+} > "$SKILL_PATH/references/languages.md"
 printf '%s\n' "Installed by Reviewonator" > "$SKILL_MARKER"
 
 printf 'Installed Reviewonator executable: %s\n' "$BIN_PATH"
 printf 'Installed Claude Code skill: %s\n' "$SKILL_PATH"
+printf 'GitHub comment language: %s\n' "$COMMENT_LANGUAGE"
+printf 'Private reviewer note language: %s\n' "$REVIEWER_LANGUAGE"
 case ":$PATH:" in
   *":$BIN_DIR:"*) ;;
   *) printf 'Add %s to PATH before using /reviewonator.\n' "$BIN_DIR" ;;

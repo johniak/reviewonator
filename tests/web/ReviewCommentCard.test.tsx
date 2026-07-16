@@ -6,11 +6,12 @@ import { ReviewCommentCard } from "../../web/components/ReviewCommentCard";
 import { review } from "../fixtures";
 
 describe("ReviewCommentCard", () => {
-  it("separates the canonical comment from private Polish reviewer context", () => {
+  it("separates the canonical comment from private reviewer context in the configured language", () => {
     const comment = review.comments[0];
     render(
       <ReviewCommentCard
         comment={comment}
+        reviewerLanguage="German"
         focused
         selectedIds={new Set([comment.id])}
         revisionMessages={{}}
@@ -19,9 +20,9 @@ describe("ReviewCommentCard", () => {
       />,
     );
     expect(screen.getByText(comment.body)).toBeVisible();
-    expect(screen.getByText(comment.reviewerExplanation)).toHaveAttribute("lang", "pl");
+    expect(screen.getByText(comment.reviewerExplanation)).toBeVisible();
     expect(screen.getByText("For reviewer only")).toBeVisible();
-    expect(screen.getByText("Private · Polish")).toBeVisible();
+    expect(screen.getByText("Private · German")).toBeVisible();
     expect(screen.getByRole("article")).toHaveClass("comment-severity-bug");
     expect(screen.getByRole("article")).toHaveClass("comment-focused");
     expect(screen.getByRole("article")).toHaveAttribute("id", "review-comment-S1");

@@ -11,6 +11,7 @@ describe("PublishDialog", () => {
       <PublishDialog
         open
         comments={review.comments}
+        reviewerLanguage="German"
         initialBody={review.summary}
         initialEvent="REQUEST_CHANGES"
         publishing={false}
@@ -26,7 +27,7 @@ describe("PublishDialog", () => {
     expect(screen.getByText("General comment")).toBeVisible();
     expect(screen.getByText(review.comments[0].body)).toBeVisible();
     expect(screen.queryByText(review.comments[0].reviewerExplanation)).not.toBeInTheDocument();
-    expect(screen.getByText(/Private Polish explanations are excluded/)).toBeVisible();
+    expect(screen.getByText(/Private German explanations are excluded/)).toBeVisible();
 
     await userEvent.click(screen.getByRole("radio", { name: /Approve/ }));
     await userEvent.click(screen.getByRole("checkbox", { name: /I confirm/ }));

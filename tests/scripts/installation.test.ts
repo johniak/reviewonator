@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { chmod, cp, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,6 +6,23 @@ import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 
 const run = promisify(execFile);
+
+function runWithInput(file: string, args: string[], input: string): Promise<{ stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(file, args, {
+      env: { ...process.env, REVIEWONATOR_INTERACTIVE: "1" },
+      stdio: ["pipe", "ignore", "pipe"],
+    });
+    let stderr = "";
+    child.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
+    child.once("error", reject);
+    child.once("exit", (code) => {
+      if (code === 0) resolve({ stderr });
+      else reject(new Error(`Installer exited with ${code}: ${stderr}`));
+    });
+    child.stdin.end(input);
+  });
+}
 
 async function installationFixture() {
   const root = await mkdtemp(join(tmpdir(), "reviewonator-install-test-"));
@@ -31,6 +48,10 @@ describe("installation scripts", () => {
 
     expect(await readFile(join(fixture.binDir, "reviewonator"), "utf8")).toContain("reviewonator");
     expect(await readFile(join(fixture.skillDir, "reviewonator", "SKILL.md"), "utf8")).toContain("name: reviewonator");
+    expect(await readFile(join(fixture.skillDir, "reviewonator", "references", "languages.md"), "utf8"))
+      .toContain("review summary in English");
+    expect(await readFile(join(fixture.skillDir, "reviewonator", "references", "languages.md"), "utf8"))
+      .toContain("reviewer explanations in English");
 
     await run(join(fixture.project, "scripts", "uninstall.sh"), options);
     await expect(readFile(join(fixture.binDir, "reviewonator"))).rejects.toThrow();
@@ -46,6 +67,40 @@ describe("installation scripts", () => {
       "--skill-dir", fixture.skillDir,
     ])).rejects.toMatchObject({ code: 1 });
     expect(await readFile(join(fixture.binDir, "reviewonator"), "utf8")).toBe("user-owned");
+  });
+
+  it("writes non-interactive language choices into the installed skill", async () => {
+    const fixture = await installationFixture();
+    await run(join(fixture.project, "scripts", "install.sh"), [
+      "--bin-dir", fixture.binDir,
+      "--skill-dir", fixture.skillDir,
+      "--comment-language", "German",
+      "--reviewer-language", "French",
+    ]);
+
+    const languages = await readFile(
+      join(fixture.skillDir, "reviewonator", "references", "languages.md"),
+      "utf8",
+    );
+    expect(languages).toContain("review summary in German");
+    expect(languages).toContain("reviewer explanations in French");
+  });
+
+  it("prompts for both languages during an interactive installation", async () => {
+    const fixture = await installationFixture();
+    const result = await runWithInput(join(fixture.project, "scripts", "install.sh"), [
+      "--bin-dir", fixture.binDir,
+      "--skill-dir", fixture.skillDir,
+    ], "Spanish\nUkrainian\n");
+
+    expect(result.stderr).toContain("Language for comments published to GitHub [English]");
+    expect(result.stderr).toContain("Language for private reviewer notes [English]");
+    const languages = await readFile(
+      join(fixture.skillDir, "reviewonator", "references", "languages.md"),
+      "utf8",
+    );
+    expect(languages).toContain("review summary in Spanish");
+    expect(languages).toContain("reviewer explanations in Ukrainian");
   });
 });
 
@@ -64,6 +119,7 @@ describe("release packaging", () => {
     expect(stdout.split("\n")).toEqual(expect.arrayContaining([
       "./reviewonator",
       "./reviewonator-skill/SKILL.md",
+      "./reviewonator-skill/references/languages.md",
       "./LICENSE",
       "./THIRD_PARTY_NOTICES.md",
       "./third-party-licenses/pierre-diffs-Apache-2.0.txt",

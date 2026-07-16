@@ -55,7 +55,7 @@ export class GitHubClient implements GitHubGateway {
     ].join(",");
     const [metadata, patch, conversation, reviews, inline] = await Promise.all([
       this.runGh(["pr", "view", prUrl, "--json", fields], "Could not load pull request metadata."),
-      this.runGh(["pr", "diff", prUrl, "--patch"], "Could not load the pull request diff."),
+      this.runGh(["pr", "diff", prUrl, "--color", "never"], "Could not load the pull request diff."),
       this.loadDiscussionPage(
         `repos/${repository.owner}/${repository.name}/issues/${repository.number}/comments`,
         "Could not load pull request conversation comments.",
@@ -149,7 +149,11 @@ export class GitHubClient implements GitHubGateway {
     path: string,
     ref: string,
   ): Promise<string | null> {
-    if (objectId && !/^0+$/.test(objectId)) {
+    if (!objectId || /^0+$/.test(objectId)) {
+      return null;
+    }
+
+    if (/^[0-9a-f]{40}$/i.test(objectId)) {
       const blob = await this.runner.run("gh", [
         "api",
         "-H", "Accept: application/vnd.github.raw+json",
@@ -160,8 +164,6 @@ export class GitHubClient implements GitHubGateway {
       if (!isNotFound(blob)) {
         throw new Error(`Could not load ${path} from GitHub. ${blob.stderr.trim()}`);
       }
-    } else {
-      return null;
     }
 
     const encodedPath = path.split("/").map(encodeURIComponent).join("/");

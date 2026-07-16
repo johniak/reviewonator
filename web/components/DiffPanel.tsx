@@ -16,6 +16,7 @@ type Props = CommentActions & {
   activePath: string;
   fileUrls: Record<string, string>;
   comments: ReviewComment[];
+  reviewerLanguage?: string;
   focusedCommentId: string | null;
   viewMode: "single" | "all";
   onViewModeChange: (mode: "single" | "all") => void;
@@ -29,6 +30,7 @@ export function DiffPanel({
   activePath,
   fileUrls,
   comments,
+  reviewerLanguage = "English",
   focusedCommentId,
   viewMode,
   onViewModeChange,
@@ -124,6 +126,7 @@ export function DiffPanel({
               file={file}
               fileUrl={fileUrls[file.name]}
               annotations={lineAnnotations}
+              reviewerLanguage={reviewerLanguage}
               focusedCommentId={focusedCommentId}
               actions={actions}
               diffStyle={diffStyle}
@@ -144,6 +147,7 @@ function FileDiffCard({
   file,
   fileUrl,
   annotations,
+  reviewerLanguage,
   focusedCommentId,
   actions,
   diffStyle,
@@ -152,6 +156,7 @@ function FileDiffCard({
   file: FileDiffMetadata;
   fileUrl: string | undefined;
   annotations: DiffLineAnnotation<ReviewComment>[];
+  reviewerLanguage: string;
   focusedCommentId: string | null;
   actions: CommentActions;
   diffStyle: "unified" | "split";
@@ -219,6 +224,7 @@ function FileDiffCard({
         <RenderedFileDiff
           file={expandableFile}
           annotations={annotations}
+          reviewerLanguage={reviewerLanguage}
           focusedCommentId={focusedCommentId}
           actions={actions}
           diffStyle={diffStyle}
@@ -252,12 +258,14 @@ export function buildExpandableDiff(file: FileDiffMetadata, context: FileContext
 function RenderedFileDiff({
   file,
   annotations,
+  reviewerLanguage,
   focusedCommentId,
   actions,
   diffStyle,
 }: {
   file: FileDiffMetadata;
   annotations: DiffLineAnnotation<ReviewComment>[];
+  reviewerLanguage: string;
   focusedCommentId: string | null;
   actions: CommentActions;
   diffStyle: "unified" | "split";
@@ -279,6 +287,7 @@ function RenderedFileDiff({
       renderAnnotation={(annotation) => annotation.metadata
         ? <ReviewCommentCard
             comment={annotation.metadata}
+            reviewerLanguage={reviewerLanguage}
             focused={annotation.metadata.id === focusedCommentId}
             {...actions}
           />

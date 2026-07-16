@@ -1,6 +1,10 @@
 {
   "version": 2,
   "prUrl": "https://github.com/acme/widgets/pull/42",
+  "languages": {
+    "comments": "English",
+    "reviewerNotes": "Polish"
+  },
   "summary": "The implementation is close, but the new retry path can execute the same payment twice after a network timeout.",
   "recommendation": "REQUEST_CHANGES",
   "comments": [

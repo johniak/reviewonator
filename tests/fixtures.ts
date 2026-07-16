@@ -72,6 +72,7 @@ export const discussion: PullRequestDiscussionItem[] = [
 export const review: ReviewDocument = {
   version: 2,
   prUrl,
+  languages: { comments: "English", reviewerNotes: "Polish" },
   summary: "The change needs one correction before it is safe to merge.",
   recommendation: "REQUEST_CHANGES",
   comments: [

@@ -4,9 +4,16 @@ import { z } from "zod";
 export const severities = ["security", "bug", "warning", "suggestion", "nit"] as const;
 export const reviewEvents = ["COMMENT", "APPROVE", "REQUEST_CHANGES"] as const;
 const reviewerExplanationSchema = z.string().trim().min(1).max(65_535).refine(
-  (value) => /^Co:\s+.+\s+Dlaczego:\s+.+$/s.test(value),
-  { message: "Reviewer explanations must use: Co: ... Dlaczego: ..." },
+  hasWhatAndWhySections,
+  { message: "Reviewer explanations must use localized What: ... Why: ... sections." },
 );
+
+const languageSchema = z.string().trim().min(1).max(80).refine(
+  (value) => !/[\r\n]/.test(value),
+  { message: "Language names must fit on one line." },
+);
+
+const defaultLanguages = { comments: "English", reviewerNotes: "English" } as const;
 
 export const reviewCommentSchema = z.object({
   id: z.string().trim().min(1).max(80),
@@ -37,6 +44,10 @@ export const reviewDocumentSchema = z.object({
   prUrl: z.url().refine((value) => /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+\/?$/.test(value), {
     message: "Expected a GitHub pull request URL.",
   }),
+  languages: z.object({
+    comments: languageSchema,
+    reviewerNotes: languageSchema,
+  }).default(defaultLanguages),
   summary: z.string().trim().max(65_535),
   recommendation: z.enum(reviewEvents),
   comments: z.array(reviewCommentSchema).max(500),
@@ -76,6 +87,11 @@ export type ReviewDocument = z.infer<typeof reviewDocumentSchema>;
 export type RevisionRequest = z.infer<typeof revisionRequestSchema>;
 export type PublishRequest = z.infer<typeof publishRequestSchema>;
 export type ReviewEvent = (typeof reviewEvents)[number];
+
+function hasWhatAndWhySections(value: string): boolean {
+  const localizedHeading = /(?:^|\s)[\p{L}\p{M}][\p{L}\p{M}\s'’-]{0,38}[:：]\s+\S/gu;
+  return [...value.matchAll(localizedHeading)].length >= 2;
+}
 
 export function validateReviewLocations(review: ReviewDocument, patch: string): void {
   const changedLines = new Map<string, Set<number>>();

@@ -7,6 +7,14 @@ describe("review document", () => {
     expect(reviewDocumentSchema.parse(review)).toEqual(review);
   });
 
+  it("defaults both review languages to English for older documents", () => {
+    const { languages: _, ...withoutLanguages } = review;
+    expect(reviewDocumentSchema.parse(withoutLanguages).languages).toEqual({
+      comments: "English",
+      reviewerNotes: "English",
+    });
+  });
+
   it("rejects duplicate comment ids", () => {
     expect(() => reviewDocumentSchema.parse({
       ...review,
@@ -22,11 +30,17 @@ describe("review document", () => {
     })).toThrow();
   });
 
-  it("requires the Polish explanation to describe what and why", () => {
+  it("requires the reviewer explanation to describe what and why in its configured language", () => {
     expect(() => reviewDocumentSchema.parse({
       ...review,
       comments: [{ ...review.comments[0], reviewerExplanation: "Tylko tłumaczenie komentarza." }],
-    })).toThrow(/Co: \.\.\. Dlaczego:/);
+    })).toThrow(/localized What:/);
+
+    expect(() => reviewDocumentSchema.parse({
+      ...review,
+      languages: { comments: "German", reviewerNotes: "English" },
+      comments: [{ ...review.comments[0], reviewerExplanation: "What: Pass the value from the caller. Why: A constant result ignores the input." }],
+    })).not.toThrow();
   });
 
   it("rejects file locations on general comments", () => {

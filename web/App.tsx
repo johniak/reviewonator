@@ -246,6 +246,7 @@ export function App() {
             activePath={activePath}
             fileUrls={session.fileUrls}
             comments={comments}
+            reviewerLanguage={review.languages.reviewerNotes}
             focusedCommentId={focusedCommentId}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
@@ -303,6 +304,7 @@ export function App() {
                     <ReviewCommentCard
                       key={comment.id}
                       comment={comment}
+                      reviewerLanguage={review.languages.reviewerNotes}
                       compact
                       focused={comment.id === focusedCommentId}
                       {...actions}
@@ -349,6 +351,7 @@ export function App() {
       <PublishDialog
         open={publishOpen}
         comments={selectedComments}
+        reviewerLanguage={review.languages.reviewerNotes}
         initialBody={publishBody}
         initialEvent={review.recommendation}
         publishing={publishing}
