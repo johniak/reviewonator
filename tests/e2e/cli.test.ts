@@ -1,15 +1,17 @@
 // @vitest-environment node
 
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
+import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 
 const fixtureDir = resolve("tests/e2e/fixtures");
 const reviewFile = join(fixtureDir, "review.json");
 const prUrl = "https://github.com/acme/widgets/pull/42";
 const activeChildren = new Set<ReturnType<typeof spawn>>();
+const run = promisify(execFile);
 
 afterEach(() => {
   for (const child of activeChildren) child.kill();
@@ -79,6 +81,13 @@ function waitForExit(child: ReturnType<typeof spawn>): Promise<number | null> {
 }
 
 describe("Reviewonator CLI end-to-end", () => {
+  it("reports the packaged application version", async () => {
+    const packageJson = JSON.parse(await readFile("package.json", "utf8")) as { version: string };
+    const { stdout } = await run("bun", ["src/cli.ts", "--version"], { cwd: process.cwd() });
+
+    expect(stdout).toBe(`Reviewonator ${packageJson.version}\n`);
+  });
+
   it("returns human revision requests to Claude as structured JSON", async () => {
     const process = await startReviewonator();
     const { baseUrl, token } = await process.ready;

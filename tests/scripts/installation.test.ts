@@ -40,11 +40,85 @@ async function installationFixture() {
   return { root, project, binDir, skillDir };
 }
 
+async function updateFixture(installedVersion: string, releaseVersion: string) {
+  const fixture = await installationFixture();
+  const platform = `${process.platform === "darwin" ? "darwin" : "linux"}-${process.arch === "arm64" ? "arm64" : "x64"}`;
+  const payload = join(fixture.root, "payload");
+  const releaseSkill = join(payload, "reviewonator-skill");
+  await mkdir(join(releaseSkill, "references"), { recursive: true });
+  await writeFile(join(payload, "reviewonator"), versionedExecutable(releaseVersion));
+  await chmod(join(payload, "reviewonator"), 0o755);
+  await writeFile(join(releaseSkill, "SKILL.md"), "---\nname: reviewonator\n---\n");
+  await writeFile(join(releaseSkill, "references", "languages.md"), "release defaults\n");
+  const archive = join(fixture.root, `reviewonator-${platform}.tar.gz`);
+  await run("tar", ["-czf", archive, "-C", payload, "."]);
+
+  await mkdir(fixture.binDir, { recursive: true });
+  await mkdir(join(fixture.skillDir, "reviewonator", "references"), { recursive: true });
+  await writeFile(join(fixture.binDir, "reviewonator"), versionedExecutable(installedVersion));
+  await chmod(join(fixture.binDir, "reviewonator"), 0o755);
+  await writeFile(join(fixture.binDir, "reviewonator.reviewonator-managed"), "managed\n");
+  await writeFile(join(fixture.skillDir, "reviewonator", ".reviewonator-managed"), "managed\n");
+  await writeFile(join(fixture.skillDir, "reviewonator", "SKILL.md"), "---\nname: reviewonator\n---\n");
+  await writeFile(
+    join(fixture.skillDir, "reviewonator", "references", "languages.md"),
+    "# Review languages\n\n- Write public pull request comments and the review summary in German.\n- Write private reviewer explanations in French.\n",
+  );
+
+  const fakeBin = join(fixture.root, "fake-bin");
+  await mkdir(fakeBin);
+  await writeFile(join(fakeBin, "gh"), `#!/bin/sh
+set -eu
+if [ "$1 $2" = "release view" ]; then
+  printf 'v%s\\n' "$REVIEWONATOR_TEST_RELEASE_VERSION"
+  exit 0
+fi
+if [ "$1 $2" = "release download" ]; then
+  if [ "\${REVIEWONATOR_TEST_FAIL_DOWNLOAD:-}" = "1" ]; then exit 99; fi
+  pattern=""
+  destination=""
+  shift 3
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --pattern) pattern=$2; shift 2 ;;
+      --dir) destination=$2; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+  cp "$REVIEWONATOR_TEST_ARCHIVE" "$destination/$pattern"
+  exit 0
+fi
+printf 'Unexpected gh arguments: %s\\n' "$*" >&2
+exit 2
+`);
+  await chmod(join(fakeBin, "gh"), 0o755);
+
+  return {
+    ...fixture,
+    env: {
+      ...process.env,
+      PATH: `${fakeBin}:${process.env.PATH}`,
+      REVIEWONATOR_TEST_ARCHIVE: archive,
+      REVIEWONATOR_TEST_RELEASE_VERSION: releaseVersion,
+    },
+  };
+}
+
+function versionedExecutable(version: string): string {
+  return `#!/bin/sh
+if [ "\${1:-}" = "--version" ]; then
+  printf 'Reviewonator ${version}\\n'
+else
+  printf 'reviewonator ${version}\\n'
+fi
+`;
+}
+
 describe("installation scripts", () => {
   it("installs and uninstalls only Reviewonator-managed files", async () => {
     const fixture = await installationFixture();
     const options = ["--bin-dir", fixture.binDir, "--skill-dir", fixture.skillDir];
-    await run(join(fixture.project, "scripts", "install.sh"), options);
+    await run(join(fixture.project, "scripts", "install.sh"), [...options, "--local"]);
 
     expect(await readFile(join(fixture.binDir, "reviewonator"), "utf8")).toContain("reviewonator");
     expect(await readFile(join(fixture.skillDir, "reviewonator", "SKILL.md"), "utf8")).toContain("name: reviewonator");
@@ -65,6 +139,7 @@ describe("installation scripts", () => {
     await expect(run(join(fixture.project, "scripts", "install.sh"), [
       "--bin-dir", fixture.binDir,
       "--skill-dir", fixture.skillDir,
+      "--local",
     ])).rejects.toMatchObject({ code: 1 });
     expect(await readFile(join(fixture.binDir, "reviewonator"), "utf8")).toBe("user-owned");
   });
@@ -74,6 +149,7 @@ describe("installation scripts", () => {
     await run(join(fixture.project, "scripts", "install.sh"), [
       "--bin-dir", fixture.binDir,
       "--skill-dir", fixture.skillDir,
+      "--local",
       "--comment-language", "German",
       "--reviewer-language", "French",
     ]);
@@ -91,6 +167,7 @@ describe("installation scripts", () => {
     const result = await runWithInput(join(fixture.project, "scripts", "install.sh"), [
       "--bin-dir", fixture.binDir,
       "--skill-dir", fixture.skillDir,
+      "--local",
     ], "Spanish\nUkrainian\n");
 
     expect(result.stderr).toContain("Language for comments published to GitHub [English]");
@@ -101,6 +178,50 @@ describe("installation scripts", () => {
     );
     expect(languages).toContain("review summary in Spanish");
     expect(languages).toContain("reviewer explanations in Ukrainian");
+  });
+
+  it("updates an older managed release and preserves its language choices", async () => {
+    const fixture = await updateFixture("0.3.1", "0.4.0");
+    const options = [
+      "--bin-dir", fixture.binDir,
+      "--skill-dir", fixture.skillDir,
+      "--repository", "acme/reviewonator",
+    ];
+    const first = await run(join(fixture.project, "scripts", "install.sh"), options, { env: fixture.env });
+
+    expect(first.stdout).toContain("Updating Reviewonator 0.3.1 to 0.4.0");
+    expect(await run(join(fixture.binDir, "reviewonator"), ["--version"]))
+      .toMatchObject({ stdout: "Reviewonator 0.4.0\n" });
+    const languages = await readFile(
+      join(fixture.skillDir, "reviewonator", "references", "languages.md"),
+      "utf8",
+    );
+    expect(languages).toContain("review summary in German");
+    expect(languages).toContain("reviewer explanations in French");
+
+    const second = await run(join(fixture.project, "scripts", "install.sh"), options, {
+      env: { ...fixture.env, REVIEWONATOR_TEST_FAIL_DOWNLOAD: "1" },
+    });
+    expect(second.stdout).toContain("Reviewonator 0.4.0 is already up to date");
+  });
+
+  it("does not downgrade a newer managed version without --force", async () => {
+    const fixture = await updateFixture("0.5.0", "0.4.0");
+    const options = [
+      "--bin-dir", fixture.binDir,
+      "--skill-dir", fixture.skillDir,
+      "--repository", "acme/reviewonator",
+    ];
+    const kept = await run(join(fixture.project, "scripts", "install.sh"), [...options, "--comment-language", "Spanish"], {
+      env: { ...fixture.env, REVIEWONATOR_TEST_FAIL_DOWNLOAD: "1" },
+    });
+    expect(kept.stdout).toContain("Installed Reviewonator 0.5.0 is newer");
+    expect(await readFile(join(fixture.skillDir, "reviewonator", "references", "languages.md"), "utf8"))
+      .toContain("review summary in Spanish");
+
+    await run(join(fixture.project, "scripts", "install.sh"), [...options, "--force"], { env: fixture.env });
+    expect(await run(join(fixture.binDir, "reviewonator"), ["--version"]))
+      .toMatchObject({ stdout: "Reviewonator 0.4.0\n" });
   });
 });
 

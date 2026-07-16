@@ -1,4 +1,5 @@
 import { parseArgs } from "node:util";
+import packageJson from "../package.json" with { type: "json" };
 import favicon from "../web/favicon.svg" with { type: "text" };
 import appHtml from "../web-dist/index.txt" with { type: "text" };
 import { reviewDocumentSchema, validateReviewLocations } from "./domain/review";
@@ -11,6 +12,7 @@ const help = `Reviewonator — review a GitHub pull request visually
 
 Usage:
   reviewonator <PR_URL> --review-file <PATH> [--no-open] [--port <PORT>]
+  reviewonator --version
 
 Requirements:
   gh must be installed and authenticated.
@@ -22,6 +24,7 @@ async function main(): Promise<void> {
     allowPositionals: true,
     options: {
       help: { type: "boolean", short: "h" },
+      version: { type: "boolean", short: "v" },
       "review-file": { type: "string" },
       "no-open": { type: "boolean", default: false },
       port: { type: "string" },
@@ -30,6 +33,11 @@ async function main(): Promise<void> {
 
   if (values.help) {
     process.stdout.write(help);
+    return;
+  }
+
+  if (values.version) {
+    process.stdout.write(`Reviewonator ${packageJson.version}\n`);
     return;
   }
 

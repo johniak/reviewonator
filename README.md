@@ -81,7 +81,7 @@ To install from a source checkout instead:
 ```sh
 bun install --frozen-lockfile
 bun run build
-./scripts/install.sh
+./scripts/install.sh --local
 ```
 
 The installer and uninstaller use ownership markers and refuse to overwrite or remove files they do not manage.
@@ -107,7 +107,19 @@ An approval may be submitted without a summary. Requesting changes requires at l
 
 ## Update and uninstall
 
-Run the installer again to replace an existing Reviewonator-managed installation with the current build or latest release.
+Run the installer again to check GitHub Releases and update an older managed installation:
+
+```sh
+./scripts/install.sh
+```
+
+The installer reports the installed and latest versions, skips the download when already current, preserves the existing language choices, and refuses to downgrade a newer build. Use `--force` only when you intentionally want to reinstall or downgrade to the latest release. Use `--local` to install the executable and skill from the current source checkout instead of GitHub Releases.
+
+Check the installed version with:
+
+```sh
+reviewonator --version
+```
 
 To remove both installed components:
 
