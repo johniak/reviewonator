@@ -47,7 +47,7 @@ describe("GitHub review body", () => {
     );
   });
 
-  it("starts with every proposed comment excluded", async () => {
+  it("starts with every proposed comment pending and no implicit rejection", async () => {
     const session = new ReviewSession(pullRequest, patch, review, new AppGateway(), discussion);
     const serverApp = createApp({ html: "<html></html>", favicon: "<svg></svg>", token: "secret", session });
     vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
@@ -66,7 +66,10 @@ describe("GitHub review body", () => {
       element?.classList.contains("selection-summary")
       && element.textContent?.replace(/\s+/g, " ").includes("0 of 2 comments selected") === true
     ))).toBeVisible();
-    await waitFor(() => expect(screen.getAllByRole("button", { name: "Excluded" })).toHaveLength(2));
+    await waitFor(() => expect(screen.getAllByRole("button", { name: "Include" })).toHaveLength(2));
+    expect(screen.getAllByRole("button", { name: "Reject" })).toHaveLength(2);
+    expect(screen.getByRole("button", { name: /Bug Pending S1/ })).toBeVisible();
+    expect(screen.getByRole("button", { name: /Warning Pending G1/ })).toBeVisible();
     expect(screen.getByRole("button", { name: "Open src/example.ts" })).toHaveTextContent("example.ts");
     expect(screen.getByRole("button", { name: "Open src/example.ts" })).toHaveTextContent("src");
     expect(screen.getByRole("link", { name: "View pull request on GitHub" })).toHaveAttribute(
@@ -74,6 +77,44 @@ describe("GitHub review body", () => {
       pullRequest.url,
     );
     expect(screen.getByRole("tab", { name: "PR discussion 3" })).toBeVisible();
+  });
+
+  it("restores carried decisions and returns the remaining decisions with revision feedback", async () => {
+    const carriedReview = {
+      ...review,
+      comments: [{ ...review.comments[0], included: true }, { ...review.comments[1], rejected: true }],
+    };
+    const session = new ReviewSession(pullRequest, patch, carriedReview, new AppGateway(), discussion);
+    const serverApp = createApp({ html: "<html></html>", favicon: "<svg></svg>", token: "secret", session });
+    vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+      const value = input instanceof Request ? input.url : input.toString();
+      const url = new URL(value, "http://reviewonator.local");
+      return serverApp.request(`${url.pathname}${url.search}`, init);
+    });
+    window.location.hash = "secret";
+
+    render(createElement(App));
+
+    expect(await screen.findByText((_content, element) => Boolean(
+      element?.classList.contains("selection-summary")
+      && element.textContent?.replace(/\s+/g, " ").includes("1 of 2 comments selected") === true
+    ))).toBeVisible();
+    expect(screen.getByRole("button", { name: /Bug Included S1 src\/example\.ts:2/ })).toBeVisible();
+    expect(screen.getByRole("button", { name: /Warning Rejected G1 General comment/ })).toBeVisible();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Request revision" })[1]);
+    fireEvent.change(screen.getByPlaceholderText("Explain what is inaccurate, unclear, or missing…"), {
+      target: { value: "Make the test recommendation concrete." },
+    });
+    expect(screen.getByRole("button", { name: /Warning Revision G1 General comment/ })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Send 1 request to AI agent" }));
+
+    await expect(session.waitForResult()).resolves.toMatchObject({
+      status: "revision_requested",
+      selectedCommentIds: ["S1"],
+      rejectedCommentIds: [],
+      requests: [{ commentId: "G1", message: "Make the test recommendation concrete." }],
+    });
   });
 
   it("shows existing conversation, review, and inline comments in the discussion tab", async () => {

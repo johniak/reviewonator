@@ -1,10 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { reviewDocumentSchema, validateReviewLocations } from "../../src/domain/review";
+import {
+  revisionRequestSchema,
+  reviewDocumentSchema,
+  validateReviewLocations,
+} from "../../src/domain/review";
 import { patch, review } from "../fixtures";
 
 describe("review document", () => {
   it("accepts a valid structured review", () => {
     expect(reviewDocumentSchema.parse(review)).toEqual(review);
+  });
+
+  it("accepts a carried inclusion decision without changing older comments", () => {
+    const parsed = reviewDocumentSchema.parse({
+      ...review,
+      comments: [{ ...review.comments[0], included: true }, review.comments[1]],
+    });
+
+    expect(parsed.comments[0].included).toBe(true);
+    expect(parsed.comments[1].included).toBeUndefined();
+  });
+
+  it("rejects contradictory carried decisions", () => {
+    expect(() => reviewDocumentSchema.parse({
+      ...review,
+      comments: [{ ...review.comments[0], included: true, rejected: true }],
+    })).toThrow(/both included and rejected/);
   });
 
   it("defaults both review languages to English for older documents", () => {
@@ -50,18 +71,59 @@ describe("review document", () => {
     })).toThrow(/General comments cannot include/);
   });
 
-  it("allows an approval without a summary", () => {
-    expect(reviewDocumentSchema.parse({
-      ...review,
-      summary: "",
-      recommendation: "APPROVE",
-      comments: [],
-    }).summary).toBe("");
+  it.each(["COMMENT", "APPROVE", "REQUEST_CHANGES"] as const)(
+    "allows %s without a review summary",
+    (recommendation) => {
+      expect(reviewDocumentSchema.parse({ ...review, summary: "", recommendation }).summary).toBe("");
+    },
+  );
+
+});
+
+describe("revision request", () => {
+  it("accepts a user-authored comment on either side of a diff line", () => {
+    expect(revisionRequestSchema.parse({
+      newComments: [{
+        path: "src/example.ts",
+        line: 2,
+        side: "RIGHT",
+        message: "This looks like it ignores the input. Check it and write a clear comment.",
+      }],
+    })).toEqual({
+      selectedCommentIds: [],
+      rejectedCommentIds: [],
+      requests: [],
+      newComments: [{
+        path: "src/example.ts",
+        line: 2,
+        side: "RIGHT",
+        message: "This looks like it ignores the input. Check it and write a clear comment.",
+      }],
+    });
   });
 
-  it("requires a summary for non-approval recommendations", () => {
-    expect(() => reviewDocumentSchema.parse({ ...review, summary: "", recommendation: "COMMENT" }))
-      .toThrow(/summary is required unless approving/i);
+  it("rejects an empty request", () => {
+    expect(() => revisionRequestSchema.parse({})).toThrow(/At least one revision or new comment/);
+  });
+
+  it("carries selected comment ids with a revision request", () => {
+    expect(revisionRequestSchema.parse({
+      selectedCommentIds: ["S1"],
+      requests: [{ commentId: "G1", message: "Rewrite this comment." }],
+    }).selectedCommentIds).toEqual(["S1"]);
+  });
+
+  it("carries rejected comment ids and rejects conflicting decisions", () => {
+    expect(revisionRequestSchema.parse({
+      rejectedCommentIds: ["G1"],
+      requests: [{ commentId: "S1", message: "Rewrite this comment." }],
+    }).rejectedCommentIds).toEqual(["G1"]);
+
+    expect(() => revisionRequestSchema.parse({
+      selectedCommentIds: ["S1"],
+      rejectedCommentIds: ["S1"],
+      requests: [{ commentId: "G1", message: "Rewrite this comment." }],
+    })).toThrow(/both selected and rejected/);
   });
 });
 

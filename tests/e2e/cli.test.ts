@@ -88,7 +88,7 @@ describe("Reviewonator CLI end-to-end", () => {
     expect(stdout).toBe(`Reviewonator ${packageJson.version}\n`);
   });
 
-  it("returns human revision requests to Claude as structured JSON", async () => {
+  it("returns human revision requests to the AI agent as structured JSON", async () => {
     const process = await startReviewonator();
     const { baseUrl, token } = await process.ready;
     const session = await authenticatedFetch(baseUrl, token, "/api/session");
@@ -97,13 +97,31 @@ describe("Reviewonator CLI end-to-end", () => {
 
     const revision = await authenticatedFetch(baseUrl, token, "/api/revision", {
       method: "POST",
-      body: JSON.stringify({ requests: [{ commentId: "S1", message: "Verify provider idempotency." }] }),
+      body: JSON.stringify({
+        selectedCommentIds: ["G1"],
+        rejectedCommentIds: ["S2"],
+        requests: [{ commentId: "S1", message: "Verify provider idempotency." }],
+        newComments: [{
+          path: "src/payments/retry.ts",
+          line: 8,
+          side: "RIGHT",
+          message: "Check whether this retry can run forever and rewrite my comment.",
+        }],
+      }),
     });
     expect(revision.status).toBe(200);
     expect(await waitForExit(process.child)).toBe(0);
     expect(JSON.parse(process.output())).toEqual({
       status: "revision_requested",
+      selectedCommentIds: ["G1"],
+      rejectedCommentIds: ["S2"],
       requests: [{ commentId: "S1", message: "Verify provider idempotency." }],
+      newComments: [{
+        path: "src/payments/retry.ts",
+        line: 8,
+        side: "RIGHT",
+        message: "Check whether this retry can run forever and rewrite my comment.",
+      }],
     });
   }, 15_000);
 

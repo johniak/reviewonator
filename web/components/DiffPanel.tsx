@@ -5,13 +5,30 @@ import {
   type FileDiffMetadata,
 } from "@pierre/diffs";
 import { FileDiff } from "@pierre/diffs/react";
-import { AlignJustify, Check, Columns2, ExternalLink, FileCode2, LoaderCircle, Rows3, Square } from "lucide-react";
+import {
+  AlignJustify,
+  Check,
+  Columns2,
+  ExternalLink,
+  FileCode2,
+  LoaderCircle,
+  MessageSquarePlus,
+  Plus,
+  Rows3,
+  Square,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FileContext } from "../../src/github/client";
-import type { CommentActions, ReviewComment } from "../types";
+import type {
+  CommentActions,
+  LineCommentDraft,
+  LineCommentDraftActions,
+  ReviewComment,
+} from "../types";
 import { ReviewCommentCard } from "./ReviewCommentCard";
 
-type Props = CommentActions & {
+type Props = CommentActions & LineCommentDraftActions & {
   patch: string;
   activePath: string;
   fileUrls: Record<string, string>;
@@ -37,6 +54,10 @@ export function DiffPanel({
   diffStyle,
   onDiffStyleChange,
   loadFileContext,
+  drafts,
+  onCreateDraft,
+  onChangeDraft,
+  onRemoveDraft,
   ...actions
 }: Props) {
   const files = useMemo(
@@ -106,6 +127,10 @@ export function DiffPanel({
             </button>
           </div>
         </div>
+        <p className="line-comment-hint">
+          <MessageSquarePlus aria-hidden="true" size={14} />
+          Hover any line and press <strong>+</strong> to comment.
+        </p>
       </div>
 
       <div
@@ -113,13 +138,7 @@ export function DiffPanel({
         className={viewMode === "all" ? "all-files-stack" : "single-file-stack"}
       >
         {visibleFiles.map((file) => {
-          const lineAnnotations: DiffLineAnnotation<ReviewComment>[] = comments
-            .filter((comment) => comment.type === "line" && comment.path === file.name)
-            .map((comment) => ({
-              side: "additions",
-              lineNumber: comment.line!,
-              metadata: comment,
-            }));
+          const lineAnnotations = buildLineAnnotations(file.name, comments, drafts);
           return (
             <FileDiffCard
               key={file.name}
@@ -131,12 +150,52 @@ export function DiffPanel({
               actions={actions}
               diffStyle={diffStyle}
               loadFileContext={loadFileContext}
+              onCreateDraft={onCreateDraft}
+              onChangeDraft={onChangeDraft}
+              onRemoveDraft={onRemoveDraft}
             />
           );
         })}
       </div>
     </div>
   );
+}
+
+type LineAnnotationContent = {
+  comments: ReviewComment[];
+  draft?: LineCommentDraft;
+};
+
+export function buildLineAnnotations(
+  path: string,
+  comments: ReviewComment[],
+  drafts: LineCommentDraft[],
+): DiffLineAnnotation<LineAnnotationContent>[] {
+  const grouped = new Map<string, DiffLineAnnotation<LineAnnotationContent>>();
+  const getAnnotation = (side: "deletions" | "additions", lineNumber: number) => {
+    const key = `${side}:${lineNumber}`;
+    const existing = grouped.get(key);
+    if (existing) return existing;
+    const annotation: DiffLineAnnotation<LineAnnotationContent> = {
+      side,
+      lineNumber,
+      metadata: { comments: [] },
+    };
+    grouped.set(key, annotation);
+    return annotation;
+  };
+
+  for (const comment of comments) {
+    if (comment.type === "line" && comment.path === path && comment.line) {
+      getAnnotation("additions", comment.line).metadata.comments.push(comment);
+    }
+  }
+  for (const draft of drafts) {
+    if (draft.path === path) {
+      getAnnotation(draft.side === "LEFT" ? "deletions" : "additions", draft.line).metadata.draft = draft;
+    }
+  }
+  return [...grouped.values()];
 }
 
 export function fileSectionId(path: string): string {
@@ -152,16 +211,19 @@ function FileDiffCard({
   actions,
   diffStyle,
   loadFileContext,
+  onCreateDraft,
+  onChangeDraft,
+  onRemoveDraft,
 }: {
   file: FileDiffMetadata;
   fileUrl: string | undefined;
-  annotations: DiffLineAnnotation<ReviewComment>[];
+  annotations: DiffLineAnnotation<LineAnnotationContent>[];
   reviewerLanguage: string;
   focusedCommentId: string | null;
   actions: CommentActions;
   diffStyle: "unified" | "split";
   loadFileContext: (path: string) => Promise<FileContext>;
-}) {
+} & Pick<LineCommentDraftActions, "onCreateDraft" | "onChangeDraft" | "onRemoveDraft">) {
   const containerRef = useRef<HTMLElement>(null);
   const [shouldLoad, setShouldLoad] = useState(false);
   const [context, setContext] = useState<FileContext | null>(null);
@@ -228,6 +290,10 @@ function FileDiffCard({
           focusedCommentId={focusedCommentId}
           actions={actions}
           diffStyle={diffStyle}
+          path={file.name}
+          onCreateDraft={onCreateDraft}
+          onChangeDraft={onChangeDraft}
+          onRemoveDraft={onRemoveDraft}
         />
       </div>
     </section>
@@ -262,16 +328,21 @@ function RenderedFileDiff({
   focusedCommentId,
   actions,
   diffStyle,
+  path,
+  onCreateDraft,
+  onChangeDraft,
+  onRemoveDraft,
 }: {
   file: FileDiffMetadata;
-  annotations: DiffLineAnnotation<ReviewComment>[];
+  annotations: DiffLineAnnotation<LineAnnotationContent>[];
   reviewerLanguage: string;
   focusedCommentId: string | null;
   actions: CommentActions;
   diffStyle: "unified" | "split";
-}) {
+  path: string;
+} & Pick<LineCommentDraftActions, "onCreateDraft" | "onChangeDraft" | "onRemoveDraft">) {
   return (
-    <FileDiff<ReviewComment>
+    <FileDiff<LineAnnotationContent>
       fileDiff={file}
       options={{
         themeType: "dark",
@@ -282,16 +353,82 @@ function RenderedFileDiff({
         expansionLineCount: 10,
         overflow: "scroll",
         disableFileHeader: true,
+        enableGutterUtility: true,
+        lineHoverHighlight: "both",
       }}
       lineAnnotations={annotations}
-      renderAnnotation={(annotation) => annotation.metadata
-        ? <ReviewCommentCard
-            comment={annotation.metadata}
-            reviewerLanguage={reviewerLanguage}
-            focused={annotation.metadata.id === focusedCommentId}
-            {...actions}
-          />
-        : null}
+      renderGutterUtility={(getHoveredLine) => (
+        <button
+          className="diff-comment-trigger"
+          type="button"
+          aria-label="Add a comment to this line"
+          title="Ask the AI agent to review your comment"
+          onClick={() => {
+            const hovered = getHoveredLine();
+            if (!hovered) return;
+            onCreateDraft({
+              path,
+              line: hovered.lineNumber,
+              side: hovered.side === "deletions" ? "LEFT" : "RIGHT",
+            });
+          }}
+        >
+          <Plus aria-hidden="true" size={13} />
+        </button>
+      )}
+      renderAnnotation={(annotation) => annotation.metadata ? (
+        <div className="line-annotation-stack">
+          {annotation.metadata.comments.map((comment) => (
+            <ReviewCommentCard
+              key={comment.id}
+              comment={comment}
+              reviewerLanguage={reviewerLanguage}
+              focused={comment.id === focusedCommentId}
+              {...actions}
+            />
+          ))}
+          {annotation.metadata.draft && (
+            <LineCommentDraftCard
+              draft={annotation.metadata.draft}
+              onChangeDraft={onChangeDraft}
+              onRemoveDraft={onRemoveDraft}
+            />
+          )}
+        </div>
+      ) : null}
     />
+  );
+}
+
+export function LineCommentDraftCard({
+  draft,
+  onChangeDraft,
+  onRemoveDraft,
+}: {
+  draft: LineCommentDraft;
+} & Pick<LineCommentDraftActions, "onChangeDraft" | "onRemoveDraft">) {
+  const location = { path: draft.path, line: draft.line, side: draft.side };
+  return (
+    <section className="line-comment-draft" aria-label={`Your comment for ${draft.path} line ${draft.line}`}>
+      <div className="line-comment-draft-heading">
+        <span><MessageSquarePlus aria-hidden="true" size={14} /> Your comment for the AI agent</span>
+        <button
+          type="button"
+          aria-label="Discard this comment"
+          title="Discard"
+          onClick={() => onRemoveDraft(location)}
+        >
+          <Trash2 aria-hidden="true" size={13} />
+        </button>
+      </div>
+      <textarea
+        autoFocus
+        rows={3}
+        value={draft.message}
+        placeholder="Write the point in your own words. The AI agent will verify it against the code and rewrite it as a clear review comment."
+        onChange={(event) => onChangeDraft(location, event.target.value)}
+      />
+      <small>This stays private until the AI agent checks it and you explicitly include the revised comment.</small>
+    </section>
   );
 }

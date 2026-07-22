@@ -11,16 +11,35 @@ describe("ReviewFindingNavigation", () => {
       <ReviewFindingNavigation
         comments={review.comments}
         activeCommentId="S1"
+        selectedIds={new Set(["S1"])}
+        rejectedIds={new Set()}
+        revisionMessages={{ G1: "Rewrite this finding." }}
         onSelect={onSelect}
       />,
     );
 
-    const lineFinding = screen.getByRole("button", { name: /Bug S1 src\/example\.ts:2/ });
+    const lineFinding = screen.getByRole("button", { name: /Bug Included S1 src\/example\.ts:2/ });
     expect(lineFinding).toHaveAttribute("aria-current", "true");
     await userEvent.click(lineFinding);
-    await userEvent.click(screen.getByRole("button", { name: /Warning G1 General comment/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Warning Revision G1 General comment/ }));
 
     expect(onSelect).toHaveBeenNthCalledWith(1, review.comments[0]);
     expect(onSelect).toHaveBeenNthCalledWith(2, review.comments[1]);
+  });
+
+  it("distinguishes consciously rejected findings from pending ones", () => {
+    render(
+      <ReviewFindingNavigation
+        comments={review.comments}
+        activeCommentId={null}
+        selectedIds={new Set()}
+        rejectedIds={new Set(["S1"])}
+        revisionMessages={{}}
+        onSelect={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /Bug Rejected S1/ })).toBeVisible();
+    expect(screen.getByRole("button", { name: /Warning Pending G1/ })).toBeVisible();
   });
 });

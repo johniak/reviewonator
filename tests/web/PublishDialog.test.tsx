@@ -26,6 +26,10 @@ describe("PublishDialog", () => {
     expect(screen.getByText("src/example.ts:2")).toBeVisible();
     expect(screen.getByText("General comment")).toBeVisible();
     expect(screen.getByText(review.comments[0].body)).toBeVisible();
+    const includedComments = screen.getByRole("region", { name: "Included comments list" });
+    expect(includedComments).toHaveClass("publish-comment-list");
+    expect(includedComments).toHaveAttribute("tabindex", "0");
+    expect(includedComments).toContainElement(screen.getByText(review.comments[0].body));
     expect(screen.queryByText(review.comments[0].reviewerExplanation)).not.toBeInTheDocument();
     expect(screen.getByText(/Private German explanations are excluded/)).toBeVisible();
 
@@ -57,7 +61,8 @@ describe("PublishDialog", () => {
     expect(onPublish).toHaveBeenCalledWith({ body: "", event: "APPROVE" });
   });
 
-  it("keeps publishing disabled for an empty non-approval body", async () => {
+  it("publishes an empty non-approval summary without adding fallback text", async () => {
+    const onPublish = vi.fn();
     render(
       <PublishDialog
         open
@@ -67,12 +72,16 @@ describe("PublishDialog", () => {
         publishing={false}
         error={null}
         onOpenChange={vi.fn()}
-        onPublish={vi.fn()}
+        onPublish={onPublish}
       />,
     );
-    const body = screen.getByRole("textbox", { name: "Review summary posted to GitHub" });
+    const body = screen.getByRole("textbox", { name: "Review summary posted to GitHub (optional)" });
     await userEvent.clear(body);
     await userEvent.click(screen.getByRole("checkbox", { name: /I confirm/ }));
-    expect(screen.getByRole("button", { name: "Publish review" })).toBeDisabled();
+    expect(screen.queryByText(/Reviewonator will post:/)).not.toBeInTheDocument();
+    const publish = screen.getByRole("button", { name: "Publish review" });
+    expect(publish).toBeEnabled();
+    await userEvent.click(publish);
+    expect(onPublish).toHaveBeenCalledWith({ body: "", event: "REQUEST_CHANGES" });
   });
 });

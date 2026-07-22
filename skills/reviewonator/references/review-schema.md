@@ -17,6 +17,7 @@ Write UTF-8 JSON matching this shape:
       "id": "S1",
       "type": "line",
       "severity": "bug",
+      "included": true,
       "path": "src/payments/retry.ts",
       "line": 87,
       "side": "RIGHT",
@@ -39,11 +40,12 @@ Write UTF-8 JSON matching this shape:
 - `version` must be `2`.
 - `prUrl` must exactly identify the reviewed GitHub PR.
 - `languages.comments` and `languages.reviewerNotes` must match the installed language configuration.
-- `summary` becomes the editable review body shown on the final confirmation screen. It may be empty when `recommendation` is `APPROVE`; use an empty string for a finding-free approval.
+- `summary` becomes the editable review body shown on the final confirmation screen. It is always optional and may be an empty string for every recommendation.
 - `recommendation` must be `COMMENT`, `APPROVE`, or `REQUEST_CHANGES`.
 - Comment IDs must be unique and stable across revision rounds.
 - `type` must be `line` or `general`.
 - `severity` must be `security`, `bug`, `warning`, `suggestion`, or `nit`.
+- `included` and `rejected` are optional and default to `false`. A new comment with neither flag starts as pending. Set exactly one flag to `true` only when the comment ID appears in the corresponding `selectedCommentIds` or `rejectedCommentIds` returned by Reviewonator during the previous revision round. Never set both flags on one comment.
 - A line comment must include `path`, `line`, and `side: "RIGHT"`. The line must be an added line in the current PR diff.
 - A general comment must not contain `path`, `line`, or `side`.
 - `body` is the exact canonical text proposed for GitHub in the configured comment language.

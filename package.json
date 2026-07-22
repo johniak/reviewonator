@@ -1,6 +1,6 @@
 {
   "name": "reviewonator",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "A local human-in-the-loop interface for AI-generated GitHub pull request reviews.",
   "private": true,
   "license": "MIT",
@@ -16,6 +16,7 @@
   "keywords": [
     "ai",
     "claude-code",
+    "codex",
     "code-review",
     "github",
     "pull-request"

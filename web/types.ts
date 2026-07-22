@@ -12,9 +12,25 @@ export type SessionSnapshot = {
 
 export type CommentActions = {
   selectedIds: Set<string>;
+  rejectedIds: Set<string>;
   revisionMessages: Record<string, string>;
   onToggleSelected: (id: string) => void;
+  onToggleRejected: (id: string) => void;
   onRevisionChange: (id: string, message: string) => void;
+};
+
+export type LineCommentDraft = {
+  path: string;
+  line: number;
+  side: "LEFT" | "RIGHT";
+  message: string;
+};
+
+export type LineCommentDraftActions = {
+  drafts: LineCommentDraft[];
+  onCreateDraft: (location: Omit<LineCommentDraft, "message">) => void;
+  onChangeDraft: (location: Omit<LineCommentDraft, "message">, message: string) => void;
+  onRemoveDraft: (location: Omit<LineCommentDraft, "message">) => void;
 };
 
 export type PublishDraft = {

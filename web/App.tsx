@@ -23,7 +23,7 @@ import { PublishDialog } from "./components/PublishDialog";
 import { PullRequestDiscussion } from "./components/PullRequestDiscussion";
 import { commentCardId, ReviewCommentCard } from "./components/ReviewCommentCard";
 import { ReviewFindingNavigation } from "./components/ReviewFindingNavigation";
-import type { SessionSnapshot } from "./types";
+import type { LineCommentDraft, SessionSnapshot } from "./types";
 
 type Completion =
   | { type: "revision" }
@@ -37,9 +37,11 @@ export function App() {
   const [viewMode, setViewMode] = useState<"single" | "all">("single");
   const [diffStyle, setDiffStyle] = useState<"unified" | "split">("unified");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [rejectedIds, setRejectedIds] = useState<Set<string>>(new Set());
   const [focusedCommentId, setFocusedCommentId] = useState<string | null>(null);
   const [pendingCommentId, setPendingCommentId] = useState<string | null>(null);
   const [revisionMessages, setRevisionMessages] = useState<Record<string, string>>({});
+  const [lineCommentDrafts, setLineCommentDrafts] = useState<Record<string, LineCommentDraft>>({});
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -51,6 +53,12 @@ export function App() {
       .then((loaded) => {
         setSession(loaded);
         setActivePath(loaded.pullRequest.files[0]?.path ?? "");
+        setSelectedIds(new Set(
+          loaded.review.comments.filter((comment) => comment.included).map((comment) => comment.id),
+        ));
+        setRejectedIds(new Set(
+          loaded.review.comments.filter((comment) => comment.rejected).map((comment) => comment.id),
+        ));
       })
       .catch((error: unknown) => setLoadingError(error instanceof Error ? error.message : "Could not load the review."));
   }, []);
@@ -91,21 +99,79 @@ export function App() {
   const pendingRevisions = Object.entries(revisionMessages)
     .filter(([, message]) => message.trim())
     .map(([commentId, message]) => ({ commentId, message: message.trim() }));
+  const pendingNewComments = Object.values(lineCommentDrafts)
+    .filter(({ message }) => message.trim())
+    .map((draft) => ({ ...draft, message: draft.message.trim() }));
+  const pendingAgentRequests = pendingRevisions.length + pendingNewComments.length;
 
   const actions = {
     selectedIds,
+    rejectedIds,
     revisionMessages,
-    onToggleSelected: (id: string) => setSelectedIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    }),
-    onRevisionChange: (id: string, message: string) => setRevisionMessages((current) => ({
-      ...current,
-      [id]: message,
-    })),
+    onToggleSelected: toggleSelected,
+    onToggleRejected: toggleRejected,
+    onRevisionChange: changeRevision,
   };
+
+  function clearRevision(id: string) {
+    setRevisionMessages((current) => {
+      if (!(id in current)) return current;
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+  }
+
+  function toggleSelected(id: string) {
+    const willSelect = !selectedIds.has(id);
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (willSelect) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+    if (willSelect) {
+      setRejectedIds((current) => {
+        const next = new Set(current);
+        next.delete(id);
+        return next;
+      });
+      clearRevision(id);
+    }
+  }
+
+  function toggleRejected(id: string) {
+    const willReject = !rejectedIds.has(id);
+    setRejectedIds((current) => {
+      const next = new Set(current);
+      if (willReject) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+    if (willReject) {
+      setSelectedIds((current) => {
+        const next = new Set(current);
+        next.delete(id);
+        return next;
+      });
+      clearRevision(id);
+    }
+  }
+
+  function changeRevision(id: string, message: string) {
+    setRevisionMessages((current) => ({ ...current, [id]: message }));
+    if (!message.trim()) return;
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      next.delete(id);
+      return next;
+    });
+    setRejectedIds((current) => {
+      const next = new Set(current);
+      next.delete(id);
+      return next;
+    });
+  }
 
   if (loadingError) return <LoadFailure message={loadingError} />;
   if (!session) return <LoadingScreen />;
@@ -119,11 +185,37 @@ export function App() {
   async function sendRevisionRequests() {
     setActionError(null);
     try {
-      await api.requestRevision({ requests: pendingRevisions });
+      await api.requestRevision({
+        selectedCommentIds: [...selectedIds],
+        rejectedCommentIds: [...rejectedIds],
+        requests: pendingRevisions,
+        newComments: pendingNewComments,
+      });
       setCompletion({ type: "revision" });
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Could not send revision requests.");
     }
+  }
+
+  function createLineCommentDraft(location: Omit<LineCommentDraft, "message">) {
+    const key = lineCommentDraftKey(location);
+    setLineCommentDrafts((current) => current[key]
+      ? current
+      : { ...current, [key]: { ...location, message: "" } });
+  }
+
+  function changeLineCommentDraft(location: Omit<LineCommentDraft, "message">, message: string) {
+    const key = lineCommentDraftKey(location);
+    setLineCommentDrafts((current) => ({ ...current, [key]: { ...location, message } }));
+  }
+
+  function removeLineCommentDraft(location: Omit<LineCommentDraft, "message">) {
+    const key = lineCommentDraftKey(location);
+    setLineCommentDrafts((current) => {
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
   }
 
   async function publish(input: { body: string; event: ReviewEvent }) {
@@ -222,6 +314,9 @@ export function App() {
           <ReviewFindingNavigation
             comments={comments}
             activeCommentId={focusedCommentId}
+            selectedIds={selectedIds}
+            rejectedIds={rejectedIds}
+            revisionMessages={revisionMessages}
             onSelect={selectComment}
           />
 
@@ -253,6 +348,10 @@ export function App() {
             diffStyle={diffStyle}
             onDiffStyleChange={setDiffStyle}
             loadFileContext={api.loadFileContext}
+            drafts={Object.values(lineCommentDrafts)}
+            onCreateDraft={createLineCommentDraft}
+            onChangeDraft={changeLineCommentDraft}
+            onRemoveDraft={removeLineCommentDraft}
             {...actions}
           />
         </main>
@@ -283,7 +382,7 @@ export function App() {
             {panelTab === "review" ? (
               <>
                 <section className="review-summary">
-                  <span className="eyebrow">Claude's assessment</span>
+                  <span className="eyebrow">AI assessment</span>
                   <h2>Review summary</h2>
                   <p>{review.summary}</p>
                   <div className="recommendation">
@@ -299,7 +398,7 @@ export function App() {
                     <span>{generalComments.length}</span>
                   </div>
                   {generalComments.length === 0 ? (
-                    <p className="muted-copy">Claude did not add any general comments.</p>
+                    <p className="muted-copy">The AI agent did not add any general comments.</p>
                   ) : generalComments.map((comment) => (
                     <ReviewCommentCard
                       key={comment.id}
@@ -323,16 +422,16 @@ export function App() {
               <span><strong>{selectedComments.length}</strong> of {comments.length} comments selected</span>
             </div>
             {actionError && <p className="error-message" role="alert">{actionError}</p>}
-            {pendingRevisions.length > 0 && (
+            {pendingAgentRequests > 0 && (
               <button className="revision-submit-button" type="button" onClick={sendRevisionRequests}>
                 <RotateCcw size={16} />
-                Send {pendingRevisions.length} revision request{pendingRevisions.length === 1 ? "" : "s"} to Claude
+                Send {pendingAgentRequests} request{pendingAgentRequests === 1 ? "" : "s"} to AI agent
               </button>
             )}
             <button
               className="primary-button"
               type="button"
-              disabled={pendingRevisions.length > 0}
+              disabled={pendingAgentRequests > 0}
               onClick={() => {
                 setActionError(null);
                 setPublishOpen(true);
@@ -381,6 +480,10 @@ export function describeFilePath(path: string): { name: string; directory: strin
     name,
     directory: parts.length > 2 ? `…/${directory}` : directory || "Repository root",
   };
+}
+
+export function lineCommentDraftKey(location: Omit<LineCommentDraft, "message">): string {
+  return `${location.path}:${location.side}:${location.line}`;
 }
 
 function scrollWithinPanel(element: HTMLElement, block: "start" | "center") {
@@ -484,7 +587,7 @@ function getCompletionContent(completion: Completion) {
   if (completion.type === "revision") {
     return {
       title: "Revision requested",
-      body: "Claude will update the requested comments and reopen Reviewonator.",
+      body: "The AI agent will update the requested comments and reopen Reviewonator.",
       className: "completion-revision",
       icon: <RotateCcw />,
     };

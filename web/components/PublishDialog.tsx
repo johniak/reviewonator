@@ -37,7 +37,6 @@ export function PublishDialog({
   const [body, setBody] = useState(initialBody);
   const [event, setEvent] = useState(initialEvent);
   const [confirmed, setConfirmed] = useState(false);
-
   useEffect(() => {
     if (open) {
       setBody(initialBody);
@@ -84,7 +83,7 @@ export function PublishDialog({
             </fieldset>
 
             <label className="publish-body-field">
-              <span>Review summary posted to GitHub{event === "APPROVE" ? " (optional)" : ""}</span>
+              <span>Review summary posted to GitHub (optional)</span>
               <textarea rows={7} value={body} onChange={(event) => setBody(event.target.value)} />
             </label>
 
@@ -97,19 +96,21 @@ export function PublishDialog({
                 <EyeOff aria-hidden="true" size={14} />
                 Private {reviewerLanguage} explanations are excluded from this GitHub review.
               </p>
-              {comments.length === 0 ? (
-                <p className="muted-copy">No inline or general comments are selected.</p>
-              ) : comments.map((comment) => (
-                <div className="publish-comment" key={comment.id}>
-                  <div>
-                    <SeverityBadge severity={comment.severity} />
-                    <span className="comment-location">
-                      {comment.type === "line" ? `${comment.path}:${comment.line}` : "General comment"}
-                    </span>
+              <div className="publish-comment-list" role="region" aria-label="Included comments list" tabIndex={0}>
+                {comments.length === 0 ? (
+                  <p className="muted-copy">No inline or general comments are selected.</p>
+                ) : comments.map((comment) => (
+                  <div className="publish-comment" key={comment.id}>
+                    <div>
+                      <SeverityBadge severity={comment.severity} />
+                      <span className="comment-location">
+                        {comment.type === "line" ? `${comment.path}:${comment.line}` : "General comment"}
+                      </span>
+                    </div>
+                    <p>{comment.body}</p>
                   </div>
-                  <p>{comment.body}</p>
-                </div>
-              ))}
+                ))}
+              </div>
             </section>
           </div>
 
@@ -127,7 +128,7 @@ export function PublishDialog({
             <button
               className="primary-button publish-button"
               type="button"
-              disabled={!confirmed || (event !== "APPROVE" && !body.trim()) || publishing}
+              disabled={!confirmed || publishing}
               onClick={() => onPublish({ body: body.trim(), event })}
             >
               {publishing ? "Publishing…" : "Publish review"}

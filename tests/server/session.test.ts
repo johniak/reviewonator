@@ -30,7 +30,10 @@ describe("ReviewSession", () => {
     session.requestRevision({ requests: [{ commentId: "S1", message: "Verify the actual caller contract." }] });
     await expect(session.waitForResult()).resolves.toEqual({
       status: "revision_requested",
+      selectedCommentIds: [],
+      rejectedCommentIds: [],
       requests: [{ commentId: "S1", message: "Verify the actual caller contract." }],
+      newComments: [],
     });
     expect(github.published).toBeUndefined();
   });
@@ -39,6 +42,63 @@ describe("ReviewSession", () => {
     const session = new ReviewSession(pullRequest, patch, review, new FakeGitHub());
     expect(() => session.requestRevision({ requests: [{ commentId: "missing", message: "Rewrite it." }] }))
       .toThrow(/Unknown review comment ids/);
+  });
+
+  it("returns the deduplicated selection so the next review round can preserve it", async () => {
+    const session = new ReviewSession(pullRequest, patch, review, new FakeGitHub());
+    session.requestRevision({
+      selectedCommentIds: ["S1", "S1"],
+      rejectedCommentIds: ["G1", "G1"],
+      requests: [{ commentId: "G1", message: "Rewrite this finding." }],
+    });
+
+    await expect(session.waitForResult()).resolves.toMatchObject({
+      status: "revision_requested",
+      selectedCommentIds: ["S1"],
+      rejectedCommentIds: ["G1"],
+    });
+  });
+
+  it("rejects unknown selected comments", () => {
+    const session = new ReviewSession(pullRequest, patch, review, new FakeGitHub());
+    expect(() => session.requestRevision({
+      selectedCommentIds: ["missing"],
+      requests: [{ commentId: "S1", message: "Rewrite it." }],
+    })).toThrow(/Unknown review comment ids/);
+  });
+
+  it("rejects unknown rejected comments", () => {
+    const session = new ReviewSession(pullRequest, patch, review, new FakeGitHub());
+    expect(() => session.requestRevision({
+      rejectedCommentIds: ["missing"],
+      requests: [{ commentId: "S1", message: "Rewrite it." }],
+    })).toThrow(/Unknown review comment ids/);
+  });
+
+  it("returns a user-authored line comment to the agent", async () => {
+    const session = new ReviewSession(pullRequest, patch, review, new FakeGitHub());
+    const newComment = {
+      path: "src/example.ts",
+      line: 2,
+      side: "RIGHT" as const,
+      message: "Verify whether this constant is intentional and rewrite my comment.",
+    };
+    session.requestRevision({ newComments: [newComment] });
+
+    await expect(session.waitForResult()).resolves.toEqual({
+      status: "revision_requested",
+      selectedCommentIds: [],
+      rejectedCommentIds: [],
+      requests: [],
+      newComments: [newComment],
+    });
+  });
+
+  it("rejects user-authored comments outside the pull request", () => {
+    const session = new ReviewSession(pullRequest, patch, review, new FakeGitHub());
+    expect(() => session.requestRevision({
+      newComments: [{ path: "src/missing.ts", line: 1, side: "RIGHT", message: "Check this." }],
+    })).toThrow(/outside this pull request/);
   });
 
   it("publishes only the comments explicitly selected by the user", async () => {
@@ -77,14 +137,16 @@ describe("ReviewSession", () => {
     expect(github.published?.request.body).toBe("");
   });
 
-  it("rejects an empty body for a non-approval review", async () => {
-    const session = new ReviewSession(pullRequest, patch, review, new FakeGitHub());
+  it("allows an empty user summary for a non-approval review", async () => {
+    const github = new FakeGitHub();
+    const session = new ReviewSession(pullRequest, patch, review, github);
     await expect(session.publish({
       confirmed: true,
       event: "REQUEST_CHANGES",
       body: "",
       selectedCommentIds: [],
-    })).rejects.toThrow(/body is required unless approving/i);
+    })).resolves.toBeDefined();
+    expect(github.published?.request.body).toBe("");
   });
 
   it("blocks publication when the PR head changed", async () => {

@@ -21,6 +21,8 @@ export const reviewCommentSchema = z.object({
   severity: z.enum(severities),
   body: z.string().trim().min(1).max(65_535),
   reviewerExplanation: reviewerExplanationSchema,
+  included: z.boolean().optional(),
+  rejected: z.boolean().optional(),
   path: z.string().trim().min(1).optional(),
   line: z.int().positive().optional(),
   side: z.literal("RIGHT").optional(),
@@ -35,6 +37,12 @@ export const reviewCommentSchema = z.object({
     context.addIssue({
       code: "custom",
       message: "General comments cannot include a file location.",
+    });
+  }
+  if (comment.included && comment.rejected) {
+    context.addIssue({
+      code: "custom",
+      message: "A review comment cannot be both included and rejected.",
     });
   }
 });
@@ -52,9 +60,6 @@ export const reviewDocumentSchema = z.object({
   recommendation: z.enum(reviewEvents),
   comments: z.array(reviewCommentSchema).max(500),
 }).superRefine((review, context) => {
-  if (review.recommendation !== "APPROVE" && !review.summary) {
-    context.addIssue({ code: "custom", path: ["summary"], message: "A summary is required unless approving." });
-  }
   const ids = new Set<string>();
   for (const comment of review.comments) {
     if (ids.has(comment.id)) {
@@ -65,10 +70,30 @@ export const reviewDocumentSchema = z.object({
 });
 
 export const revisionRequestSchema = z.object({
+  selectedCommentIds: z.array(z.string().min(1)).max(500).default([]),
+  rejectedCommentIds: z.array(z.string().min(1)).max(500).default([]),
   requests: z.array(z.object({
     commentId: z.string().min(1),
     message: z.string().trim().min(1).max(4_000),
-  })).min(1).max(500),
+  })).max(500).default([]),
+  newComments: z.array(z.object({
+    path: z.string().trim().min(1),
+    line: z.int().positive(),
+    side: z.enum(["LEFT", "RIGHT"]),
+    message: z.string().trim().min(1).max(4_000),
+  })).max(500).default([]),
+}).superRefine((request, context) => {
+  if (request.requests.length + request.newComments.length === 0) {
+    context.addIssue({ code: "custom", message: "At least one revision or new comment is required." });
+  }
+  const selectedIds = new Set(request.selectedCommentIds);
+  const conflictingIds = [...new Set(request.rejectedCommentIds.filter((id) => selectedIds.has(id)))];
+  if (conflictingIds.length > 0) {
+    context.addIssue({
+      code: "custom",
+      message: `Comments cannot be both selected and rejected: ${conflictingIds.join(", ")}`,
+    });
+  }
 });
 
 export const publishRequestSchema = z.object({
@@ -76,10 +101,6 @@ export const publishRequestSchema = z.object({
   event: z.enum(reviewEvents),
   body: z.string().trim().max(65_535),
   selectedCommentIds: z.array(z.string().min(1)).max(500),
-}).superRefine((request, context) => {
-  if (request.event !== "APPROVE" && !request.body) {
-    context.addIssue({ code: "custom", path: ["body"], message: "A review body is required unless approving." });
-  }
 });
 
 export type ReviewComment = z.infer<typeof reviewCommentSchema>;

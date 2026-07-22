@@ -11,7 +11,13 @@ import {
 import type { FileContext, FileRevision, GitHubGateway, PublishedReview } from "../github/client";
 
 export type SessionResult =
-  | { status: "revision_requested"; requests: RevisionRequest["requests"] }
+  | {
+      status: "revision_requested";
+      selectedCommentIds: RevisionRequest["selectedCommentIds"];
+      rejectedCommentIds: RevisionRequest["rejectedCommentIds"];
+      requests: RevisionRequest["requests"];
+      newComments: RevisionRequest["newComments"];
+    }
   | { status: "published"; review: PublishedReview }
   | { status: "cancelled" };
 
@@ -61,13 +67,30 @@ export class ReviewSession {
     this.assertOpen();
     const request = revisionRequestSchema.parse(input);
     const knownIds = new Set(this.review.comments.map((comment) => comment.id));
-    const unknownIds = request.requests
-      .map(({ commentId }) => commentId)
+    const selectedCommentIds = [...new Set(request.selectedCommentIds)];
+    const rejectedCommentIds = [...new Set(request.rejectedCommentIds)];
+    const unknownIds = [
+      ...request.requests.map(({ commentId }) => commentId),
+      ...selectedCommentIds,
+      ...rejectedCommentIds,
+    ]
       .filter((id) => !knownIds.has(id));
     if (unknownIds.length > 0) {
       throw new Error(`Unknown review comment ids: ${unknownIds.join(", ")}`);
     }
-    this.complete({ status: "revision_requested", requests: request.requests });
+    const unknownPaths = request.newComments
+      .map(({ path }) => path)
+      .filter((path) => !this.fileRevisions.has(path));
+    if (unknownPaths.length > 0) {
+      throw new Error(`New comments target files outside this pull request: ${[...new Set(unknownPaths)].join(", ")}`);
+    }
+    this.complete({
+      status: "revision_requested",
+      selectedCommentIds,
+      rejectedCommentIds,
+      requests: request.requests,
+      newComments: request.newComments,
+    });
   }
 
   loadFileContext(path: string): Promise<FileContext> {

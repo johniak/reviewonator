@@ -8,13 +8,13 @@ Do not merely prepare a plan or a prototype. Deliver a working application.
 
 Reviewonator is a local, human-in-the-loop interface for AI-generated GitHub pull request reviews. Its interaction model should be inspired by tools such as Planonator: an AI agent performs the analysis, then opens a polished browser UI where a human can inspect, edit, select, and explicitly publish the result.
 
-The first supported agent is **Claude Code**. Keep future Codex support possible without implementing it now.
+The supported agents are **Claude Code** and **Codex**. They must share one Reviewonator workflow and data contract rather than maintaining separate implementations.
 
-The workflow starts when a user invokes a Claude Code skill with a GitHub pull request URL. The user must already have an authenticated GitHub CLI (`gh`) installation.
+The workflow starts when a user invokes the installed Claude Code or Codex skill with a GitHub pull request URL. The user must already have an authenticated GitHub CLI (`gh`) installation.
 
 ## Required workflow
 
-1. The Claude Code skill accepts a GitHub pull request URL.
+1. The Claude Code or Codex skill accepts a GitHub pull request URL.
 2. It verifies that `gh` and Reviewonator are installed and that `gh` is authenticated.
 3. The agent reviews the pull request according to strict review guidelines and produces a documented, validated structured result, such as JSON.
 4. The skill launches Reviewonator and waits for its structured result.
@@ -129,8 +129,8 @@ This must be installable by other users, not tied to one machine.
 Provide:
 
 - the Reviewonator application and CLI;
-- the Claude Code skill as project source;
-- an installation script that installs the executable and skill to user-selected destinations while offering sensible defaults;
+- one agent-neutral review skill as project source, compatible with Claude Code and Codex;
+- an installation script with a multi-select for Claude Code, Codex, or both, plus user-selected destinations and sensible defaults;
 - an uninstall script that removes only the files installed by Reviewonator;
 - prerequisite checks and clear error messages;
 - concise usage and verification instructions.
@@ -152,7 +152,7 @@ Do not silently modify an unrelated existing skill or overwrite user files witho
 
 The task is complete only when:
 
-- the end-to-end Claude Code → Reviewonator → revision/cancel/publish protocol works;
+- the end-to-end Claude Code/Codex → Reviewonator → revision/cancel/publish protocol works;
 - publication cannot happen without explicit human confirmation;
 - every general and inline finding has a tested English canonical comment and private Polish reviewer explanation, and only the English content can be published;
 - all required diff modes and expandable context work together;

@@ -109,6 +109,20 @@ describe("GitHubClient", () => {
     expect(JSON.stringify(payload)).not.toContain(review.comments[0].reviewerExplanation);
   });
 
+  it("keeps the GitHub review body empty when the optional user summary is empty", async () => {
+    const runner = new RecordingRunner([
+      success(JSON.stringify({ id: 100, html_url: "https://github.com/acme/widgets/pull/42#pullrequestreview-100", state: "CHANGES_REQUESTED" })),
+    ]);
+
+    await new GitHubClient(runner).publishReview(
+      pullRequest,
+      { confirmed: true, event: "REQUEST_CHANGES", body: "", selectedCommentIds: ["S1"] },
+      [review.comments[0]],
+    );
+
+    expect(JSON.parse(runner.calls[0].input!).body).toBe("");
+  });
+
   it("loads both exact blob versions without exposing an auth token", async () => {
     const runner = new RecordingRunner([success("old contents"), success("new contents")]);
     const context = await new GitHubClient(runner).loadFileContext(pullRequest, {

@@ -10,11 +10,13 @@
 
 Reviewonator turns an AI-generated pull request review into a focused, local review workspace. Inspect every finding in its diff context, revise the proposed wording, choose what to include, and publish only after an explicit confirmation.
 
-The first integration targets Claude Code. The data format and application boundary are designed so other agents, including Codex, can be added later.
+Reviewonator supports Claude Code and Codex through one shared review workflow.
 
 <p align="center">
-  <img src="docs/assets/reviewonator-demo.jpg" width="1280" alt="Reviewonator showing AI review findings alongside a pull request diff">
+  <img src="docs/assets/reviewonator-overview.jpg" width="1280" alt="Reviewonator final GitHub review confirmation with the selected decision and comments">
 </p>
+
+See the [feature guide](docs/features.md) for a visual walkthrough of the review workspace, comment decisions, pull request discussion, and safe publishing flow.
 
 ## Why Reviewonator?
 
@@ -30,7 +32,7 @@ The first integration targets Claude Code. The data format and application bound
 
 ## How it works
 
-1. The Claude Code skill performs a pull request review and writes a validated JSON document.
+1. The installed Claude Code or Codex skill performs a pull request review and writes a validated JSON document.
 2. The `reviewonator` executable retrieves pull request data through your authenticated GitHub CLI session.
 3. A local loopback-only web application opens in your browser.
 4. You inspect and edit the proposed review.
@@ -42,7 +44,7 @@ Your GitHub credentials remain in the CLI process. They are never embedded in th
 
 - macOS or Linux on x64 or ARM64
 - [GitHub CLI](https://cli.github.com/) installed and authenticated with `gh auth login`
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview)
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), Codex, or both
 - Access to the pull request you want to review
 
 [Bun](https://bun.sh/) is required only when building from source.
@@ -57,24 +59,27 @@ cd reviewonator
 ./scripts/install.sh
 ```
 
-The installer asks which language Claude should use for comments published to GitHub and which language it should use for private reviewer notes. Both default to English.
+The installer first requires an explicit multi-select choice for Claude Code, Codex, or both. It never chooses an agent integration silently. It then asks which language the agent should use for comments published to GitHub and for private reviewer notes. Both language choices default to English.
 
 When a local build is not present, the installer downloads the latest binary for your platform from GitHub Releases. It installs:
 
 - the executable in `~/.local/bin/reviewonator`;
-- the Claude Code skill in `~/.claude/skills/reviewonator`.
+- the Claude Code skill in `~/.claude/skills/reviewonator`, when selected;
+- the Codex skill in `~/.agents/skills/reviewonator`, when selected.
 
 Make sure `~/.local/bin` is on your `PATH`. Custom locations are supported:
 
 ```sh
 ./scripts/install.sh \
+  --targets claude,codex \
   --bin-dir "$HOME/bin" \
-  --skill-dir "$HOME/.claude/skills" \
+  --claude-skill-dir "$HOME/.claude/skills" \
+  --codex-skill-dir "$HOME/.agents/skills" \
   --comment-language English \
   --reviewer-language English
 ```
 
-The language flags, or the `REVIEWONATOR_COMMENT_LANGUAGE` and `REVIEWONATOR_REVIEWER_LANGUAGE` environment variables, make non-interactive installations deterministic.
+`--targets` accepts `claude`, `codex`, or a comma-separated selection. Non-interactive installation must provide `--targets` or `REVIEWONATOR_TARGETS`; the installer never guesses. `REVIEWONATOR_COMMENT_LANGUAGE` and `REVIEWONATOR_REVIEWER_LANGUAGE` provide the remaining non-interactive configuration. The older `--skill-dir` option remains an alias for `--claude-skill-dir` and does not implicitly select Claude Code.
 
 To install from a source checkout instead:
 
@@ -86,12 +91,26 @@ bun run build
 
 The installer and uninstaller use ownership markers and refuse to overwrite or remove files they do not manage.
 
+### Codex and GitHub authentication
+
+On macOS, Codex's sandbox may be unable to read the GitHub CLI token stored in Keychain even though `gh auth status` succeeds in your normal terminal. The Reviewonator skill handles this by requesting permission to run authenticated `gh` commands and the Reviewonator process outside the sandbox. Approve only the narrowly scoped commands shown by Codex. This permission lets the process use your existing `gh` login; it does not publish a review. Publication still requires separate, explicit confirmation in the Reviewonator UI.
+
+Do not work around the sandbox by copying the GitHub token into a prompt, configuration file, `GH_TOKEN`, or `GITHUB_TOKEN`.
+
 ## Use
 
-In Claude Code, invoke the installed skill with a pull request URL:
+Invoke the installed skill with a pull request URL.
+
+In Claude Code:
 
 ```text
 /reviewonator https://github.com/owner/repository/pull/123
+```
+
+In Codex:
+
+```text
+$reviewonator https://github.com/owner/repository/pull/123
 ```
 
 The agent completes the review first, then launches Reviewonator. In the application:
@@ -121,13 +140,13 @@ Check the installed version with:
 reviewonator --version
 ```
 
-To remove both installed components:
+Run the uninstaller and select one or both agent integrations to remove:
 
 ```sh
 ./scripts/uninstall.sh
 ```
 
-The same `--bin-dir` and `--skill-dir` options are available when uninstalling.
+The same `--targets`, `--bin-dir`, `--claude-skill-dir`, and `--codex-skill-dir` options are available when uninstalling. The executable remains installed while another managed integration still uses it.
 
 ## Development
 
@@ -157,7 +176,7 @@ The release workflow builds binaries for macOS and Linux on x64 and ARM64, packa
 
 ## Project status
 
-Reviewonator is an early-stage project. Its review workflow and JSON contract may evolve before version 1.0. Claude Code is the only supported agent integration today.
+Reviewonator is an early-stage project. Its review workflow and JSON contract may evolve before version 1.0. Claude Code and Codex are supported today.
 
 ## Contributing and security
 

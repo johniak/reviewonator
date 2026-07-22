@@ -14,8 +14,10 @@ describe("ReviewCommentCard", () => {
         reviewerLanguage="German"
         focused
         selectedIds={new Set([comment.id])}
+        rejectedIds={new Set()}
         revisionMessages={{}}
         onToggleSelected={vi.fn()}
+        onToggleRejected={vi.fn()}
         onRevisionChange={vi.fn()}
       />,
     );
@@ -28,22 +30,27 @@ describe("ReviewCommentCard", () => {
     expect(screen.getByRole("article")).toHaveAttribute("id", "review-comment-S1");
   });
 
-  it("lets the user include or exclude an agent comment", async () => {
+  it("offers separate deliberate include and reject actions", async () => {
     const onToggleSelected = vi.fn();
+    const onToggleRejected = vi.fn();
     render(
       <ReviewCommentCard
         comment={review.comments[0]}
-        selectedIds={new Set(["S1"])}
+        selectedIds={new Set()}
+        rejectedIds={new Set()}
         revisionMessages={{}}
         onToggleSelected={onToggleSelected}
+        onToggleRejected={onToggleRejected}
         onRevisionChange={vi.fn()}
       />,
     );
-    await userEvent.click(screen.getByRole("button", { name: "Included" }));
+    await userEvent.click(screen.getByRole("button", { name: "Include" }));
+    await userEvent.click(screen.getByRole("button", { name: "Reject" }));
     expect(onToggleSelected).toHaveBeenCalledWith("S1");
+    expect(onToggleRejected).toHaveBeenCalledWith("S1");
   });
 
-  it("collects a precise revision request for Claude", async () => {
+  it("collects a precise revision request for the AI agent", async () => {
     const onRevisionChange = vi.fn();
     function Harness() {
       const [message, setMessage] = useState("");
@@ -51,8 +58,10 @@ describe("ReviewCommentCard", () => {
         <ReviewCommentCard
           comment={review.comments[0]}
           selectedIds={new Set(["S1"])}
+          rejectedIds={new Set()}
           revisionMessages={{ S1: message }}
           onToggleSelected={vi.fn()}
+          onToggleRejected={vi.fn()}
           onRevisionChange={(id, value) => {
             setMessage(value);
             onRevisionChange(id, value);
@@ -62,7 +71,7 @@ describe("ReviewCommentCard", () => {
     }
     render(<Harness />);
     await userEvent.click(screen.getByRole("button", { name: "Request revision" }));
-    await userEvent.type(screen.getByRole("textbox", { name: "What should Claude change?" }), "Check the caller.");
+    await userEvent.type(screen.getByRole("textbox", { name: "What should the AI agent change?" }), "Check the caller.");
     expect(onRevisionChange).toHaveBeenLastCalledWith("S1", "Check the caller.");
   });
 });

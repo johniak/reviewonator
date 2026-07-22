@@ -70,7 +70,10 @@ describe("Reviewonator HTTP API", () => {
     expect(response.status).toBe(200);
     await expect(session.waitForResult()).resolves.toEqual({
       status: "revision_requested",
+      selectedCommentIds: [],
+      rejectedCommentIds: [],
       requests: [{ commentId: "S1", message: "Re-check this finding." }],
+      newComments: [],
     });
   });
 
