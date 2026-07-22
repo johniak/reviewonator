@@ -13,7 +13,7 @@ Reviewonator turns an AI-generated pull request review into a focused, local rev
 Reviewonator supports Claude Code and Codex through one shared review workflow.
 
 <p align="center">
-  <img src="docs/assets/reviewonator-overview.jpg" width="1280" alt="Reviewonator final GitHub review confirmation with the selected decision and comments">
+  <img src="docs/assets/reviewonator-main.jpg" width="1280" alt="Reviewonator main review workspace with pull request files, inline findings, and the review summary">
 </p>
 
 See the [feature guide](docs/features.md) for a visual walkthrough of the review workspace, comment decisions, pull request discussion, and safe publishing flow.

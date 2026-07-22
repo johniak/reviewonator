@@ -3,12 +3,13 @@ import { describe, expect, it } from "vitest";
 
 const overviewAsset = "docs/assets/reviewonator-overview.jpg";
 const discussionAsset = "docs/assets/pr-discussion.jpg";
+const mainAsset = "docs/assets/reviewonator-main.jpg";
 
 describe("project documentation", () => {
   it("links the README screenshot and feature guide", () => {
     const readme = readFileSync("README.md", "utf8");
 
-    expect(readme).toContain(`src="${overviewAsset}"`);
+    expect(readme).toContain(`src="${mainAsset}"`);
     expect(readme).toContain("[feature guide](docs/features.md)");
   });
 
@@ -22,7 +23,7 @@ describe("project documentation", () => {
     expect(guide).toContain("assets/reviewonator-overview.jpg");
   });
 
-  it.each([overviewAsset, discussionAsset])("ships a substantial JPEG at %s", (asset) => {
+  it.each([mainAsset, overviewAsset, discussionAsset])("ships a substantial JPEG at %s", (asset) => {
     const image = readFileSync(asset);
 
     expect([...image.subarray(0, 3)]).toEqual([255, 216, 255]);
