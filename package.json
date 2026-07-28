@@ -1,6 +1,6 @@
 {
   "name": "reviewonator",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "A local human-in-the-loop interface for AI-generated GitHub pull request reviews.",
   "private": true,
   "license": "MIT",
