@@ -1,6 +1,6 @@
 import type { PullRequest } from "../src/domain/pull-request";
 import type { PullRequestDiscussionItem } from "../src/domain/discussion";
-import type { ReviewDocument } from "../src/domain/review";
+import type { ReviewDocument, UserCommentThread } from "../src/domain/review";
 
 export const prUrl = "https://github.com/acme/widgets/pull/42";
 
@@ -69,12 +69,24 @@ export const discussion: PullRequestDiscussionItem[] = [
   },
 ];
 
+export const userThread: UserCommentThread = {
+  id: "U1",
+  path: "src/example.ts",
+  line: 2,
+  side: "RIGHT",
+  messages: [
+    { id: "U1-M1", author: "user", body: "This constant looks wrong. Does it ignore the input?" },
+    { id: "U1-M2", author: "agent", body: "The function has no input, so this does not ignore a caller value." },
+  ],
+};
+
 export const review: ReviewDocument = {
   version: 2,
   prUrl,
   languages: { comments: "English", reviewerNotes: "Polish" },
   summary: "The change needs one correction before it is safe to merge.",
   recommendation: "REQUEST_CHANGES",
+  userThreads: [],
   comments: [
     {
       id: "S1",

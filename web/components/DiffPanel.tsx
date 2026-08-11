@@ -25,16 +25,21 @@ import type {
   LineCommentDraft,
   LineCommentDraftActions,
   ReviewComment,
+  UserCommentThread,
+  UserThreadActions,
 } from "../types";
 import { ReviewCommentCard } from "./ReviewCommentCard";
+import { userThreadCardId, UserCommentThreadCard } from "./UserCommentThread";
 
-type Props = CommentActions & LineCommentDraftActions & {
+type Props = CommentActions & LineCommentDraftActions & UserThreadActions & {
   patch: string;
   activePath: string;
   fileUrls: Record<string, string>;
   comments: ReviewComment[];
+  userThreads: UserCommentThread[];
   reviewerLanguage?: string;
   focusedCommentId: string | null;
+  focusedThreadId: string | null;
   viewMode: "single" | "all";
   onViewModeChange: (mode: "single" | "all") => void;
   diffStyle: "unified" | "split";
@@ -47,8 +52,10 @@ export function DiffPanel({
   activePath,
   fileUrls,
   comments,
+  userThreads,
   reviewerLanguage = "English",
   focusedCommentId,
+  focusedThreadId,
   viewMode,
   onViewModeChange,
   diffStyle,
@@ -58,7 +65,12 @@ export function DiffPanel({
   onCreateDraft,
   onChangeDraft,
   onRemoveDraft,
-  ...actions
+  replyMessages,
+  dismissalReasons,
+  onReplyChange,
+  onDismissalChange,
+  onSelectFinding,
+  ...commentActions
 }: Props) {
   const files = useMemo(
     () => parsePatchFiles(patch, "reviewonator", true).flatMap((item) => item.files),
@@ -138,7 +150,7 @@ export function DiffPanel({
         className={viewMode === "all" ? "all-files-stack" : "single-file-stack"}
       >
         {visibleFiles.map((file) => {
-          const lineAnnotations = buildLineAnnotations(file.name, comments, drafts);
+          const lineAnnotations = buildLineAnnotations(file.name, comments, userThreads, drafts);
           return (
             <FileDiffCard
               key={file.name}
@@ -147,7 +159,15 @@ export function DiffPanel({
               annotations={lineAnnotations}
               reviewerLanguage={reviewerLanguage}
               focusedCommentId={focusedCommentId}
-              actions={actions}
+              focusedThreadId={focusedThreadId}
+              commentActions={commentActions}
+              threadActions={{
+                replyMessages,
+                dismissalReasons,
+                onReplyChange,
+                onDismissalChange,
+                onSelectFinding,
+              }}
               diffStyle={diffStyle}
               loadFileContext={loadFileContext}
               onCreateDraft={onCreateDraft}
@@ -163,12 +183,14 @@ export function DiffPanel({
 
 type LineAnnotationContent = {
   comments: ReviewComment[];
+  userThreads: UserCommentThread[];
   draft?: LineCommentDraft;
 };
 
 export function buildLineAnnotations(
   path: string,
   comments: ReviewComment[],
+  userThreads: UserCommentThread[],
   drafts: LineCommentDraft[],
 ): DiffLineAnnotation<LineAnnotationContent>[] {
   const grouped = new Map<string, DiffLineAnnotation<LineAnnotationContent>>();
@@ -179,7 +201,7 @@ export function buildLineAnnotations(
     const annotation: DiffLineAnnotation<LineAnnotationContent> = {
       side,
       lineNumber,
-      metadata: { comments: [] },
+      metadata: { comments: [], userThreads: [] },
     };
     grouped.set(key, annotation);
     return annotation;
@@ -188,6 +210,12 @@ export function buildLineAnnotations(
   for (const comment of comments) {
     if (comment.type === "line" && comment.path === path && comment.line) {
       getAnnotation("additions", comment.line).metadata.comments.push(comment);
+    }
+  }
+  for (const thread of userThreads) {
+    if (thread.path === path) {
+      getAnnotation(thread.side === "LEFT" ? "deletions" : "additions", thread.line)
+        .metadata.userThreads.push(thread);
     }
   }
   for (const draft of drafts) {
@@ -208,7 +236,9 @@ function FileDiffCard({
   annotations,
   reviewerLanguage,
   focusedCommentId,
-  actions,
+  focusedThreadId,
+  commentActions,
+  threadActions,
   diffStyle,
   loadFileContext,
   onCreateDraft,
@@ -220,7 +250,9 @@ function FileDiffCard({
   annotations: DiffLineAnnotation<LineAnnotationContent>[];
   reviewerLanguage: string;
   focusedCommentId: string | null;
-  actions: CommentActions;
+  focusedThreadId: string | null;
+  commentActions: CommentActions;
+  threadActions: UserThreadActions;
   diffStyle: "unified" | "split";
   loadFileContext: (path: string) => Promise<FileContext>;
 } & Pick<LineCommentDraftActions, "onCreateDraft" | "onChangeDraft" | "onRemoveDraft">) {
@@ -288,7 +320,9 @@ function FileDiffCard({
           annotations={annotations}
           reviewerLanguage={reviewerLanguage}
           focusedCommentId={focusedCommentId}
-          actions={actions}
+          focusedThreadId={focusedThreadId}
+          commentActions={commentActions}
+          threadActions={threadActions}
           diffStyle={diffStyle}
           path={file.name}
           onCreateDraft={onCreateDraft}
@@ -326,7 +360,9 @@ function RenderedFileDiff({
   annotations,
   reviewerLanguage,
   focusedCommentId,
-  actions,
+  focusedThreadId,
+  commentActions,
+  threadActions,
   diffStyle,
   path,
   onCreateDraft,
@@ -337,7 +373,9 @@ function RenderedFileDiff({
   annotations: DiffLineAnnotation<LineAnnotationContent>[];
   reviewerLanguage: string;
   focusedCommentId: string | null;
-  actions: CommentActions;
+  focusedThreadId: string | null;
+  commentActions: CommentActions;
+  threadActions: UserThreadActions;
   diffStyle: "unified" | "split";
   path: string;
 } & Pick<LineCommentDraftActions, "onCreateDraft" | "onChangeDraft" | "onRemoveDraft">) {
@@ -378,13 +416,21 @@ function RenderedFileDiff({
       )}
       renderAnnotation={(annotation) => annotation.metadata ? (
         <div className="line-annotation-stack">
+          {annotation.metadata.userThreads.map((thread) => (
+            <UserCommentThreadCard
+              key={thread.id}
+              thread={thread}
+              focused={thread.id === focusedThreadId}
+              {...threadActions}
+            />
+          ))}
           {annotation.metadata.comments.map((comment) => (
             <ReviewCommentCard
               key={comment.id}
               comment={comment}
               reviewerLanguage={reviewerLanguage}
               focused={comment.id === focusedCommentId}
-              {...actions}
+              {...commentActions}
             />
           ))}
           {annotation.metadata.draft && (
@@ -409,7 +455,11 @@ export function LineCommentDraftCard({
 } & Pick<LineCommentDraftActions, "onChangeDraft" | "onRemoveDraft">) {
   const location = { path: draft.path, line: draft.line, side: draft.side };
   return (
-    <section className="line-comment-draft" aria-label={`Your comment for ${draft.path} line ${draft.line}`}>
+    <section
+      id={userThreadCardId(draft.id)}
+      className="line-comment-draft"
+      aria-label={`Your comment for ${draft.path} line ${draft.line}`}
+    >
       <div className="line-comment-draft-heading">
         <span><MessageSquarePlus aria-hidden="true" size={14} /> Your comment for the AI agent</span>
         <button

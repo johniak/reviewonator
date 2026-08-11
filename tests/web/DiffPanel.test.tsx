@@ -9,7 +9,7 @@ import {
   DiffPanel,
   LineCommentDraftCard,
 } from "../../web/components/DiffPanel";
-import { review } from "../fixtures";
+import { review, userThread } from "../fixtures";
 
 const patch = readFileSync("tests/e2e/fixtures/pr.patch", "utf8");
 const fileUrls = {
@@ -23,6 +23,13 @@ const actions = {
   onToggleSelected: vi.fn(),
   onToggleRejected: vi.fn(),
   onRevisionChange: vi.fn(),
+  userThreads: [],
+  focusedThreadId: null,
+  replyMessages: {},
+  dismissalReasons: {},
+  onReplyChange: vi.fn(),
+  onDismissalChange: vi.fn(),
+  onSelectFinding: vi.fn(),
   drafts: [],
   onCreateDraft: vi.fn(),
   onChangeDraft: vi.fn(),
@@ -142,27 +149,38 @@ describe("DiffPanel view modes", () => {
     expect(onDiffStyleChange).toHaveBeenCalledWith("split");
   });
 
-  it("keeps an AI finding and a user draft together on the same line", () => {
+  it("keeps the user discussion, AI finding, and a new draft together on the same line", () => {
     const draft = {
+      id: "U-draft",
       path: "src/example.ts",
       line: 2,
       side: "RIGHT" as const,
       message: "Check whether this constant is intentional.",
     };
-    const annotations = buildLineAnnotations("src/example.ts", review.comments, [draft]);
+    const annotations = buildLineAnnotations("src/example.ts", review.comments, [userThread], [draft]);
 
     expect(annotations).toHaveLength(1);
     expect(annotations[0]).toMatchObject({
       side: "additions",
       lineNumber: 2,
-      metadata: { comments: [review.comments[0]], draft },
+      metadata: { comments: [review.comments[0]], userThreads: [userThread], draft },
+    });
+  });
+
+  it("anchors a user discussion to the selected side of the diff", () => {
+    const deletedLineThread = { ...userThread, line: 1, side: "LEFT" as const };
+
+    expect(buildLineAnnotations("src/example.ts", [], [deletedLineThread], [])[0]).toMatchObject({
+      side: "deletions",
+      lineNumber: 1,
+      metadata: { userThreads: [deletedLineThread] },
     });
   });
 
   it("lets the user edit and discard a line comment before sending it to the AI agent", async () => {
     const onChangeDraft = vi.fn();
     const onRemoveDraft = vi.fn();
-    const draft = { path: "src/example.ts", line: 2, side: "RIGHT" as const, message: "" };
+    const draft = { id: "U-draft", path: "src/example.ts", line: 2, side: "RIGHT" as const, message: "" };
     render(
       <LineCommentDraftCard
         draft={draft}

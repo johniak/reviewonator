@@ -4,7 +4,7 @@ import {
   reviewDocumentSchema,
   validateReviewLocations,
 } from "../../src/domain/review";
-import { patch, review } from "../fixtures";
+import { patch, review, userThread } from "../fixtures";
 
 describe("review document", () => {
   it("accepts a valid structured review", () => {
@@ -41,6 +41,45 @@ describe("review document", () => {
       ...review,
       comments: [review.comments[0], { ...review.comments[1], id: "S1" }],
     })).toThrow(/Duplicate comment id/);
+  });
+
+  it("preserves a private user-agent discussion and links an accepted concern to a finding", () => {
+    const linkedThread = {
+      ...userThread,
+      findingId: "S1",
+      messages: [
+        userThread.messages[0],
+        { id: "U1-M2", author: "agent" as const, body: "You are right. I added finding S1." },
+      ],
+    };
+    expect(reviewDocumentSchema.parse({ ...review, userThreads: [linkedThread] }).userThreads)
+      .toEqual([linkedThread]);
+  });
+
+  it("rejects invalid user-agent thread history and unknown linked findings", () => {
+    expect(() => reviewDocumentSchema.parse({
+      ...review,
+      userThreads: [{ ...userThread, messages: [{ id: "M1", author: "agent", body: "I started this." }] }],
+    })).toThrow(/must start with a user message/);
+
+    expect(() => reviewDocumentSchema.parse({
+      ...review,
+      userThreads: [{ ...userThread, findingId: "missing" }],
+    })).toThrow(/unknown finding/);
+
+    expect(() => reviewDocumentSchema.parse({
+      ...review,
+      userThreads: [{ ...userThread, dismissed: true }],
+    })).toThrow(/requires its user's reason/i);
+
+    expect(reviewDocumentSchema.parse({
+      ...review,
+      userThreads: [{
+        ...userThread,
+        dismissed: true,
+        dismissalReason: "I checked the caller and this behavior is intentional.",
+      }],
+    }).userThreads[0]?.dismissed).toBe(true);
   });
 
   it("requires a private reviewer explanation for every comment", () => {
@@ -83,7 +122,8 @@ describe("review document", () => {
 describe("revision request", () => {
   it("accepts a user-authored comment on either side of a diff line", () => {
     expect(revisionRequestSchema.parse({
-      newComments: [{
+      newThreads: [{
+        id: "U2",
         path: "src/example.ts",
         line: 2,
         side: "RIGHT",
@@ -93,17 +133,33 @@ describe("revision request", () => {
       selectedCommentIds: [],
       rejectedCommentIds: [],
       requests: [],
-      newComments: [{
+      newThreads: [{
+        id: "U2",
         path: "src/example.ts",
         line: 2,
         side: "RIGHT",
         message: "This looks like it ignores the input. Check it and write a clear comment.",
       }],
+      threadReplies: [],
+      dismissedThreads: [],
     });
   });
 
+  it("accepts a reply or a user-controlled dismissal, but not both for the same thread", () => {
+    expect(revisionRequestSchema.parse({
+      threadReplies: [{ threadId: "U1", message: "The caller contract still matters here." }],
+    }).threadReplies).toHaveLength(1);
+    expect(revisionRequestSchema.parse({
+      dismissedThreads: [{ threadId: "U1", reason: "I checked the caller and this is intentional." }],
+    }).dismissedThreads).toHaveLength(1);
+    expect(() => revisionRequestSchema.parse({
+      threadReplies: [{ threadId: "U1", message: "Keep discussing this." }],
+      dismissedThreads: [{ threadId: "U1", reason: "Close it." }],
+    })).toThrow(/cannot be replied to and dismissed together/);
+  });
+
   it("rejects an empty request", () => {
-    expect(() => revisionRequestSchema.parse({})).toThrow(/At least one revision or new comment/);
+    expect(() => revisionRequestSchema.parse({})).toThrow(/At least one revision or user comment update/);
   });
 
   it("carries selected comment ids with a revision request", () => {
@@ -146,5 +202,14 @@ describe("review location validation", () => {
       comments: [{ ...review.comments[0], path: "src/missing.ts" }],
     };
     expect(() => validateReviewLocations(invalid, patch)).toThrow(/src\/missing.ts/);
+  });
+
+  it("allows user threads on unchanged lines but rejects files outside the patch", () => {
+    expect(() => validateReviewLocations({ ...review, userThreads: [{ ...userThread, line: 1 }] }, patch))
+      .not.toThrow();
+    expect(() => validateReviewLocations({
+      ...review,
+      userThreads: [{ ...userThread, path: "src/missing.ts" }],
+    }, patch)).toThrow(/User comment threads must target files/);
   });
 });

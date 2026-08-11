@@ -16,7 +16,9 @@ export type SessionResult =
       selectedCommentIds: RevisionRequest["selectedCommentIds"];
       rejectedCommentIds: RevisionRequest["rejectedCommentIds"];
       requests: RevisionRequest["requests"];
-      newComments: RevisionRequest["newComments"];
+      newThreads: RevisionRequest["newThreads"];
+      threadReplies: RevisionRequest["threadReplies"];
+      dismissedThreads: RevisionRequest["dismissedThreads"];
     }
   | { status: "published"; review: PublishedReview }
   | { status: "cancelled" };
@@ -67,6 +69,7 @@ export class ReviewSession {
     this.assertOpen();
     const request = revisionRequestSchema.parse(input);
     const knownIds = new Set(this.review.comments.map((comment) => comment.id));
+    const threadsById = new Map(this.review.userThreads.map((thread) => [thread.id, thread]));
     const selectedCommentIds = [...new Set(request.selectedCommentIds)];
     const rejectedCommentIds = [...new Set(request.rejectedCommentIds)];
     const unknownIds = [
@@ -78,18 +81,46 @@ export class ReviewSession {
     if (unknownIds.length > 0) {
       throw new Error(`Unknown review comment ids: ${unknownIds.join(", ")}`);
     }
-    const unknownPaths = request.newComments
+    const duplicateThreadIds = request.newThreads
+      .map(({ id }) => id)
+      .filter((id) => threadsById.has(id));
+    if (duplicateThreadIds.length > 0) {
+      throw new Error(`User comment thread ids already exist: ${[...new Set(duplicateThreadIds)].join(", ")}`);
+    }
+    const unknownThreadIds = [
+      ...request.threadReplies.map(({ threadId }) => threadId),
+      ...request.dismissedThreads.map(({ threadId }) => threadId),
+    ].filter((id) => !threadsById.has(id));
+    if (unknownThreadIds.length > 0) {
+      throw new Error(`Unknown user comment thread ids: ${[...new Set(unknownThreadIds)].join(", ")}`);
+    }
+    for (const { threadId } of request.threadReplies) {
+      const thread = threadsById.get(threadId)!;
+      if (thread.dismissed) throw new Error(`Cannot reply to dismissed user comment thread: ${threadId}`);
+      if (thread.findingId) throw new Error(`Cannot reply to a user comment thread converted to a finding: ${threadId}`);
+      if (thread.messages.at(-1)?.author !== "agent") {
+        throw new Error(`Cannot reply before the agent responds to user comment thread: ${threadId}`);
+      }
+    }
+    for (const { threadId } of request.dismissedThreads) {
+      if (threadsById.get(threadId)!.dismissed) {
+        throw new Error(`User comment thread is already dismissed: ${threadId}`);
+      }
+    }
+    const unknownPaths = request.newThreads
       .map(({ path }) => path)
       .filter((path) => !this.fileRevisions.has(path));
     if (unknownPaths.length > 0) {
-      throw new Error(`New comments target files outside this pull request: ${[...new Set(unknownPaths)].join(", ")}`);
+      throw new Error(`New user comment threads target files outside this pull request: ${[...new Set(unknownPaths)].join(", ")}`);
     }
     this.complete({
       status: "revision_requested",
       selectedCommentIds,
       rejectedCommentIds,
       requests: request.requests,
-      newComments: request.newComments,
+      newThreads: request.newThreads,
+      threadReplies: request.threadReplies,
+      dismissedThreads: request.dismissedThreads,
     });
   }
 

@@ -13,9 +13,20 @@ You can:
 - expand ten lines of context above or below a patch;
 - open the complete file or pull request on GitHub;
 - navigate directly between findings from the left sidebar;
-- add your own note to any diff line for the AI agent to verify and rewrite.
+- start your own private discussion with the AI agent on any diff line.
 
 Context expansion is handled by the local Reviewonator process through your authenticated GitHub CLI session. GitHub credentials are never sent to the browser.
+
+## Discuss your own concerns with the AI agent
+
+Click **+** beside a diff line to add your own comment. Reviewonator keeps these conversations in a separate **My comments** section and never publishes them directly to GitHub.
+
+The agent checks the exact code before responding. It can:
+
+- agree, create a normal review finding, and link it to your discussion;
+- disagree, explain why, and leave the discussion open for your next reply.
+
+Only you can dismiss a discussion, and Reviewonator requires your reason. Drafts, replies, waiting discussions, linked findings, and dismissed discussions have distinct states in the sidebar, so it is clear who needs to act next.
 
 ## Decide what happens to every finding
 

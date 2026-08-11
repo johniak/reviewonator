@@ -101,11 +101,20 @@ describe("Reviewonator CLI end-to-end", () => {
         selectedCommentIds: ["G1"],
         rejectedCommentIds: ["S2"],
         requests: [{ commentId: "S1", message: "Verify provider idempotency." }],
-        newComments: [{
+        newThreads: [{
+          id: "U3",
           path: "src/payments/retry.ts",
           line: 8,
           side: "RIGHT",
           message: "Check whether this retry can run forever and rewrite my comment.",
+        }],
+        threadReplies: [{
+          threadId: "U1",
+          message: "The provider docs say a timeout can happen after acceptance.",
+        }],
+        dismissedThreads: [{
+          threadId: "U2",
+          reason: "The external worker deadline does bound this path.",
         }],
       }),
     });
@@ -116,11 +125,20 @@ describe("Reviewonator CLI end-to-end", () => {
       selectedCommentIds: ["G1"],
       rejectedCommentIds: ["S2"],
       requests: [{ commentId: "S1", message: "Verify provider idempotency." }],
-      newComments: [{
+      newThreads: [{
+        id: "U3",
         path: "src/payments/retry.ts",
         line: 8,
         side: "RIGHT",
         message: "Check whether this retry can run forever and rewrite my comment.",
+      }],
+      threadReplies: [{
+        threadId: "U1",
+        message: "The provider docs say a timeout can happen after acceptance.",
+      }],
+      dismissedThreads: [{
+        threadId: "U2",
+        reason: "The external worker deadline does bound this path.",
       }],
     });
   }, 15_000);

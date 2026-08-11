@@ -3,7 +3,7 @@ import type { PullRequest } from "../../src/domain/pull-request";
 import type { PublishRequest, ReviewComment } from "../../src/domain/review";
 import type { GitHubGateway, LoadedPullRequest, PublishedReview } from "../../src/github/client";
 import { ClosedSessionError, ReviewSession, StalePullRequestError } from "../../src/server/session";
-import { patch, pullRequest, review } from "../fixtures";
+import { patch, pullRequest, review, userThread } from "../fixtures";
 
 class FakeGitHub implements GitHubGateway {
   headSha = pullRequest.headRefOid;
@@ -33,7 +33,9 @@ describe("ReviewSession", () => {
       selectedCommentIds: [],
       rejectedCommentIds: [],
       requests: [{ commentId: "S1", message: "Verify the actual caller contract." }],
-      newComments: [],
+      newThreads: [],
+      threadReplies: [],
+      dismissedThreads: [],
     });
     expect(github.published).toBeUndefined();
   });
@@ -75,30 +77,77 @@ describe("ReviewSession", () => {
     })).toThrow(/Unknown review comment ids/);
   });
 
-  it("returns a user-authored line comment to the agent", async () => {
+  it("returns a new private user comment thread to the agent", async () => {
     const session = new ReviewSession(pullRequest, patch, review, new FakeGitHub());
-    const newComment = {
+    const newThread = {
+      id: "U2",
       path: "src/example.ts",
       line: 2,
       side: "RIGHT" as const,
       message: "Verify whether this constant is intentional and rewrite my comment.",
     };
-    session.requestRevision({ newComments: [newComment] });
+    session.requestRevision({ newThreads: [newThread] });
 
     await expect(session.waitForResult()).resolves.toEqual({
       status: "revision_requested",
       selectedCommentIds: [],
       rejectedCommentIds: [],
       requests: [],
-      newComments: [newComment],
+      newThreads: [newThread],
+      threadReplies: [],
+      dismissedThreads: [],
     });
   });
 
-  it("rejects user-authored comments outside the pull request", () => {
+  it("rejects new user comment threads outside the pull request", () => {
     const session = new ReviewSession(pullRequest, patch, review, new FakeGitHub());
     expect(() => session.requestRevision({
-      newComments: [{ path: "src/missing.ts", line: 1, side: "RIGHT", message: "Check this." }],
+      newThreads: [{ id: "U2", path: "src/missing.ts", line: 1, side: "RIGHT", message: "Check this." }],
     })).toThrow(/outside this pull request/);
+  });
+
+  it("returns a user reply and keeps the agent from dismissing the thread", async () => {
+    const reviewWithThread = { ...review, userThreads: [userThread] };
+    const session = new ReviewSession(pullRequest, patch, reviewWithThread, new FakeGitHub());
+    session.requestRevision({
+      threadReplies: [{ threadId: "U1", message: "The function gets its value through closure state." }],
+    });
+
+    await expect(session.waitForResult()).resolves.toMatchObject({
+      status: "revision_requested",
+      threadReplies: [{ threadId: "U1", message: "The function gets its value through closure state." }],
+      dismissedThreads: [],
+    });
+  });
+
+  it("lets only the user dismiss an existing thread with a reason", async () => {
+    const reviewWithThread = { ...review, userThreads: [userThread] };
+    const session = new ReviewSession(pullRequest, patch, reviewWithThread, new FakeGitHub());
+    session.requestRevision({
+      dismissedThreads: [{ threadId: "U1", reason: "The agent is right; there is no input contract." }],
+    });
+
+    await expect(session.waitForResult()).resolves.toMatchObject({
+      status: "revision_requested",
+      threadReplies: [],
+      dismissedThreads: [{ threadId: "U1", reason: "The agent is right; there is no input contract." }],
+    });
+  });
+
+  it("rejects replies before the agent answers and updates for unknown threads", () => {
+    const waitingThread = { ...userThread, messages: [userThread.messages[0]] };
+    const session = new ReviewSession(
+      pullRequest,
+      patch,
+      { ...review, userThreads: [waitingThread] },
+      new FakeGitHub(),
+    );
+    expect(() => session.requestRevision({
+      threadReplies: [{ threadId: "U1", message: "Another message." }],
+    })).toThrow(/before the agent responds/);
+    expect(() => session.requestRevision({
+      dismissedThreads: [{ threadId: "missing", reason: "Not relevant." }],
+    })).toThrow(/Unknown user comment thread ids/);
   });
 
   it("publishes only the comments explicitly selected by the user", async () => {

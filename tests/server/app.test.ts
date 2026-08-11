@@ -73,7 +73,9 @@ describe("Reviewonator HTTP API", () => {
       selectedCommentIds: [],
       rejectedCommentIds: [],
       requests: [{ commentId: "S1", message: "Re-check this finding." }],
-      newComments: [],
+      newThreads: [],
+      threadReplies: [],
+      dismissedThreads: [],
     });
   });
 

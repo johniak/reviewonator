@@ -12,6 +12,27 @@ Write UTF-8 JSON matching this shape:
   },
   "summary": "The retry change can duplicate successful payments after a timeout.",
   "recommendation": "REQUEST_CHANGES",
+  "userThreads": [
+    {
+      "id": "U1",
+      "path": "src/payments/retry.ts",
+      "line": 87,
+      "side": "RIGHT",
+      "findingId": "S1",
+      "messages": [
+        {
+          "id": "U1-M1",
+          "author": "user",
+          "body": "Can this retry charge the customer twice?"
+        },
+        {
+          "id": "U1-M2",
+          "author": "agent",
+          "body": "Yes. A timeout can happen after the provider accepts the charge, so I added finding S1."
+        }
+      ]
+    }
+  ],
   "comments": [
     {
       "id": "S1",
@@ -42,6 +63,13 @@ Write UTF-8 JSON matching this shape:
 - `languages.comments` and `languages.reviewerNotes` must match the installed language configuration.
 - `summary` becomes the editable review body shown on the final confirmation screen. It is always optional and may be an empty string for every recommendation.
 - `recommendation` must be `COMMENT`, `APPROVE`, or `REQUEST_CHANGES`.
+- `userThreads` contains private conversations started by the user on diff lines. It is never published to GitHub.
+- User thread IDs and message IDs must be unique and stable across review rounds. Preserve every earlier message verbatim and append new messages in order.
+- A user thread must start with a user message and alternate between `user` and `agent`. An open thread with a final user message requires an agent response in the next review round.
+- When the user is correct, append a clear agent response, create a normal review finding, and set `findingId` to that finding's stable ID.
+- When the agent disagrees, append a simple explanation and leave `findingId` unset so the user can reply again.
+- Only set `dismissed: true` and copy `dismissalReason` for a thread listed in `dismissedThreads` by Reviewonator. The agent must never dismiss a thread itself and must not reply to a dismissal.
+- A thread with `findingId` must link to an existing finding and end with an agent response.
 - Comment IDs must be unique and stable across revision rounds.
 - `type` must be `line` or `general`.
 - `severity` must be `security`, `bug`, `warning`, `suggestion`, or `nit`.

@@ -21,9 +21,16 @@ import { api } from "./api";
 import { DiffPanel, fileSectionId } from "./components/DiffPanel";
 import { PublishDialog } from "./components/PublishDialog";
 import { PullRequestDiscussion } from "./components/PullRequestDiscussion";
+import { MyCommentNavigation } from "./components/MyCommentNavigation";
 import { commentCardId, ReviewCommentCard } from "./components/ReviewCommentCard";
 import { ReviewFindingNavigation } from "./components/ReviewFindingNavigation";
-import type { LineCommentDraft, SessionSnapshot } from "./types";
+import { userThreadCardId } from "./components/UserCommentThread";
+import type {
+  LineCommentDraft,
+  LineCommentLocation,
+  SessionSnapshot,
+  UserCommentThread,
+} from "./types";
 
 type Completion =
   | { type: "revision" }
@@ -40,8 +47,12 @@ export function App() {
   const [rejectedIds, setRejectedIds] = useState<Set<string>>(new Set());
   const [focusedCommentId, setFocusedCommentId] = useState<string | null>(null);
   const [pendingCommentId, setPendingCommentId] = useState<string | null>(null);
+  const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null);
+  const [pendingThreadId, setPendingThreadId] = useState<string | null>(null);
   const [revisionMessages, setRevisionMessages] = useState<Record<string, string>>({});
   const [lineCommentDrafts, setLineCommentDrafts] = useState<Record<string, LineCommentDraft>>({});
+  const [threadReplies, setThreadReplies] = useState<Record<string, string>>({});
+  const [dismissalReasons, setDismissalReasons] = useState<Record<string, string>>({});
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -91,7 +102,36 @@ export function App() {
     };
   }, [activePath, pendingCommentId, viewMode]);
 
+  useEffect(() => {
+    if (!pendingThreadId) return;
+    let cancelled = false;
+    let attempts = 0;
+    let timer: number | undefined;
+    const scrollToThread = () => {
+      if (cancelled) return;
+      const element = document.getElementById(userThreadCardId(pendingThreadId));
+      if (element) {
+        scrollWithinPanel(element, "center");
+        element.focus({ preventScroll: true });
+        setPendingThreadId(null);
+        return;
+      }
+      if (attempts < 40) {
+        attempts += 1;
+        timer = window.setTimeout(scrollToThread, 50);
+      } else {
+        setPendingThreadId(null);
+      }
+    };
+    scrollToThread();
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [activePath, pendingThreadId, viewMode]);
+
   const comments = session?.review.comments ?? [];
+  const userThreads = session?.review.userThreads ?? [];
   const selectedComments = useMemo(
     () => comments.filter((comment) => selectedIds.has(comment.id)),
     [comments, selectedIds],
@@ -99,10 +139,19 @@ export function App() {
   const pendingRevisions = Object.entries(revisionMessages)
     .filter(([, message]) => message.trim())
     .map(([commentId, message]) => ({ commentId, message: message.trim() }));
-  const pendingNewComments = Object.values(lineCommentDrafts)
+  const pendingNewThreads = Object.values(lineCommentDrafts)
     .filter(({ message }) => message.trim())
     .map((draft) => ({ ...draft, message: draft.message.trim() }));
-  const pendingAgentRequests = pendingRevisions.length + pendingNewComments.length;
+  const pendingThreadReplies = Object.entries(threadReplies)
+    .filter(([, message]) => message.trim())
+    .map(([threadId, message]) => ({ threadId, message: message.trim() }));
+  const pendingDismissedThreads = Object.entries(dismissalReasons)
+    .filter(([, reason]) => reason.trim())
+    .map(([threadId, reason]) => ({ threadId, reason: reason.trim() }));
+  const pendingAgentRequests = pendingRevisions.length
+    + pendingNewThreads.length
+    + pendingThreadReplies.length
+    + pendingDismissedThreads.length;
 
   const actions = {
     selectedIds,
@@ -111,6 +160,14 @@ export function App() {
     onToggleSelected: toggleSelected,
     onToggleRejected: toggleRejected,
     onRevisionChange: changeRevision,
+  };
+
+  const threadActions = {
+    replyMessages: threadReplies,
+    dismissalReasons,
+    onReplyChange: changeThreadReply,
+    onDismissalChange: changeDismissalReason,
+    onSelectFinding: selectFindingById,
   };
 
   function clearRevision(id: string) {
@@ -173,6 +230,28 @@ export function App() {
     });
   }
 
+  function changeThreadReply(id: string, message: string) {
+    setThreadReplies((current) => ({ ...current, [id]: message }));
+    if (!message.trim()) return;
+    setDismissalReasons((current) => {
+      if (!(id in current)) return current;
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+  }
+
+  function changeDismissalReason(id: string, reason: string) {
+    setDismissalReasons((current) => ({ ...current, [id]: reason }));
+    if (!reason.trim()) return;
+    setThreadReplies((current) => {
+      if (!(id in current)) return current;
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+  }
+
   if (loadingError) return <LoadFailure message={loadingError} />;
   if (!session) return <LoadingScreen />;
   if (completion) return <CompletionScreen completion={completion} />;
@@ -189,7 +268,9 @@ export function App() {
         selectedCommentIds: [...selectedIds],
         rejectedCommentIds: [...rejectedIds],
         requests: pendingRevisions,
-        newComments: pendingNewComments,
+        newThreads: pendingNewThreads,
+        threadReplies: pendingThreadReplies,
+        dismissedThreads: pendingDismissedThreads,
       });
       setCompletion({ type: "revision" });
     } catch (error) {
@@ -197,19 +278,24 @@ export function App() {
     }
   }
 
-  function createLineCommentDraft(location: Omit<LineCommentDraft, "message">) {
+  function createLineCommentDraft(location: LineCommentLocation) {
     const key = lineCommentDraftKey(location);
+    const id = lineCommentDrafts[key]?.id ?? createUserThreadId();
     setLineCommentDrafts((current) => current[key]
       ? current
-      : { ...current, [key]: { ...location, message: "" } });
+      : { ...current, [key]: { id, ...location, message: "" } });
+    setFocusedCommentId(null);
+    setFocusedThreadId(id);
   }
 
-  function changeLineCommentDraft(location: Omit<LineCommentDraft, "message">, message: string) {
+  function changeLineCommentDraft(location: LineCommentLocation, message: string) {
     const key = lineCommentDraftKey(location);
-    setLineCommentDrafts((current) => ({ ...current, [key]: { ...location, message } }));
+    setLineCommentDrafts((current) => current[key]
+      ? { ...current, [key]: { ...current[key], ...location, message } }
+      : current);
   }
 
-  function removeLineCommentDraft(location: Omit<LineCommentDraft, "message">) {
+  function removeLineCommentDraft(location: LineCommentLocation) {
     const key = lineCommentDraftKey(location);
     setLineCommentDrafts((current) => {
       const next = { ...current };
@@ -245,7 +331,9 @@ export function App() {
   function selectFile(path: string) {
     setActivePath(path);
     setFocusedCommentId(null);
+    setFocusedThreadId(null);
     setPendingCommentId(null);
+    setPendingThreadId(null);
     if (viewMode === "all") {
       const section = document.getElementById(fileSectionId(path));
       if (section) scrollWithinPanel(section, "start");
@@ -257,8 +345,28 @@ export function App() {
 
   function selectComment(comment: ReviewComment) {
     setFocusedCommentId(comment.id);
+    setFocusedThreadId(null);
     if (comment.type === "line" && comment.path) setActivePath(comment.path);
     setPendingCommentId(comment.id);
+  }
+
+  function selectFindingById(id: string) {
+    const comment = comments.find((item) => item.id === id);
+    if (comment) selectComment(comment);
+  }
+
+  function selectUserThread(thread: UserCommentThread) {
+    setFocusedThreadId(thread.id);
+    setFocusedCommentId(null);
+    setActivePath(thread.path);
+    setPendingThreadId(thread.id);
+  }
+
+  function selectDraft(draft: LineCommentDraft) {
+    setFocusedThreadId(draft.id);
+    setFocusedCommentId(null);
+    setActivePath(draft.path);
+    setPendingThreadId(draft.id);
   }
 
   return (
@@ -311,6 +419,16 @@ export function App() {
             })}
           </nav>
 
+          <MyCommentNavigation
+            threads={userThreads}
+            drafts={Object.values(lineCommentDrafts)}
+            activeThreadId={focusedThreadId}
+            replyMessages={threadReplies}
+            dismissalReasons={dismissalReasons}
+            onSelectThread={selectUserThread}
+            onSelectDraft={selectDraft}
+          />
+
           <ReviewFindingNavigation
             comments={comments}
             activeCommentId={focusedCommentId}
@@ -341,8 +459,10 @@ export function App() {
             activePath={activePath}
             fileUrls={session.fileUrls}
             comments={comments}
+            userThreads={userThreads}
             reviewerLanguage={review.languages.reviewerNotes}
             focusedCommentId={focusedCommentId}
+            focusedThreadId={focusedThreadId}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
             diffStyle={diffStyle}
@@ -352,6 +472,7 @@ export function App() {
             onCreateDraft={createLineCommentDraft}
             onChangeDraft={changeLineCommentDraft}
             onRemoveDraft={removeLineCommentDraft}
+            {...threadActions}
             {...actions}
           />
         </main>
@@ -482,8 +603,12 @@ export function describeFilePath(path: string): { name: string; directory: strin
   };
 }
 
-export function lineCommentDraftKey(location: Omit<LineCommentDraft, "message">): string {
+export function lineCommentDraftKey(location: LineCommentLocation): string {
   return `${location.path}:${location.side}:${location.line}`;
+}
+
+export function createUserThreadId(): string {
+  return `U-${crypto.randomUUID()}`;
 }
 
 function scrollWithinPanel(element: HTMLElement, block: "start" | "center") {

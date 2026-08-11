@@ -124,17 +124,27 @@ describe("Reviewonator skill", () => {
     expect(skill).toContain("normally 2–4 sentences and at most about 80 words");
     expect(skill).toContain("problem, consequence, and required change once");
     expect(skill).toContain("Go longer only when shortening it would make the fix ambiguous");
+    expect(skill).toContain("Use simple, familiar words");
+    expect(skill).toContain("Prefer short, plain sentences");
+    expect(skill).toContain("Do not use fancy, academic, or overly formal language");
     expect(skill).toContain("a thoughtful human teammate would write it");
     expect(skill).toContain("rewrite anything that sounds generated, templated, or like a linter message");
   });
 
-  it("verifies and improves user-authored line comments in the next review round", async () => {
+  it("keeps user-authored line comments as private discussions with the agent", async () => {
     const skill = await readFile("skills/reviewonator/SKILL.md", "utf8");
 
-    expect(skill).toContain("For each item in `newComments`");
-    expect(skill).toContain("Verify the concern instead of trusting it blindly");
-    expect(skill).toContain("turn each valid concern into a new finding");
-    expect(skill).toContain("preserve every unaffected finding");
+    expect(skill).toContain("Preserve every existing `userThreads` entry, stable thread ID, location, and message ID");
+    expect(skill).toContain("For each item in `newThreads`");
+    expect(skill).toContain("For each item in `threadReplies`");
+    expect(skill).toContain("verify the concern instead of trusting it blindly");
+    expect(skill).toContain("if the user is right");
+    expect(skill).toContain("create a normal review finding");
+    expect(skill).toContain("if the agent still disagrees");
+    expect(skill).toContain("keep the thread open so the user can reply again");
+    expect(skill).toContain("For each item in `dismissedThreads`");
+    expect(skill).toContain("only the user may dismiss their discussion");
+    expect(skill).toContain("must never be copied into the GitHub review");
   });
 
   it("preserves explicit human decisions across revision rounds", async () => {
@@ -144,7 +154,7 @@ describe("Reviewonator skill", () => {
     expect(skill).toContain("set `included: true`");
     expect(skill).toContain("set `rejected: true`");
     expect(skill).toContain("Never set both flags");
-    expect(skill).toContain("New comments start pending");
+    expect(skill).toContain("New findings start pending");
   });
 
   it("never requires or invents a review summary", async () => {

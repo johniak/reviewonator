@@ -1,6 +1,11 @@
 import type { PullRequest } from "../src/domain/pull-request";
 import type { PullRequestDiscussionItem } from "../src/domain/discussion";
-import type { ReviewComment, ReviewDocument, ReviewEvent } from "../src/domain/review";
+import type {
+  ReviewComment,
+  ReviewDocument,
+  ReviewEvent,
+  UserCommentThread,
+} from "../src/domain/review";
 
 export type SessionSnapshot = {
   pullRequest: PullRequest;
@@ -20,17 +25,28 @@ export type CommentActions = {
 };
 
 export type LineCommentDraft = {
+  id: string;
   path: string;
   line: number;
   side: "LEFT" | "RIGHT";
   message: string;
 };
 
+export type LineCommentLocation = Pick<LineCommentDraft, "path" | "line" | "side">;
+
 export type LineCommentDraftActions = {
   drafts: LineCommentDraft[];
-  onCreateDraft: (location: Omit<LineCommentDraft, "message">) => void;
-  onChangeDraft: (location: Omit<LineCommentDraft, "message">, message: string) => void;
-  onRemoveDraft: (location: Omit<LineCommentDraft, "message">) => void;
+  onCreateDraft: (location: LineCommentLocation) => void;
+  onChangeDraft: (location: LineCommentLocation, message: string) => void;
+  onRemoveDraft: (location: LineCommentLocation) => void;
+};
+
+export type UserThreadActions = {
+  replyMessages: Record<string, string>;
+  dismissalReasons: Record<string, string>;
+  onReplyChange: (id: string, message: string) => void;
+  onDismissalChange: (id: string, reason: string) => void;
+  onSelectFinding: (id: string) => void;
 };
 
 export type PublishDraft = {
@@ -38,4 +54,4 @@ export type PublishDraft = {
   body: string;
 };
 
-export type { ReviewComment };
+export type { ReviewComment, UserCommentThread };

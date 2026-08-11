@@ -7,7 +7,7 @@ import type { GitHubGateway, LoadedPullRequest, PublishedReview } from "../../sr
 import { createApp } from "../../src/server/app";
 import { ReviewSession } from "../../src/server/session";
 import { App, buildPublishBody, CompletionScreen, describeFilePath } from "../../web/App";
-import { discussion, patch, pullRequest, review } from "../fixtures";
+import { discussion, patch, pullRequest, review, userThread } from "../fixtures";
 
 class AppGateway implements GitHubGateway {
   async verifyPrerequisites() {}
@@ -136,6 +136,74 @@ describe("GitHub review body", () => {
     expect(screen.getByText("Requested changes")).toBeVisible();
     expect(screen.getByRole("button", { name: "src/example.ts:2" })).toBeVisible();
     expect(screen.getAllByRole("link", { name: /Open .* comment on GitHub/ })).toHaveLength(3);
+  });
+
+  it("shows user discussions separately and returns a follow-up reply to the agent", async () => {
+    const session = new ReviewSession(
+      pullRequest,
+      patch,
+      { ...review, userThreads: [userThread] },
+      new AppGateway(),
+      discussion,
+    );
+    const serverApp = createApp({ html: "<html></html>", favicon: "<svg></svg>", token: "secret", session });
+    vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+      const value = input instanceof Request ? input.url : input.toString();
+      const url = new URL(value, "http://reviewonator.local");
+      return serverApp.request(`${url.pathname}${url.search}`, init);
+    });
+    window.location.hash = "secret";
+    render(createElement(App));
+
+    expect(await screen.findByRole("navigation", { name: "My comments" })).toBeVisible();
+    expect(screen.getByRole("button", { name: /Needs your reply.*src\/example\.ts:2/ })).toBeVisible();
+    fireEvent.change(screen.getByLabelText("Reply to the AI agent"), {
+      target: { value: "The closure supplies the value, so please check that path." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send 1 request to AI agent" }));
+
+    await expect(session.waitForResult()).resolves.toMatchObject({
+      status: "revision_requested",
+      threadReplies: [{
+        threadId: "U1",
+        message: "The closure supplies the value, so please check that path.",
+      }],
+      dismissedThreads: [],
+    });
+  });
+
+  it("lets the user dismiss their discussion with a reason", async () => {
+    const session = new ReviewSession(
+      pullRequest,
+      patch,
+      { ...review, userThreads: [userThread] },
+      new AppGateway(),
+      discussion,
+    );
+    const serverApp = createApp({ html: "<html></html>", favicon: "<svg></svg>", token: "secret", session });
+    vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+      const value = input instanceof Request ? input.url : input.toString();
+      const url = new URL(value, "http://reviewonator.local");
+      return serverApp.request(`${url.pathname}${url.search}`, init);
+    });
+    window.location.hash = "secret";
+    render(createElement(App));
+
+    await screen.findByRole("navigation", { name: "My comments" });
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss discussion" }));
+    fireEvent.change(screen.getByLabelText("Why are you dismissing this discussion?"), {
+      target: { value: "The agent is right; this function has no input contract." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send 1 request to AI agent" }));
+
+    await expect(session.waitForResult()).resolves.toMatchObject({
+      status: "revision_requested",
+      threadReplies: [],
+      dismissedThreads: [{
+        threadId: "U1",
+        reason: "The agent is right; this function has no input contract.",
+      }],
+    });
   });
 });
 

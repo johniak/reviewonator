@@ -7,6 +7,28 @@
   },
   "summary": "The implementation is close, but the new retry path can execute the same payment twice after a network timeout.",
   "recommendation": "REQUEST_CHANGES",
+  "userThreads": [
+    {
+      "id": "U1",
+      "path": "src/payments/retry.ts",
+      "line": 8,
+      "side": "RIGHT",
+      "messages": [
+        { "id": "U1-M1", "author": "user", "body": "Can this retry charge the customer twice?" },
+        { "id": "U1-M2", "author": "agent", "body": "The provider contract is unclear, so I cannot prove that yet." }
+      ]
+    },
+    {
+      "id": "U2",
+      "path": "src/payments/retry.ts",
+      "line": 9,
+      "side": "RIGHT",
+      "messages": [
+        { "id": "U2-M1", "author": "user", "body": "This loop may never stop." },
+        { "id": "U2-M2", "author": "agent", "body": "The worker has an external deadline, so this may be bounded." }
+      ]
+    }
+  ],
   "comments": [
     {
       "id": "S1",
