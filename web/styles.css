@@ -59,8 +59,11 @@ button:focus-visible, a:focus-visible, textarea:focus-visible, input:focus-visib
   border: 1px solid var(--border); background: #131720; border-radius: 8px; padding: 7px 10px; font-size: 12px; white-space: nowrap;
 }
 .pr-heading a:hover, .secondary-button:hover { color: white; border-color: #3a4050; background: #181d27; }
-.diff-stats { display: flex; gap: 8px; font: 700 12px ui-monospace, monospace; }
+.diff-stats { display: flex; gap: 8px; align-items: center; font: 700 12px ui-monospace, monospace; }
 .diff-stats span { padding: 5px 8px; border-radius: 6px; }
+.diff-stats .live-session-badge { display: inline-flex; align-items: center; gap: 5px; color: #5bd89f; background: rgba(72, 197, 139, .08); border: 1px solid rgba(72, 197, 139, .3); border-radius: 999px; font: 700 8px system-ui, sans-serif; text-transform: uppercase; letter-spacing: .05em; }
+.live-session-badge svg { fill: currentColor; }
+.diff-stats .live-session-badge.working { color: #80cafa; background: rgba(85, 185, 243, .08); border-color: rgba(85, 185, 243, .3); }
 .additions { color: var(--green); background: rgba(86, 211, 155, .09); }
 .deletions { color: var(--red); background: rgba(243, 123, 131, .09); }
 
@@ -119,6 +122,7 @@ button:focus-visible, a:focus-visible, textarea:focus-visible, input:focus-visib
 .finding-status-revision { color: #b6a8ff; border-color: rgba(155,135,245,.34); background: rgba(155,135,245,.1); }
 .finding-status-rejected { color: #ff929a; border-color: rgba(243,123,131,.3); background: rgba(243,123,131,.08); }
 .finding-status-pending { color: #9aa3b2; border-color: rgba(154,163,178,.22); background: rgba(154,163,178,.06); }
+.finding-discussion-count { display: inline-flex; align-items: center; gap: 3px; color: #76c4ef; font-size: 8px; }
 .finding-severity-security { --finding-accent: #ff4d78 !important; }.finding-severity-bug { --finding-accent: #ff825f !important; }.finding-severity-warning { --finding-accent: #f2c84b !important; }.finding-severity-suggestion { --finding-accent: #55b9f3 !important; }.finding-severity-nit { --finding-accent: #a9b1bf !important; }
 .commits-heading { border-top: 1px solid var(--border-soft); }
 .commit-list { padding: 2px 10px 20px; }
@@ -262,6 +266,17 @@ button:focus-visible, a:focus-visible, textarea:focus-visible, input:focus-visib
 .reviewer-explanation-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #b8aaf8; font-size: 9px; font-weight: 700; letter-spacing: .02em; }
 .reviewer-explanation-heading span { display: inline-flex; align-items: center; gap: 5px; }.reviewer-explanation-heading small { color: #858d9d; font-size: 8px; font-weight: 600; white-space: nowrap; }
 .reviewer-explanation p { margin: 7px 0 0; color: #b9beca; font-size: 10.5px; line-height: 1.5; white-space: pre-wrap; }
+.finding-discussion { display: grid; gap: 8px; margin: 0 0 11px; padding: 10px; background: #10151d; border: 1px solid rgba(91, 174, 225, .2); border-radius: 9px; }
+.finding-discussion-heading { display: flex; align-items: center; gap: 6px; color: #83c9f0; font-size: 8.5px; font-weight: 750; text-transform: uppercase; letter-spacing: .04em; }
+.finding-discussion-message { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 7px; align-items: start; }
+.finding-discussion-message > span { width: 22px; height: 22px; display: grid; place-items: center; color: #c9c0ff; background: #25283a; border: 1px solid #393e54; border-radius: 7px; }
+.finding-discussion-agent > span { color: #87cff7; background: #1b2a35; border-color: #315064; }
+.finding-discussion-message > div { padding: 7px 8px; background: #0d1117; border: 1px solid #282f3b; border-radius: 7px; }
+.finding-discussion-user > div { background: rgba(155, 135, 245, .045); border-color: rgba(155, 135, 245, .23); }
+.finding-discussion-message strong { color: #d8dce4; font-size: 8px; }
+.finding-discussion-message p { margin: 3px 0 0; color: #c2c8d2; font-size: 10px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.finding-discussion-waiting { display: flex; align-items: center; gap: 6px; margin: 9px 0 0; color: #80cafa; font-size: 9px; }
+.finding-discussion-waiting svg { animation: spin 1.3s linear infinite; }
 .severity-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 9px; font-weight: 750; letter-spacing: .035em; text-transform: uppercase; }
 .severity-security { color: #ff8e9a; }.severity-bug { color: #ff9b75; }.severity-warning { color: #f0c96c; }.severity-suggestion { color: #77bdf5; }.severity-nit { color: #aeb5c2; }
 .comment-actions { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -272,13 +287,22 @@ button:focus-visible, a:focus-visible, textarea:focus-visible, input:focus-visib
 .selection-button, .rejection-button, .revision-button { padding: 5px 7px; font-size: 9px; }
 .selection-button.active { color: var(--green); border-color: rgba(86,211,155,.3); background: rgba(86,211,155,.07); }
 .rejection-button.active { color: #ff929a; border-color: rgba(243,123,131,.32); background: rgba(243,123,131,.08); }
-.revision-button.active, .revision-button:hover { color: #d3caff; border-color: rgba(155,135,245,.34); }
-.revision-field { display: block; margin-top: 10px; }
+.revision-button.active, .revision-button:hover:not(:disabled) { color: #d3caff; border-color: rgba(155,135,245,.34); }
+.revision-button:disabled { cursor: wait; color: #80cafa; border-color: rgba(85,185,243,.24); background: rgba(85,185,243,.06); }
+.revision-composer { margin-top: 10px; }
+.revision-field { display: block; }
 .revision-field span, .publish-body-field > span { display: block; color: #9da5b4; font-size: 9.5px; margin-bottom: 5px; }
 .revision-field textarea, .publish-body-field textarea {
   width: 100%; resize: vertical; color: var(--text); background: #0f1218; border: 1px solid #303644; border-radius: 7px; padding: 8px 9px; font-size: 10.5px; line-height: 1.5;
 }
 .revision-field textarea::placeholder { color: #5e6675; }
+.finding-discussion-send {
+  min-height: 29px; margin: 7px 0 0 auto; padding: 0 11px; border: 1px solid rgba(155,135,245,.42); border-radius: 7px;
+  display: flex; align-items: center; justify-content: center; gap: 6px; color: #ece8ff; background: rgba(128,104,236,.18); font-size: 9.5px; font-weight: 700; cursor: pointer;
+}
+.finding-discussion-send:hover:not(:disabled) { background: rgba(128,104,236,.28); border-color: rgba(174,157,255,.6); }
+.finding-discussion-send:disabled { color: #747b8a; background: #151922; border-color: #2a303d; cursor: not-allowed; }
+.finding-discussion-send:disabled svg { animation: spin 1.3s linear infinite; }
 .publish-body-field small { display: block; margin-top: 5px; color: #8e96a5; font-size: 8.5px; line-height: 1.45; }
 
 .review-actions-panel { position: sticky; bottom: 0; padding: 14px 16px; background: rgba(16, 19, 26, .96); border-top: 1px solid var(--border); backdrop-filter: blur(16px); }
@@ -288,6 +312,7 @@ button:focus-visible, a:focus-visible, textarea:focus-visible, input:focus-visib
 .primary-button:hover:not(:disabled) { background: linear-gradient(180deg, #a08df5, #8069e5); }
 .primary-button:disabled { cursor: not-allowed; opacity: .4; }
 .revision-submit-button { margin-bottom: 8px; color: #d5ccff; border-color: rgba(155,135,245,.35); background: var(--purple-soft); }
+.revision-submit-button:disabled { cursor: wait; opacity: .58; }
 .cancel-button { width: 100%; margin-top: 7px; min-height: 28px; border-color: transparent; background: transparent; font-size: 9.5px; }.cancel-button:hover { color: white; background: #171b24; }
 .error-message { margin: 8px 0; color: #ff9da5; font-size: 10px; line-height: 1.4; }
 

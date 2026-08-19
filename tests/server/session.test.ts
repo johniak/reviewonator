@@ -134,6 +134,160 @@ describe("ReviewSession", () => {
     });
   });
 
+  it("keeps a live session open while the agent answers a user discussion", async () => {
+    const session = new ReviewSession(pullRequest, patch, review, new FakeGitHub(), [], true);
+    session.requestRevision({
+      newThreads: [{
+        id: "U-live",
+        path: "src/example.ts",
+        line: 2,
+        side: "RIGHT",
+        message: "Does this ignore the caller value?",
+      }],
+    });
+
+    await expect(session.waitForAgentRequest()).resolves.toMatchObject({
+      status: "revision_requested",
+      newThreads: [{ id: "U-live", message: "Does this ignore the caller value?" }],
+    });
+    expect(session.isOpen).toBe(true);
+    const waiting = session.snapshot().review.userThreads.find(({ id }) => id === "U-live")!;
+    expect(waiting.messages).toMatchObject([{ author: "user", body: "Does this ignore the caller value?" }]);
+
+    session.respond({
+      ...session.review,
+      userThreads: session.review.userThreads.map((thread) => thread.id === "U-live" ? {
+        ...thread,
+        messages: [...thread.messages, {
+          id: "U-live-M2",
+          author: "agent" as const,
+          body: "The value comes from the closure, so this line does not ignore an argument.",
+        }],
+      } : thread),
+    });
+
+    expect(session.isOpen).toBe(true);
+    expect(session.review.userThreads.find(({ id }) => id === "U-live")?.messages.at(-1)).toMatchObject({
+      author: "agent",
+      body: "The value comes from the closure, so this line does not ignore an argument.",
+    });
+  });
+
+  it("returns the same live request until the agent successfully responds", async () => {
+    const session = new ReviewSession(pullRequest, patch, review, new FakeGitHub(), [], true);
+    session.requestRevision({ requests: [{ commentId: "S1", message: "Check it again." }] });
+
+    const first = await session.waitForAgentRequest();
+    const retried = await session.waitForAgentRequest();
+
+    expect(retried).toEqual(first);
+    expect(first.status === "revision_requested"
+      ? first.review.comments.find(({ id }) => id === "S1")
+      : undefined).toMatchObject({
+      id: "S1",
+      discussion: [{ author: "user", body: "Check it again." }],
+    });
+  });
+
+  it("keeps a live discussion on an agent finding and requires one agent reply", async () => {
+    const session = new ReviewSession(pullRequest, patch, review, new FakeGitHub(), [], true);
+    session.requestRevision({ requests: [{ commentId: "S1", message: "Did you check the closure caller?" }] });
+    await session.waitForAgentRequest();
+    const waitingComment = session.review.comments.find(({ id }) => id === "S1")!;
+
+    expect(waitingComment.discussion).toMatchObject([
+      { author: "user", body: "Did you check the closure caller?" },
+    ]);
+    expect(() => session.respond(session.review)).toThrow(/exactly one response/);
+
+    session.respond({
+      ...session.review,
+      comments: session.review.comments.map((comment) => comment.id === "S1" ? {
+        ...comment,
+        body: "Read this value from the closure input instead of fixing it at 42.",
+        discussion: [...(comment.discussion ?? []), {
+          id: "S1-D2",
+          author: "agent" as const,
+          body: "Yes. I checked the caller and made the finding more precise.",
+        }],
+      } : comment),
+    });
+
+    expect(session.review.comments.find(({ id }) => id === "S1")).toMatchObject({
+      body: "Read this value from the closure input instead of fixing it at 42.",
+      discussion: [
+        { author: "user", body: "Did you check the closure caller?" },
+        { author: "agent", body: "Yes. I checked the caller and made the finding more precise." },
+      ],
+    });
+  });
+
+  it("serializes live rounds so the agent never responds to stale review state", async () => {
+    const session = new ReviewSession(pullRequest, patch, review, new FakeGitHub(), [], true);
+    session.requestRevision({ requests: [{ commentId: "S1", message: "Check it again." }] });
+
+    expect(() => session.requestRevision({
+      requests: [{ commentId: "G1", message: "Also check this." }],
+    })).toThrow(/already working/);
+  });
+
+  it("prevents the agent from changing user-owned live discussion state", async () => {
+    const session = new ReviewSession(
+      pullRequest,
+      patch,
+      { ...review, userThreads: [userThread] },
+      new FakeGitHub(),
+      [],
+      true,
+    );
+    session.requestRevision({
+      threadReplies: [{ threadId: "U1", message: "Please check the closure again." }],
+    });
+    await session.waitForAgentRequest();
+
+    expect(() => session.respond({
+      ...session.review,
+      userThreads: session.review.userThreads.map((thread) => ({
+        ...thread,
+        dismissed: true,
+        dismissalReason: "Agent decided this is irrelevant.",
+      })),
+    })).toThrow(/Only the user can dismiss/);
+
+    expect(() => session.respond({
+      ...session.review,
+      userThreads: session.review.userThreads.map((thread) => ({
+        ...thread,
+        messages: thread.messages.slice(0, -1),
+      })),
+    })).toThrow(/cannot edit discussion history/);
+  });
+
+  it("requires findings created by the agent during a live round to start pending", async () => {
+    const session = new ReviewSession(pullRequest, patch, review, new FakeGitHub(), [], true);
+    session.requestRevision({ requests: [{ commentId: "S1", message: "Check the wider path." }] });
+    await session.waitForAgentRequest();
+
+    expect(() => session.respond({
+      ...session.review,
+      comments: [...session.review.comments, {
+        ...session.review.comments[0],
+        id: "S2",
+        included: true,
+      }],
+    })).toThrow(/must start pending/);
+  });
+
+  it("notifies the browser when live review state changes", async () => {
+    const session = new ReviewSession(pullRequest, patch, review, new FakeGitHub(), [], true);
+    const changed = session.waitForChange(0);
+
+    session.requestRevision({ requests: [{ commentId: "S1", message: "Check it again." }] });
+
+    await expect(changed).resolves.toBe(1);
+    expect(session.snapshot()).toMatchObject({ live: true, version: 1 });
+  });
+
   it("rejects replies before the agent answers and updates for unknown threads", () => {
     const waitingThread = { ...userThread, messages: [userThread.messages[0]] };
     const session = new ReviewSession(

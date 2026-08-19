@@ -21,10 +21,27 @@ describe("ReviewFindingNavigation", () => {
     const lineFinding = screen.getByRole("button", { name: /Bug Included S1 src\/example\.ts:2/ });
     expect(lineFinding).toHaveAttribute("aria-current", "true");
     await userEvent.click(lineFinding);
-    await userEvent.click(screen.getByRole("button", { name: /Warning Revision G1 General comment/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Warning Reply queued G1 General comment/ }));
 
     expect(onSelect).toHaveBeenNthCalledWith(1, review.comments[0]);
     expect(onSelect).toHaveBeenNthCalledWith(2, review.comments[1]);
+  });
+
+  it("marks a finding waiting for the agent and shows its discussion size", () => {
+    const discussed = {
+      ...review.comments[0],
+      discussion: [{ id: "S1-D1", author: "user" as const, body: "Check this again." }],
+    };
+    render(<ReviewFindingNavigation
+      comments={[discussed]}
+      activeCommentId={null}
+      selectedIds={new Set()}
+      rejectedIds={new Set()}
+      revisionMessages={{}}
+      onSelect={() => {}}
+    />);
+
+    expect(screen.getByRole("button", { name: /Bug AI working 1 discussion messages S1/ })).toBeVisible();
   });
 
   it("distinguishes consciously rejected findings from pending ones", () => {

@@ -26,6 +26,11 @@ export const reviewCommentSchema = z.object({
   path: z.string().trim().min(1).optional(),
   line: z.int().positive().optional(),
   side: z.literal("RIGHT").optional(),
+  discussion: z.array(z.object({
+    id: z.string().trim().min(1).max(80),
+    author: z.enum(["user", "agent"]),
+    body: z.string().trim().min(1).max(4_000),
+  })).max(100).optional(),
 }).superRefine((comment, context) => {
   if (comment.type === "line" && (!comment.path || !comment.line || comment.side !== "RIGHT")) {
     context.addIssue({
@@ -44,6 +49,19 @@ export const reviewCommentSchema = z.object({
       code: "custom",
       message: "A review comment cannot be both included and rejected.",
     });
+  }
+  const messageIds = new Set<string>();
+  for (const [index, message] of (comment.discussion ?? []).entries()) {
+    if (messageIds.has(message.id)) {
+      context.addIssue({ code: "custom", message: `Duplicate finding discussion message id: ${message.id}` });
+    }
+    messageIds.add(message.id);
+    if (index === 0 && message.author !== "user") {
+      context.addIssue({ code: "custom", message: "A finding discussion must start with a user message." });
+    }
+    if (index > 0 && message.author === comment.discussion?.[index - 1]?.author) {
+      context.addIssue({ code: "custom", message: "User and agent messages must alternate in a finding discussion." });
+    }
   }
 });
 

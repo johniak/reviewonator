@@ -1,4 +1,4 @@
-import { Check, Circle, MessagesSquare, RotateCcw, X } from "lucide-react";
+import { Check, Circle, MessageSquareReply, MessagesSquare, RotateCcw, X } from "lucide-react";
 import type { ReviewComment } from "../types";
 import { SeverityBadge } from "./SeverityBadge";
 
@@ -33,6 +33,7 @@ export function ReviewFindingNavigation({
             selectedIds.has(comment.id),
             rejectedIds.has(comment.id),
             Boolean(revisionMessages[comment.id]?.trim()),
+            comment.discussion ?? [],
           );
           return (
             <button
@@ -48,6 +49,14 @@ export function ReviewFindingNavigation({
                   {status.icon}
                   {status.label}
                 </span>
+                {(comment.discussion?.length ?? 0) > 0 && (
+                  <span
+                    className="finding-discussion-count"
+                    aria-label={`${comment.discussion!.length} discussion messages`}
+                  >
+                    <MessageSquareReply aria-hidden="true" size={10} /> {comment.discussion!.length}
+                  </span>
+                )}
                 <b>{comment.id}</b>
               </span>
               <small>{comment.type === "line" ? `${comment.path}:${comment.line}` : "General comment"}</small>
@@ -59,9 +68,17 @@ export function ReviewFindingNavigation({
   );
 }
 
-function findingStatus(selected: boolean, rejected: boolean, revisionRequested: boolean) {
+function findingStatus(
+  selected: boolean,
+  rejected: boolean,
+  revisionRequested: boolean,
+  discussion: ReviewComment["discussion"],
+) {
   if (revisionRequested) {
-    return { kind: "revision", label: "Revision", icon: <RotateCcw aria-hidden="true" size={10} /> } as const;
+    return { kind: "revision", label: "Reply queued", icon: <RotateCcw aria-hidden="true" size={10} /> } as const;
+  }
+  if (discussion?.at(-1)?.author === "user") {
+    return { kind: "revision", label: "AI working", icon: <RotateCcw aria-hidden="true" size={10} /> } as const;
   }
   if (selected) {
     return { kind: "included", label: "Included", icon: <Check aria-hidden="true" size={10} /> } as const;

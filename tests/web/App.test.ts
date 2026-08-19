@@ -102,11 +102,11 @@ describe("GitHub review body", () => {
     expect(screen.getByRole("button", { name: /Bug Included S1 src\/example\.ts:2/ })).toBeVisible();
     expect(screen.getByRole("button", { name: /Warning Rejected G1 General comment/ })).toBeVisible();
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Request revision" })[1]);
-    fireEvent.change(screen.getByPlaceholderText("Explain what is inaccurate, unclear, or missing…"), {
+    fireEvent.click(screen.getAllByRole("button", { name: "Discuss with AI" })[1]);
+    fireEvent.change(screen.getByPlaceholderText("Explain what seems wrong, unclear, or worth checking…"), {
       target: { value: "Make the test recommendation concrete." },
     });
-    expect(screen.getByRole("button", { name: /Warning Revision G1 General comment/ })).toBeVisible();
+    expect(screen.getByRole("button", { name: /Warning Reply queued G1 General comment/ })).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Send 1 request to AI agent" }));
 
     await expect(session.waitForResult()).resolves.toMatchObject({
@@ -170,6 +170,94 @@ describe("GitHub review body", () => {
       }],
       dismissedThreads: [],
     });
+  });
+
+  it("keeps the live workspace open while the agent handles a reply", async () => {
+    const session = new ReviewSession(
+      pullRequest,
+      patch,
+      { ...review, userThreads: [userThread] },
+      new AppGateway(),
+      discussion,
+      true,
+    );
+    const serverApp = createApp({ html: "<html></html>", favicon: "<svg></svg>", token: "secret", session });
+    vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+      const value = input instanceof Request ? input.url : input.toString();
+      const url = new URL(value, "http://reviewonator.local");
+      return serverApp.request(`${url.pathname}${url.search}`, init);
+    });
+    window.location.hash = "secret";
+    render(createElement(App));
+
+    expect(await screen.findByText("Live")).toBeVisible();
+    fireEvent.change(screen.getByLabelText("Reply to the AI agent"), {
+      target: { value: "The closure still accepts outside state. Please check it." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send 1 request to AI agent" }));
+
+    expect(await screen.findByText("AI working")).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Revision requested" })).not.toBeInTheDocument();
+    expect(screen.getAllByText("Waiting for agent").length).toBeGreaterThan(0);
+    await expect(session.waitForAgentRequest()).resolves.toMatchObject({
+      status: "revision_requested",
+      threadReplies: [{ threadId: "U1" }],
+    });
+    session.cancel();
+  });
+
+  it("updates a finding discussion live without closing the workspace", async () => {
+    let emitSessionUpdate: (() => void) | undefined;
+    class TestEventSource {
+      onerror: (() => void) | null = null;
+      addEventListener(type: string, listener: EventListener) {
+        if (type === "session") emitSessionUpdate = () => listener(new Event("session"));
+      }
+      close() {}
+    }
+    vi.stubGlobal("EventSource", TestEventSource);
+    const session = new ReviewSession(pullRequest, patch, review, new AppGateway(), discussion, true);
+    const serverApp = createApp({ html: "<html></html>", favicon: "<svg></svg>", token: "secret", session });
+    vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+      const value = input instanceof Request ? input.url : input.toString();
+      const url = new URL(value, "http://reviewonator.local");
+      return serverApp.request(`${url.pathname}${url.search}`, init);
+    });
+    window.location.hash = "secret";
+    render(createElement(App));
+
+    await screen.findByText("Live");
+    fireEvent.click(screen.getAllByRole("button", { name: "Discuss with AI" })[0]);
+    fireEvent.change(screen.getByLabelText("What do you want to discuss with the AI agent?"), {
+      target: { value: "Did you check the closure caller?" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send to AI" }));
+
+    await waitFor(() => expect(screen.getByLabelText("Discussion about finding S1"))
+      .toHaveTextContent("Did you check the closure caller?"));
+    expect(screen.getByRole("button", { name: "Waiting for AI" })).toBeDisabled();
+    await expect(session.waitForAgentRequest()).resolves.toMatchObject({
+      requests: [{ commentId: "S1", message: "Did you check the closure caller?" }],
+      newThreads: [],
+      threadReplies: [],
+      dismissedThreads: [],
+    });
+    session.respond({
+      ...session.review,
+      comments: session.review.comments.map((comment) => comment.id === "S1" ? {
+        ...comment,
+        discussion: [...(comment.discussion ?? []), {
+          id: "S1-D2",
+          author: "agent" as const,
+          body: "Yes. I checked it and the finding still applies.",
+        }],
+      } : comment),
+    });
+    emitSessionUpdate?.();
+
+    expect(await screen.findByText("Yes. I checked it and the finding still applies.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Continue discussion" })).toBeEnabled();
+    session.cancel();
   });
 
   it("lets the user dismiss their discussion with a reason", async () => {

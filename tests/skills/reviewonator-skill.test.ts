@@ -98,7 +98,7 @@ describe("Reviewonator skill", () => {
   it("keeps the human confirmation workflow and avoids premature review narration", async () => {
     const skill = await readFile("skills/reviewonator/SKILL.md", "utf8");
 
-    expect(skill).toContain("Run `reviewonator <PR_URL> --review-file <JSON_PATH>` in the foreground");
+    expect(skill).toContain("Start `reviewonator <PR_URL> --review-file <JSON_PATH> --live` as a persistent background process");
     expect(skill).toContain("do not dump the verdict, findings, or a second review summary into chat");
     expect(skill).toContain("Never publish with `gh pr review` or `gh api` from the skill");
     expect(skill).toContain("requires explicit user confirmation in its UI");
@@ -134,26 +134,57 @@ describe("Reviewonator skill", () => {
   it("keeps user-authored line comments as private discussions with the agent", async () => {
     const skill = await readFile("skills/reviewonator/SKILL.md", "utf8");
 
-    expect(skill).toContain("Preserve every existing `userThreads` entry, stable thread ID, location, and message ID");
-    expect(skill).toContain("For each item in `newThreads`");
-    expect(skill).toContain("For each item in `threadReplies`");
+    expect(skill).toContain("replace the local JSON's starting state with the returned `review`");
+    expect(skill).toContain("For every thread named by `newThreads` or `threadReplies`");
+    expect(skill).toContain("preserve the entire history verbatim and append exactly one agent response");
     expect(skill).toContain("verify the concern instead of trusting it blindly");
-    expect(skill).toContain("if the user is right");
+    expect(skill).toContain("If the user is right");
     expect(skill).toContain("create a normal review finding");
-    expect(skill).toContain("if the agent still disagrees");
+    expect(skill).toContain("If the agent still disagrees");
     expect(skill).toContain("keep the thread open so the user can reply again");
-    expect(skill).toContain("For each item in `dismissedThreads`");
+    expect(skill).toContain("Threads named by `dismissedThreads`");
     expect(skill).toContain("only the user may dismiss their discussion");
     expect(skill).toContain("must never be copied into the GitHub review");
+  });
+
+  it("keeps one live browser session through repeated wait and respond rounds", async () => {
+    const skill = await readFile("skills/reviewonator/SKILL.md", "utf8");
+
+    expect(skill).toContain("Do not start a second browser session for later rounds");
+    expect(skill).toContain("Run `reviewonator wait <PR_URL>` in the foreground");
+    expect(skill).toContain("reviewonator respond <PR_URL> --review-file <JSON_PATH>");
+    expect(skill).toContain("Continue this wait/respond loop in the same browser session");
+    expect(skill).toContain("returns the unanswered request again");
+  });
+
+  it("answers finding discussions live without publishing their private history", async () => {
+    const skill = await readFile("skills/reviewonator/SKILL.md", "utf8");
+
+    expect(skill).toContain("preserve its complete `discussion` history");
+    expect(skill).toContain("already ends with the user's new message");
+    expect(skill).toContain("append exactly one direct agent response");
+    expect(skill).toContain("Keep the finding");
+    expect(skill).toContain("Never publish the private discussion");
+    expect(skill).toContain("agent-authored finding-discussion");
+  });
+
+  it("answers the reviewer naturally instead of returning a rewrite status", async () => {
+    const skill = await readFile("skills/reviewonator/SKILL.md", "utf8");
+
+    expect(skill).toContain("a natural, direct answer to the human's latest message");
+    expect(skill).toContain("explain the code problem itself in simple terms");
+    expect(skill).toContain("use a concrete example when helpful");
+    expect(skill).toContain("Do not reply with a change log");
+    expect(skill).toContain("Do not merely describe how the canonical comment was rewritten");
+    expect(skill).toContain("Answer first");
+    expect(skill).toContain("optional short final sentence");
   });
 
   it("preserves explicit human decisions across revision rounds", async () => {
     const skill = await readFile("skills/reviewonator/SKILL.md", "utf8");
 
-    expect(skill).toContain("Treat `selectedCommentIds` and `rejectedCommentIds` as the human's carried decisions");
-    expect(skill).toContain("set `included: true`");
-    expect(skill).toContain("set `rejected: true`");
-    expect(skill).toContain("Never set both flags");
+    expect(skill).toContain("already contains the human's latest selection, rejection, messages, and dismissals");
+    expect(skill).toContain("Preserve every unaffected finding and thread");
     expect(skill).toContain("New findings start pending");
   });
 

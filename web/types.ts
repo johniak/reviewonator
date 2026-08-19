@@ -13,15 +13,20 @@ export type SessionSnapshot = {
   review: ReviewDocument;
   discussion: PullRequestDiscussionItem[];
   fileUrls: Record<string, string>;
+  live: boolean;
+  version: number;
+  agentPending: boolean;
 };
 
 export type CommentActions = {
+  agentPending: boolean;
   selectedIds: Set<string>;
   rejectedIds: Set<string>;
   revisionMessages: Record<string, string>;
   onToggleSelected: (id: string) => void;
   onToggleRejected: (id: string) => void;
   onRevisionChange: (id: string, message: string) => void;
+  onSendRevision: (id: string) => Promise<void>;
 };
 
 export type LineCommentDraft = {

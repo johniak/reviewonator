@@ -35,7 +35,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   loadSession: () => request<SessionSnapshot>("/api/session"),
   loadFileContext: (path: string) => request<FileContext>(`/api/file-context?path=${encodeURIComponent(path)}`),
-  requestRevision: (input: RevisionRequest) => request<{ status: string }>("/api/revision", {
+  requestRevision: (input: RevisionRequest) => request<{ status: string; session: SessionSnapshot }>("/api/revision", {
     method: "POST",
     body: JSON.stringify(input),
   }),
@@ -44,4 +44,10 @@ export const api = {
     body: JSON.stringify(input),
   }),
   cancel: () => request<{ status: string }>("/api/cancel", { method: "POST", body: "{}" }),
+  subscribeToSession: (onUpdate: () => void, onError: () => void) => {
+    const events = new EventSource(`/api/events?token=${encodeURIComponent(sessionToken())}`);
+    events.addEventListener("session", onUpdate);
+    events.onerror = onError;
+    return () => events.close();
+  },
 };

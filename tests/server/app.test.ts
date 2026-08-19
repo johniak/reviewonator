@@ -16,8 +16,8 @@ class AppGitHub implements GitHubGateway {
   }
 }
 
-function testApp() {
-  const session = new ReviewSession(pullRequest, patch, review, new AppGitHub(), discussion);
+function testApp(live = false) {
+  const session = new ReviewSession(pullRequest, patch, review, new AppGitHub(), discussion, live);
   return { app: createApp({ html: "<html>Reviewonator</html>", favicon: "<svg>R</svg>", token: "secret", session }), session };
 }
 
@@ -51,6 +51,12 @@ describe("Reviewonator HTTP API", () => {
       .toHaveLength(3);
   });
 
+  it("requires the session token before opening a live event stream", async () => {
+    const { app } = testApp(true);
+
+    expect((await app.request("/api/events?token=wrong")).status).toBe(401);
+  });
+
   it("rejects a publication without explicit confirmation", async () => {
     const { app } = testApp();
     const response = await app.request("/api/publish", authenticated({
@@ -77,6 +83,41 @@ describe("Reviewonator HTTP API", () => {
       threadReplies: [],
       dismissedThreads: [],
     });
+  });
+
+  it("keeps live revisions in the same session and accepts an agent response", async () => {
+    const { app, session } = testApp(true);
+    const revision = await app.request("/api/revision", authenticated({
+      newThreads: [{
+        id: "U-live",
+        path: "src/example.ts",
+        line: 2,
+        side: "RIGHT",
+        message: "Does this ignore an input?",
+      }],
+    }));
+
+    expect(revision.status).toBe(200);
+    expect((await revision.json()).session).toMatchObject({ live: true, version: 1 });
+    expect(await (await app.request("/api/agent/wait", {
+      headers: { authorization: "Bearer secret" },
+    })).json()).toMatchObject({ status: "revision_requested", newThreads: [{ id: "U-live" }] });
+
+    const response = await app.request("/api/agent/respond", authenticated({
+      ...session.review,
+      userThreads: session.review.userThreads.map((thread) => thread.id === "U-live" ? {
+        ...thread,
+        messages: [...thread.messages, {
+          id: "U-live-M2",
+          author: "agent",
+          body: "No. The value comes from the surrounding closure.",
+        }],
+      } : thread),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: "accepted" });
+    expect(session.snapshot()).toMatchObject({ live: true, version: 2 });
   });
 
   it("serves authenticated surrounding file context", async () => {

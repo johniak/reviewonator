@@ -12,6 +12,7 @@ import {
   MessageSquareText,
   OctagonAlert,
   RotateCcw,
+  Radio,
   TimerOff,
   X,
 } from "lucide-react";
@@ -73,6 +74,17 @@ export function App() {
       })
       .catch((error: unknown) => setLoadingError(error instanceof Error ? error.message : "Could not load the review."));
   }, []);
+
+  useEffect(() => {
+    if (!session?.live || typeof EventSource === "undefined") return;
+    return api.subscribeToSession(
+      () => {
+        setActionError(null);
+        api.loadSession().then(setSession).catch(() => {});
+      },
+      () => setActionError("Live connection lost. Reviewonator will reconnect automatically."),
+    );
+  }, [session?.live]);
 
   useEffect(() => {
     if (!pendingCommentId) return;
@@ -154,12 +166,14 @@ export function App() {
     + pendingDismissedThreads.length;
 
   const actions = {
+    agentPending: session?.agentPending ?? false,
     selectedIds,
     rejectedIds,
     revisionMessages,
     onToggleSelected: toggleSelected,
     onToggleRejected: toggleRejected,
     onRevisionChange: changeRevision,
+    onSendRevision: sendSingleRevisionRequest,
   };
 
   const threadActions = {
@@ -264,7 +278,7 @@ export function App() {
   async function sendRevisionRequests() {
     setActionError(null);
     try {
-      await api.requestRevision({
+      const response = await api.requestRevision({
         selectedCommentIds: [...selectedIds],
         rejectedCommentIds: [...rejectedIds],
         requests: pendingRevisions,
@@ -272,9 +286,41 @@ export function App() {
         threadReplies: pendingThreadReplies,
         dismissedThreads: pendingDismissedThreads,
       });
-      setCompletion({ type: "revision" });
+      if (!response.session.live) {
+        setCompletion({ type: "revision" });
+        return;
+      }
+      setSession(response.session);
+      setRevisionMessages({});
+      setLineCommentDrafts({});
+      setThreadReplies({});
+      setDismissalReasons({});
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Could not send revision requests.");
+    }
+  }
+
+  async function sendSingleRevisionRequest(commentId: string) {
+    const message = revisionMessages[commentId]?.trim();
+    if (!message || !session) return;
+    setActionError(null);
+    try {
+      const response = await api.requestRevision({
+        selectedCommentIds: [...selectedIds],
+        rejectedCommentIds: [...rejectedIds],
+        requests: [{ commentId, message }],
+        newThreads: [],
+        threadReplies: [],
+        dismissedThreads: [],
+      });
+      if (!response.session.live) {
+        setCompletion({ type: "revision" });
+        return;
+      }
+      setSession(response.session);
+      clearRevision(commentId);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Could not send this discussion message.");
     }
   }
 
@@ -386,6 +432,12 @@ export function App() {
           </a>
         </div>
         <div className="diff-stats">
+          {session.live && (
+            <span className={`live-session-badge ${session.agentPending ? "working" : ""}`}>
+              <Radio aria-hidden="true" size={12} />
+              {session.agentPending ? "AI working" : "Live"}
+            </span>
+          )}
           <span className="additions">+{pullRequest.additions}</span>
           <span className="deletions">−{pullRequest.deletions}</span>
         </div>
@@ -544,9 +596,16 @@ export function App() {
             </div>
             {actionError && <p className="error-message" role="alert">{actionError}</p>}
             {pendingAgentRequests > 0 && (
-              <button className="revision-submit-button" type="button" onClick={sendRevisionRequests}>
+              <button
+                className="revision-submit-button"
+                type="button"
+                disabled={session.agentPending}
+                onClick={sendRevisionRequests}
+              >
                 <RotateCcw size={16} />
-                Send {pendingAgentRequests} request{pendingAgentRequests === 1 ? "" : "s"} to AI agent
+                {session.agentPending
+                  ? "AI agent is responding"
+                  : `Send ${pendingAgentRequests} request${pendingAgentRequests === 1 ? "" : "s"} to AI agent`}
               </button>
             )}
             <button

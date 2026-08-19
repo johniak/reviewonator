@@ -13,7 +13,7 @@ Reviewonator turns an AI-generated pull request review into a focused, local rev
 Reviewonator supports Claude Code and Codex through one shared review workflow.
 
 <p align="center">
-  <img src="docs/assets/reviewonator-main.jpg" width="1280" alt="Reviewonator main review workspace with pull request files, inline findings, and the review summary">
+  <img src="docs/assets/reviewonator-diff.png" width="1280" alt="Reviewonator main review workspace showing changed code, inline findings, and the review summary">
 </p>
 
 See the [feature guide](docs/features.md) for a visual walkthrough of the review workspace, comment decisions, pull request discussion, and safe publishing flow.
@@ -26,6 +26,7 @@ See the [feature guide](docs/features.md) for a visual walkthrough of the review
 - Switch between unified and side-by-side diffs.
 - Expand context beyond the patch without exposing a GitHub token to the browser.
 - Keep private reviewer explanations separate from comments sent to the pull request.
+- Discuss any proposed finding with the AI agent live and send a reply directly from its card.
 - Edit, include, or exclude each inline and general comment. Nothing is included by default.
 - Preview the complete GitHub review before choosing **Comment**, **Approve**, or **Request changes**.
 - Cancel safely: Reviewonator never publishes automatically.
@@ -113,7 +114,7 @@ In Codex:
 $reviewonator https://github.com/owner/repository/pull/123
 ```
 
-The agent completes the review first, then launches Reviewonator. In the application:
+The agent completes the review first, then launches one live Reviewonator workspace. In the application:
 
 1. Read the private reviewer explanation for each finding.
 2. Edit the public comment if needed.
@@ -122,7 +123,9 @@ The agent completes the review first, then launches Reviewonator. In the applica
 5. Open the publish preview and choose the GitHub review event.
 6. Confirm the exact payload.
 
-An approval may be submitted without a summary. Requesting changes requires at least one selected comment or a non-empty summary, matching the intent of that review event.
+You can start a private live discussion either on an AI finding or on any diff line. The open workspace sends your message to the agent, shows its answer in place, and stays open for follow-up rounds. These discussions are never published directly to GitHub.
+
+The review summary is optional for every event, including **Approve** and **Request changes**.
 
 ## Update and uninstall
 
@@ -153,6 +156,14 @@ The same `--targets`, `--bin-dir`, `--claude-skill-dir`, and `--codex-skill-dir`
 ```sh
 bun install --frozen-lockfile
 bun run dev -- https://github.com/owner/repository/pull/123 --review-file path/to/review.json
+```
+
+For a live development session, add `--live`. Agent-side development commands can then wait for work and return an updated review without reopening the browser:
+
+```sh
+bun run dev -- https://github.com/owner/repository/pull/123 --review-file path/to/review.json --live
+reviewonator wait https://github.com/owner/repository/pull/123
+reviewonator respond https://github.com/owner/repository/pull/123 --review-file path/to/updated-review.json
 ```
 
 Useful commands:

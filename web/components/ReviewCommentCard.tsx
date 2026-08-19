@@ -1,4 +1,4 @@
-import { Check, EyeOff, RotateCcw, X } from "lucide-react";
+import { Bot, Check, EyeOff, MessageSquareReply, RotateCcw, Send, UserRound, X } from "lucide-react";
 import { useState } from "react";
 import type { CommentActions, ReviewComment } from "../types";
 import { SeverityBadge } from "./SeverityBadge";
@@ -15,17 +15,22 @@ export function ReviewCommentCard({
   reviewerLanguage = "English",
   compact = false,
   focused = false,
+  agentPending,
   selectedIds,
   rejectedIds,
   revisionMessages,
   onToggleSelected,
   onToggleRejected,
   onRevisionChange,
+  onSendRevision,
 }: Props) {
   const [showRevision, setShowRevision] = useState(Boolean(revisionMessages[comment.id]));
   const selected = selectedIds.has(comment.id);
   const rejected = rejectedIds.has(comment.id);
   const revision = revisionMessages[comment.id] ?? "";
+  const discussion = comment.discussion ?? [];
+  const waitingForAgent = discussion.at(-1)?.author === "user";
+  const fieldLabel = discussion.length > 0 ? "Reply to the AI agent" : "What do you want to discuss with the AI agent?";
 
   return (
     <article
@@ -45,6 +50,24 @@ export function ReviewCommentCard({
         </div>
         <p>{comment.reviewerExplanation}</p>
       </div>
+      {discussion.length > 0 && (
+        <div className="finding-discussion" aria-label={`Discussion about finding ${comment.id}`}>
+          <div className="finding-discussion-heading">
+            <MessageSquareReply aria-hidden="true" size={13} /> Private discussion
+          </div>
+          {discussion.map((message) => (
+            <div key={message.id} className={`finding-discussion-message finding-discussion-${message.author}`}>
+              <span>{message.author === "user"
+                ? <UserRound aria-hidden="true" size={12} />
+                : <Bot aria-hidden="true" size={12} />}</span>
+              <div>
+                <strong>{message.author === "user" ? "You" : "AI agent"}</strong>
+                <p>{message.body}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="comment-actions">
         <button
           className={`selection-button ${selected ? "active" : ""}`}
@@ -67,24 +90,41 @@ export function ReviewCommentCard({
         <button
           className={`revision-button ${showRevision ? "active" : ""}`}
           type="button"
-          onClick={() => setShowRevision((value) => !value)}
-          aria-expanded={showRevision}
+          onClick={() => { if (!waitingForAgent) setShowRevision((value) => !value); }}
+          aria-expanded={showRevision && !waitingForAgent}
+          disabled={waitingForAgent}
         >
           <RotateCcw aria-hidden="true" size={14} />
-          Request revision
+          {waitingForAgent ? "Waiting for AI" : discussion.length > 0 ? "Continue discussion" : "Discuss with AI"}
         </button>
       </div>
-      {showRevision && (
-        <label className="revision-field">
-          <span>What should the AI agent change?</span>
-          <textarea
-            value={revision}
-            onChange={(event) => onRevisionChange(comment.id, event.target.value)}
-            placeholder="Explain what is inaccurate, unclear, or missing…"
-            rows={3}
-            autoFocus
-          />
-        </label>
+      {showRevision && !waitingForAgent && (
+        <div className="revision-composer">
+          <label className="revision-field" htmlFor={`finding-discussion-${comment.id}`}>
+            <span>{fieldLabel}</span>
+            <textarea
+              id={`finding-discussion-${comment.id}`}
+              aria-label={fieldLabel}
+              value={revision}
+              onChange={(event) => onRevisionChange(comment.id, event.target.value)}
+              placeholder="Explain what seems wrong, unclear, or worth checking…"
+              rows={3}
+              autoFocus
+            />
+          </label>
+          <button
+            className="finding-discussion-send"
+            type="button"
+            disabled={!revision.trim() || agentPending}
+            onClick={() => void onSendRevision(comment.id)}
+          >
+            {agentPending ? <RotateCcw aria-hidden="true" size={13} /> : <Send aria-hidden="true" size={13} />}
+            {agentPending ? "AI agent is responding" : "Send to AI"}
+          </button>
+        </div>
+      )}
+      {waitingForAgent && (
+        <p className="finding-discussion-waiting"><RotateCcw aria-hidden="true" size={12} /> The AI agent is checking this finding.</p>
       )}
     </article>
   );

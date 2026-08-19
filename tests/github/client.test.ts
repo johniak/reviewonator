@@ -109,6 +109,35 @@ describe("GitHubClient", () => {
     expect(JSON.stringify(payload)).not.toContain(review.comments[0].reviewerExplanation);
   });
 
+  it("never publishes a private finding discussion to GitHub", async () => {
+    const runner = new RecordingRunner([
+      success(JSON.stringify({ id: 101, html_url: "https://github.com/acme/widgets/pull/42#pullrequestreview-101", state: "COMMENTED" })),
+    ]);
+    const comment = {
+      ...review.comments[0],
+      discussion: [
+        { id: "D1", author: "user" as const, body: "PRIVATE USER MESSAGE" },
+        { id: "D2", author: "agent" as const, body: "PRIVATE AGENT RESPONSE" },
+      ],
+    };
+
+    await new GitHubClient(runner).publishReview(
+      pullRequest,
+      { confirmed: true, event: "COMMENT", body: "", selectedCommentIds: ["S1"] },
+      [comment],
+    );
+
+    const payload = JSON.parse(runner.calls[0].input!);
+    expect(payload.comments).toEqual([{
+      path: "src/example.ts",
+      line: 2,
+      side: "RIGHT",
+      body: comment.body,
+    }]);
+    expect(JSON.stringify(payload)).not.toContain("PRIVATE USER MESSAGE");
+    expect(JSON.stringify(payload)).not.toContain("PRIVATE AGENT RESPONSE");
+  });
+
   it("keeps the GitHub review body empty when the optional user summary is empty", async () => {
     const runner = new RecordingRunner([
       success(JSON.stringify({ id: 100, html_url: "https://github.com/acme/widgets/pull/42#pullrequestreview-100", state: "CHANGES_REQUESTED" })),

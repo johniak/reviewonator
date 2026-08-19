@@ -17,12 +17,14 @@ const fileUrls = {
   "src/config.ts": "https://github.com/acme/widgets/blob/head-sha/src/config.ts",
 };
 const actions = {
+  agentPending: false,
   selectedIds: new Set(review.comments.map(({ id }) => id)),
   rejectedIds: new Set<string>(),
   revisionMessages: {},
   onToggleSelected: vi.fn(),
   onToggleRejected: vi.fn(),
   onRevisionChange: vi.fn(),
+  onSendRevision: vi.fn(async () => {}),
   userThreads: [],
   focusedThreadId: null,
   replyMessages: {},

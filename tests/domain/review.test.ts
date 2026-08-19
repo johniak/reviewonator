@@ -43,6 +43,39 @@ describe("review document", () => {
     })).toThrow(/Duplicate comment id/);
   });
 
+  it("preserves valid private discussions on agent findings", () => {
+    const discussion = [
+      { id: "S1-D1", author: "user" as const, body: "Did you check the closure caller?" },
+      { id: "S1-D2", author: "agent" as const, body: "Yes. The closure still supplies a fixed value." },
+    ];
+
+    expect(reviewDocumentSchema.parse({
+      ...review,
+      comments: [{ ...review.comments[0], discussion }, review.comments[1]],
+    }).comments[0]?.discussion).toEqual(discussion);
+  });
+
+  it("rejects edited or malformed finding discussion history", () => {
+    expect(() => reviewDocumentSchema.parse({
+      ...review,
+      comments: [{
+        ...review.comments[0],
+        discussion: [{ id: "S1-D1", author: "agent", body: "I started this discussion." }],
+      }],
+    })).toThrow(/must start with a user message/);
+
+    expect(() => reviewDocumentSchema.parse({
+      ...review,
+      comments: [{
+        ...review.comments[0],
+        discussion: [
+          { id: "S1-D1", author: "user", body: "First" },
+          { id: "S1-D2", author: "user", body: "Second" },
+        ],
+      }],
+    })).toThrow(/must alternate/);
+  });
+
   it("preserves a private user-agent discussion and links an accepted concern to a finding", () => {
     const linkedThread = {
       ...userThread,

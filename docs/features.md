@@ -17,6 +17,8 @@ You can:
 
 Context expansion is handled by the local Reviewonator process through your authenticated GitHub CLI session. GitHub credentials are never sent to the browser.
 
+![Changed code with inline AI findings and private reviewer context](assets/reviewonator-diff.png)
+
 ## Discuss your own concerns with the AI agent
 
 Click **+** beside a diff line to add your own comment. Reviewonator keeps these conversations in a separate **My comments** section and never publishes them directly to GitHub.
@@ -27,6 +29,8 @@ The agent checks the exact code before responding. It can:
 - disagree, explain why, and leave the discussion open for your next reply.
 
 Only you can dismiss a discussion, and Reviewonator requires your reason. Drafts, replies, waiting discussions, linked findings, and dismissed discussions have distinct states in the sidebar, so it is clear who needs to act next.
+
+The workspace stays open while you talk to the agent. After you send a comment, its status changes to **Waiting for agent** and the header shows **AI working**. The agent's reply appears in the same diff and browser session as soon as it is ready. You can continue the conversation for as many rounds as needed before publishing or cancelling the review.
 
 ## Decide what happens to every finding
 
@@ -39,11 +43,17 @@ Nothing is included by default. Every proposed comment has an explicit state:
 
 These decisions persist when the AI agent returns a revised review, so accepted work is not lost. Public GitHub wording stays separate from the private reviewer note. The private note explains the issue in the configured reviewer language and is never published.
 
+Each proposed finding also supports a private live discussion. Ask the agent about its evidence, challenge its conclusion, or request clearer wording. Your message and the agent's response remain visible below the finding, while the agent can update the proposed GitHub comment when the discussion changes the result. The browser stays open for every follow-up round, and the private conversation is never included in the published review.
+
+Use **Send to AI** on the finding card to send only that reply. The bottom action remains available when you deliberately want to send several prepared discussions together.
+
+![Live private discussion with the AI agent beside the changed code](assets/live-finding-discussion.png)
+
 ## Read the existing pull request discussion
 
 The **PR discussion** tab brings the conversation already on GitHub into the workspace. It includes conversation comments, submitted reviews, and inline review comments, with direct links back to their GitHub locations.
 
-![Existing GitHub pull request discussion in Reviewonator](assets/pr-discussion.jpg)
+![Existing GitHub pull request discussion beside the changed code](assets/pr-discussion.png)
 
 ## Preview and publish deliberately
 
@@ -51,7 +61,7 @@ The final dialog shows the exact review that Reviewonator is prepared to send. Y
 
 Publication requires a separate confirmation checkbox. Closing the dialog or cancelling the review publishes nothing.
 
-![Final Reviewonator publication confirmation](assets/reviewonator-overview.jpg)
+![Final Reviewonator publication confirmation](assets/reviewonator-overview.png)
 
 ## Use the same workflow with Claude Code or Codex
 

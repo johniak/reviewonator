@@ -43,7 +43,19 @@ Write UTF-8 JSON matching this shape:
       "line": 87,
       "side": "RIGHT",
       "body": "A timeout does not prove the charge failed. Retrying here without an idempotency key can create a second successful payment. Reuse a stable idempotency key across attempts.",
-      "reviewerExplanation": "What: Every payment attempt must reuse the same idempotency key. Why: A timeout does not prove the first charge failed, so retrying without that safeguard can charge the customer twice."
+      "reviewerExplanation": "What: Every payment attempt must reuse the same idempotency key. Why: A timeout does not prove the first charge failed, so retrying without that safeguard can charge the customer twice.",
+      "discussion": [
+        {
+          "id": "S1-D1",
+          "author": "user",
+          "body": "Did you check whether the provider already handles retries?"
+        },
+        {
+          "id": "S1-D2",
+          "author": "agent",
+          "body": "Yes. This client does not send the provider's idempotency key, so the finding still applies."
+        }
+      ]
     },
     {
       "id": "G1",
@@ -78,6 +90,13 @@ Write UTF-8 JSON matching this shape:
 - A general comment must not contain `path`, `line`, or `side`.
 - `body` is the exact canonical text proposed for GitHub in the configured comment language.
 - `reviewerExplanation` is mandatory private context in the configured reviewer-note language. Use natural equivalents of `What: ... Why: ...` to explain what is wrong or should change and the concrete consequence. It is not a translation and is never published to GitHub.
+- `discussion` is an optional private conversation about that finding. It starts with a user message and alternates between `user` and `agent`. Preserve all IDs and earlier messages verbatim. For every finding in `requests`, append exactly one agent response and keep the finding so its discussion remains visible. The agent may update `body` and `reviewerExplanation` when the new evidence changes the finding. Discussion messages are never published to GitHub.
 - Use an empty `comments` array when there are no actionable findings.
 
 Reviewonator validates the schema and diff locations before opening the browser. Invalid findings must be corrected, not bypassed.
+
+## Live review rounds
+
+`reviewonator wait <PR_URL>` returns a `revision_requested` object with an authoritative `review` field. That document already includes the user's newest finding-discussion messages, line-comment messages, dismissals, and finding decisions. Use it as the base for the response; do not reconstruct history from the separate request arrays.
+
+Submit the updated document with `reviewonator respond <PR_URL> --review-file <PATH>`. Reviewonator rejects responses that edit or remove user messages, move or create user threads, change user-owned dismissals or finding decisions, or fail to answer a thread whose last message is from the user. A valid response appends exactly one agent message to each waiting thread. The browser receives the accepted document without closing or reopening the session.

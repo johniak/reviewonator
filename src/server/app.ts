@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { streamSSE } from "hono/streaming";
 import { ZodError } from "zod";
 import { ClosedSessionError, ReviewSession, StalePullRequestError } from "./session";
 
@@ -15,6 +16,20 @@ export function createApp({ html, favicon, token, session }: AppDependencies): H
   app.get("/", (context) => context.html(html));
   app.get("/favicon.svg", (context) => context.body(favicon, 200, { "content-type": "image/svg+xml" }));
   app.get("/health", (context) => context.json({ status: "ok" }));
+
+  app.get("/api/events", (context) => {
+    if (context.req.query("token") !== token) return context.json({ error: "Unauthorized" }, 401);
+    return streamSSE(context, async (stream) => {
+      let version = session.version;
+      await stream.writeSSE({ event: "ready", data: String(version) });
+      while (session.isOpen) {
+        const nextVersion = await session.waitForChange(version);
+        if (nextVersion === null) break;
+        version = nextVersion;
+        await stream.writeSSE({ event: "session", data: String(version) });
+      }
+    });
+  });
 
   app.use("/api/*", async (context, next) => {
     if (context.req.header("authorization") !== `Bearer ${token}`) {
@@ -33,7 +48,14 @@ export function createApp({ html, favicon, token, session }: AppDependencies): H
 
   app.post("/api/revision", async (context) => {
     session.requestRevision(await context.req.json());
-    return context.json({ status: "revision_requested" });
+    return context.json({ status: "revision_requested", session: session.snapshot() });
+  });
+
+  app.get("/api/agent/wait", async (context) => context.json(await session.waitForAgentRequest()));
+
+  app.post("/api/agent/respond", async (context) => {
+    session.respond(await context.req.json());
+    return context.json({ status: "accepted" });
   });
 
   app.post("/api/publish", async (context) => {
