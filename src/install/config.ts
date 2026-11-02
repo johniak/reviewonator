@@ -59,7 +59,7 @@ export async function readConfig(env: NodeJS.ProcessEnv = process.env): Promise<
     return configSchema.parse(JSON.parse(content));
   } catch {
     throw new InvalidConfigError(
-      `The Reviewonator configuration at ${path} is invalid. Fix it or run reviewonator setup --reconfigure after removing it.`,
+      `The Reviewonator configuration at ${path} is invalid. Fix or delete it, then run reviewonator setup.`,
     );
   }
 }

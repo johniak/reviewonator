@@ -7,6 +7,9 @@ import { GitHubClient } from "./github/client";
 import { BunCommandRunner, openBrowser } from "./platform/command";
 import { createApp } from "./server/app";
 import { ReviewSession } from "./server/session";
+import { embeddedSkillFiles } from "./install/embedded-skill";
+import { createStdinPrompter } from "./install/prompt";
+import { runSetup } from "./install/setup";
 import {
   readLiveState,
   removeLiveState,
@@ -20,6 +23,9 @@ Usage:
   reviewonator <PR_URL> --review-file <PATH> [--live] [--no-open] [--port <PORT>]
   reviewonator wait <PR_URL>
   reviewonator respond <PR_URL> --review-file <PATH>
+  reviewonator setup [--targets claude,codex] [--comment-language L] [--reviewer-language L] [--reconfigure]
+  reviewonator update [--force]
+  reviewonator uninstall [--targets claude,codex]
   reviewonator --version
 
 Requirements:
@@ -37,6 +43,14 @@ async function main(): Promise<void> {
       live: { type: "boolean", default: false },
       "no-open": { type: "boolean", default: false },
       port: { type: "string" },
+      targets: { type: "string" },
+      "comment-language": { type: "string" },
+      "reviewer-language": { type: "string" },
+      "claude-skill-dir": { type: "string" },
+      "skill-dir": { type: "string" },
+      "codex-skill-dir": { type: "string" },
+      reconfigure: { type: "boolean", default: false },
+      force: { type: "boolean", default: false },
     },
   });
 
@@ -47,6 +61,31 @@ async function main(): Promise<void> {
 
   if (values.version) {
     process.stdout.write(`Reviewonator ${packageJson.version}\n`);
+    return;
+  }
+
+  if (positionals[0] === "setup") {
+    if (positionals.length !== 1) throw new Error(help);
+    const prompter = createStdinPrompter();
+    try {
+      await runSetup({
+        targets: values.targets,
+        commentLanguage: values["comment-language"],
+        reviewerLanguage: values["reviewer-language"],
+        claudeSkillDir: values["claude-skill-dir"] ?? values["skill-dir"],
+        codexSkillDir: values["codex-skill-dir"],
+        reconfigure: values.reconfigure,
+      }, {
+        env: process.env,
+        files: embeddedSkillFiles,
+        version: packageJson.version,
+        interactive: Boolean(process.stdin.isTTY) || process.env.REVIEWONATOR_INTERACTIVE === "1",
+        prompter,
+        log: (line) => process.stdout.write(`${line}\n`),
+      });
+    } finally {
+      prompter.close?.();
+    }
     return;
   }
 
