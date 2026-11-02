@@ -144,12 +144,11 @@ async function main(): Promise<void> {
   if (values.live) await ensureNoActiveLiveSession(prUrl);
 
   const runner = new BunCommandRunner();
-  const updates = new UpdateChecker({
-    version: packageJson.version,
-    env: process.env,
-    releases: new GhReleaseSource(runner),
-  });
-  updates.start();
+  // Only installs that `reviewonator update` can upgrade are offered an update.
+  const updates = (await detectInstallMethod(process.execPath)).kind === "unmanaged"
+    ? undefined
+    : new UpdateChecker({ version: packageJson.version, env: process.env, releases: new GhReleaseSource(runner) });
+  updates?.start();
   const github = new GitHubClient(runner);
   await github.verifyPrerequisites();
 
@@ -195,7 +194,7 @@ async function main(): Promise<void> {
   }
 
   const result = await session.waitForResult();
-  updates.stop();
+  updates?.stop();
   if (liveState && result.status !== "revision_requested") await writeLiveState({ ...liveState, result });
   await Bun.sleep(100);
   server.stop(true);

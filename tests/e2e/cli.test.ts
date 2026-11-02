@@ -111,17 +111,14 @@ describe("Reviewonator CLI end-to-end", () => {
     expect(stdout).toBe(`Reviewonator ${packageJson.version}\n`);
   });
 
-  it("serves an update notice for a newer release found through gh", async () => {
+  it("does not offer updates from a development run", async () => {
     const stateDirectory = await mkdtemp(join(tmpdir(), "reviewonator-update-notice-"));
     const process = await startReviewonator({ REVIEWONATOR_NO_UPDATE_CHECK: "", REVIEWONATOR_STATE_DIR: stateDirectory });
     const { baseUrl, token } = await process.ready;
 
     const response = await authenticatedFetch(baseUrl, token, "/api/update-notice");
 
-    expect((await response.json()).notice).toMatchObject({
-      latest: "99.0.0",
-      releaseUrl: "https://github.com/johniak/reviewonator/releases/tag/v99.0.0",
-    });
+    expect(await response.json()).toEqual({ notice: null });
   });
 
   it("exits right after its result even when the release lookup hangs", async () => {
