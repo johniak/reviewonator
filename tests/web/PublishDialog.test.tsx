@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -5,6 +6,17 @@ import { PublishDialog } from "../../web/components/PublishDialog";
 import { review } from "../fixtures";
 
 describe("PublishDialog", () => {
+  it("never squeezes or scrolls the included comments inside the dialog body", () => {
+    const styles = readFileSync("web/styles.css", "utf8");
+    const rule = (selector: string) => styles.match(new RegExp(`\\n${selector.replace(".", "\\.")} \\{([^}]*)\\}`))?.[1] ?? "";
+
+    expect(rule(".publish-content")).toContain("overflow-y: auto");
+    expect(rule(".publish-comments")).not.toContain("min-height");
+    expect(rule(".publish-comments")).not.toMatch(/overflow(-y)?: (hidden|auto|scroll)/);
+    expect(rule(".publish-comment-list")).not.toContain("max-height");
+    expect(rule(".publish-comment-list")).not.toContain("overflow-y");
+  });
+
   it("shows the exact selected content and requires confirmation", async () => {
     const onPublish = vi.fn();
     render(

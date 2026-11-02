@@ -960,7 +960,11 @@ textarea:focus { border-color: var(--pc-accent); }
 .event-options small { color: var(--pc-fg-muted); font-size: var(--pc-text-small); line-height: 18px; }
 .publish-body-field textarea { min-height: 120px; }
 
-.publish-comments { min-height: 0; border: var(--pc-border-width) solid var(--pc-border-default); border-radius: var(--pc-radius-md); overflow: hidden; }
+/* The included-comments box must never shrink below its content: the dialog body is the one scroll
+   region, so a squeezed box would hide the exact text that is about to be published. `overflow: clip`
+   rounds the corners without turning the box into a scroll container, which is what let the grid
+   collapse it to a few pixels in short windows. */
+.publish-comments { border: var(--pc-border-width) solid var(--pc-border-default); border-radius: var(--pc-radius-md); overflow: clip; }
 .publish-comments .section-title-row { padding: 10px 14px; background: var(--pc-bg-subtle); border-bottom: var(--pc-border-width) solid var(--pc-border-muted); }
 .private-content-note {
   display: flex;
@@ -972,7 +976,7 @@ textarea:focus { border-color: var(--pc-accent); }
   font-size: 13px;
   line-height: 20px;
 }
-.publish-comment-list { min-height: 0; max-height: min(36vh, 360px); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.publish-comment-list { overflow-wrap: anywhere; }
 .publish-comment-list:focus-visible { outline-offset: -2px; }
 .publish-comment-list > .muted-copy { padding: 12px 14px; }
 .publish-comment { padding: 10px 14px; border-bottom: var(--pc-border-width) solid var(--pc-border-muted); }
