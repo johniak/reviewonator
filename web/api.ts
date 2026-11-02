@@ -1,5 +1,6 @@
 import type { PublishRequest, RevisionRequest } from "../src/domain/review";
 import type { FileContext } from "../src/github/client";
+import type { UpdateNotice } from "../src/domain/update";
 import type { SessionSnapshot } from "./types";
 
 export class ApiError extends Error {
@@ -44,6 +45,11 @@ export const api = {
     body: JSON.stringify(input),
   }),
   cancel: () => request<{ status: string }>("/api/cancel", { method: "POST", body: "{}" }),
+  loadUpdateNotice: () => request<{ notice: UpdateNotice | null }>("/api/update-notice"),
+  dismissUpdateNotice: (version: string) => request<{ status: string }>("/api/update-notice/dismiss", {
+    method: "POST",
+    body: JSON.stringify({ version }),
+  }),
   subscribeToSession: (onUpdate: () => void, onError: () => void) => {
     const events = new EventSource(`/api/events?token=${encodeURIComponent(sessionToken())}`);
     events.addEventListener("session", onUpdate);

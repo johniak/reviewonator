@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { ReviewComment, ReviewEvent } from "../src/domain/review";
+import type { UpdateNotice } from "../src/domain/update";
 import { api } from "./api";
 import { DiffPanel, fileSectionId } from "./components/DiffPanel";
 import { PublishDialog } from "./components/PublishDialog";
@@ -25,6 +26,7 @@ import { PullRequestDiscussion } from "./components/PullRequestDiscussion";
 import { MyCommentNavigation } from "./components/MyCommentNavigation";
 import { commentCardId, ReviewCommentCard } from "./components/ReviewCommentCard";
 import { ReviewFindingNavigation } from "./components/ReviewFindingNavigation";
+import { UpdateNoticeToast } from "./components/UpdateNotice";
 import { userThreadCardId } from "./components/UserCommentThread";
 import markDark from "./brand/mark-dark.png";
 import markLight from "./brand/mark-light.png";
@@ -63,11 +65,13 @@ export function App() {
   const [completion, setCompletion] = useState<Completion | null>(null);
   const [panelTab, setPanelTab] = useState<"review" | "discussion">("review");
   const [themePreference, resolvedTheme, setThemePreference] = useTheme();
+  const [updateNotice, setUpdateNotice] = useState<UpdateNotice | null>(null);
 
   useEffect(() => {
     api.loadSession()
       .then((loaded) => {
         setSession(loaded);
+        api.loadUpdateNotice().then(({ notice }) => setUpdateNotice(notice)).catch(() => {});
         setActivePath(loaded.pullRequest.files[0]?.path ?? "");
         setSelectedIds(new Set(
           loaded.review.comments.filter((comment) => comment.included).map((comment) => comment.id),
@@ -352,6 +356,13 @@ export function App() {
       delete next[key];
       return next;
     });
+  }
+
+  function dismissUpdateNotice() {
+    if (!updateNotice) return;
+    const { latest } = updateNotice;
+    setUpdateNotice(null);
+    api.dismissUpdateNotice(latest).catch(() => {});
   }
 
   async function publish(input: { body: string; event: ReviewEvent }) {
@@ -645,6 +656,7 @@ export function App() {
         onOpenChange={setPublishOpen}
         onPublish={publish}
       />
+      {updateNotice && <UpdateNoticeToast notice={updateNotice} onDismiss={dismissUpdateNotice} />}
     </div>
   );
 }

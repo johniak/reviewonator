@@ -79,6 +79,39 @@ describe("GitHub review body", () => {
     expect(screen.getByRole("tab", { name: "PR discussion 3" })).toBeVisible();
   });
 
+  it("shows the update notice from the server and dismisses it", async () => {
+    const session = new ReviewSession(pullRequest, patch, review, new AppGateway(), discussion);
+    const dismissed: string[] = [];
+    const serverApp = createApp({
+      html: "<html></html>",
+      favicon: "<svg></svg>",
+      token: "secret",
+      session,
+      updates: {
+        notice: async () => (dismissed.length ? null : {
+          current: "0.7.0",
+          latest: "0.8.0",
+          releaseUrl: "https://github.com/johniak/reviewonator/releases/tag/v0.8.0",
+        }),
+        dismiss: async (version) => { dismissed.push(version); },
+      },
+    });
+    vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+      const value = input instanceof Request ? input.url : input.toString();
+      const url = new URL(value, "http://reviewonator.local");
+      return serverApp.request(`${url.pathname}${url.search}`, init);
+    });
+    window.location.hash = "secret";
+
+    render(createElement(App));
+
+    expect(await screen.findByText(/Reviewonator 0\.8\.0 is available/)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss update notice" }));
+
+    expect(screen.queryByText(/Reviewonator 0\.8\.0 is available/)).toBeNull();
+    await waitFor(() => expect(dismissed).toEqual(["0.8.0"]));
+  });
+
   it("restores carried decisions and returns the remaining decisions with revision feedback", async () => {
     const carriedReview = {
       ...review,

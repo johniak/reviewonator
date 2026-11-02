@@ -1034,6 +1034,48 @@ textarea:focus { border-color: var(--pc-accent); }
 }
 .auto-close-panel small { font-size: 13px; line-height: 20px; }
 
+/* ---------- Update notice ---------- */
+
+/* Floats over the bottom of the diff column so the publish actions in the context panel stay clear. */
+.update-notice {
+  position: fixed;
+  z-index: 10;
+  left: calc(var(--pc-nav-width) + var(--pc-space-4));
+  bottom: var(--pc-space-4);
+  width: min(400px, calc(100vw - var(--pc-nav-width) - var(--pc-context-width) - var(--pc-space-8)));
+  display: flex;
+  align-items: flex-start;
+  gap: var(--pc-space-2);
+  padding: var(--pc-space-3) var(--pc-space-2) var(--pc-space-3) var(--pc-space-4);
+  background: var(--pc-bg-elevated);
+  border: var(--pc-border-width) solid var(--pc-border-default);
+  border-radius: var(--pc-radius-lg);
+  box-shadow: var(--pc-shadow-floating);
+  animation: fade-in .16s ease-out;
+}
+.update-notice-body { flex: 1; min-width: 0; display: grid; justify-items: start; gap: var(--pc-space-2); }
+.update-notice-body p { margin: 0; color: var(--pc-fg-default); }
+.update-notice-command { display: flex; align-items: center; gap: var(--pc-space-2); }
+.update-notice-command code {
+  padding: 3px 8px;
+  color: var(--pc-fg-default);
+  background: var(--pc-accent-subtle);
+  border: var(--pc-border-width) solid var(--pc-accent-border);
+  border-radius: var(--pc-radius-sm);
+  font: var(--pc-text-code) / 18px var(--pc-font-code);
+}
+.update-notice-body a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--pc-accent);
+  font-size: var(--pc-text-small);
+  font-weight: 500;
+  text-decoration: none;
+}
+.update-notice-body a:hover { text-decoration: underline; }
+.update-notice-dismiss { flex: 0 0 auto; border-color: transparent; background: transparent; }
+
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes fade-in { from { opacity: 0; } }
 @keyframes dialog-in { from { opacity: 0; transform: translate(-50%, -49%); } }
@@ -1061,6 +1103,7 @@ textarea:focus { border-color: var(--pc-accent); }
   .review-panel { margin-top: 8px; }
   .line-comment-hint { display: none; }
   .event-options { grid-template-columns: 1fr; }
+  .update-notice { left: var(--pc-space-4); right: var(--pc-space-4); width: auto; max-width: 400px; }
 }
 
 @media (max-width: 767px) {
