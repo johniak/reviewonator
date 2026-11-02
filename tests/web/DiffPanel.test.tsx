@@ -36,6 +36,8 @@ const actions = {
   onCreateDraft: vi.fn(),
   onChangeDraft: vi.fn(),
   onRemoveDraft: vi.fn(),
+  viewedPaths: new Set<string>(),
+  onViewedChange: vi.fn(),
 };
 const loadFileContext = vi.fn(async () => ({ oldContent: "", newContent: "" }));
 

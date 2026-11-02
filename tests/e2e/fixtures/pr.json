@@ -1,5 +1,6 @@
 {
   "additions": 8,
+  "id": "PR_fixture42",
   "author": { "login": "octocat" },
   "baseRefName": "main",
   "baseRefOid": "base-sha",

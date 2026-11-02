@@ -11,12 +11,29 @@ import { discussion, patch, pullRequest, review, userThread } from "../fixtures"
 
 class AppGateway implements GitHubGateway {
   async verifyPrerequisites() {}
-  async loadPullRequest(): Promise<LoadedPullRequest> { return { pullRequest, patch, discussion }; }
+  viewedCalls: Array<{ path: string; viewed: boolean }> = [];
+  viewedError?: Error;
+
+  async loadPullRequest(): Promise<LoadedPullRequest> { return { pullRequest, patch, discussion, viewedFiles: [] }; }
   async getHeadSha() { return pullRequest.headRefOid; }
   async loadFileContext() { return { oldContent: "export function answer() {\n  return 41;\n}", newContent: "export function answer() {\n  const answer = 42;\n  return answer;\n}" }; }
   async publishReview(_pr: PullRequest, _request: PublishRequest, _comments: ReviewComment[]): Promise<PublishedReview> {
     return { id: 1, url: "https://github.com/acme/widgets/pull/42#review-1", state: "COMMENTED" };
   }
+  async setFileViewed(_pr: PullRequest, path: string, viewed: boolean) {
+    if (this.viewedError) throw this.viewedError;
+    this.viewedCalls.push({ path, viewed });
+  }
+}
+
+function serveSession(session: ReviewSession) {
+  const serverApp = createApp({ html: "<html></html>", favicon: "<svg></svg>", token: "secret", session });
+  vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+    const value = input instanceof Request ? input.url : input.toString();
+    const url = new URL(value, "http://reviewonator.local");
+    return serverApp.request(`${url.pathname}${url.search}`, init);
+  });
+  window.location.hash = "secret";
 }
 
 afterEach(() => {
@@ -110,6 +127,53 @@ describe("GitHub review body", () => {
 
     expect(screen.queryByText(/Reviewonator 0\.8\.0 is available/)).toBeNull();
     await waitFor(() => expect(dismissed).toEqual(["0.8.0"]));
+  });
+
+  it("collapses files viewed on GitHub and keeps the Viewed checkbox in sync", async () => {
+    const gateway = new AppGateway();
+    const session = new ReviewSession(pullRequest, patch, review, gateway, discussion, false, ["src/example.ts"]);
+    serveSession(session);
+
+    render(createElement(App));
+
+    const viewed = await screen.findByRole("checkbox", { name: "Viewed" });
+    expect(viewed).toBeChecked();
+    expect(screen.getByText("1 / 1 viewed")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Open src/example.ts" })).toHaveClass("viewed");
+    expect(document.querySelector(".diff-surface")).toBeNull();
+
+    const toggle = screen.getByRole("button", { name: "src/example.ts", expanded: false });
+    fireEvent.click(toggle);
+    expect(document.querySelector(".diff-surface")).not.toBeNull();
+    expect(viewed).toBeChecked();
+
+    fireEvent.click(viewed);
+    await waitFor(() => expect(gateway.viewedCalls).toEqual([{ path: "src/example.ts", viewed: false }]));
+    expect(viewed).not.toBeChecked();
+    expect(screen.getByText("0 / 1 viewed")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Open src/example.ts" })).not.toHaveClass("viewed");
+
+    fireEvent.click(viewed);
+    await waitFor(() => expect(gateway.viewedCalls).toHaveLength(2));
+    expect(gateway.viewedCalls[1]).toEqual({ path: "src/example.ts", viewed: true });
+    expect(document.querySelector(".diff-surface")).toBeNull();
+    expect(screen.getByRole("button", { name: "src/example.ts", expanded: false })).toBeVisible();
+  });
+
+  it("restores the Viewed checkbox and explains why when GitHub rejects the change", async () => {
+    const gateway = new AppGateway();
+    gateway.viewedError = new Error("GitHub said no.");
+    serveSession(new ReviewSession(pullRequest, patch, review, gateway, discussion));
+
+    render(createElement(App));
+
+    const viewed = await screen.findByRole("checkbox", { name: "Viewed" });
+    fireEvent.click(viewed);
+
+    expect(await screen.findByText(/GitHub said no\./)).toBeVisible();
+    expect(viewed).not.toBeChecked();
+    expect(document.querySelector(".diff-surface")).not.toBeNull();
+    expect(screen.getByText("0 / 1 viewed")).toBeVisible();
   });
 
   it("restores carried decisions and returns the remaining decisions with revision feedback", async () => {

@@ -19,6 +19,7 @@ describe("project documentation", () => {
 
     expect(guide).toContain("Nothing is included by default");
     expect(guide).toContain("PR discussion");
+    expect(guide).toContain("**Viewed** is the same per-user flag as on GitHub");
     expect(guide).toContain("Comment**, **Approve**, or **Request changes");
     expect(guide).toContain("assets/pr-discussion.png");
     expect(guide).toContain("assets/reviewonator-overview.png");

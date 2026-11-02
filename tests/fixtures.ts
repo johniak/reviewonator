@@ -33,6 +33,7 @@ export const pullRequest: PullRequest = {
   files: [{ path: "src/example.ts", additions: 2, deletions: 1 }],
   headRefName: "fix-answer",
   headRefOid: "head-sha",
+  id: "PR_fixture42",
   number: 42,
   title: "Return the correct answer",
   url: prUrl,

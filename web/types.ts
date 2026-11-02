@@ -12,6 +12,7 @@ export type SessionSnapshot = {
   patch: string;
   review: ReviewDocument;
   discussion: PullRequestDiscussionItem[];
+  viewedFiles: string[];
   fileUrls: Record<string, string>;
   live: boolean;
   version: number;

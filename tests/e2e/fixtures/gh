@@ -34,6 +34,8 @@ case "$1" in
         fi
         printf '%s\n' '{"id":99,"html_url":"https://github.com/acme/widgets/pull/42#pullrequestreview-99","state":"CHANGES_REQUESTED"}'
         ;;
+      *" graphql "*"viewerViewedState"*) cat "$FIXTURE_DIR/viewed-files.json" ;;
+      *" graphql "*"FileAsViewed"*) printf '%s\n' '{"data":{}}' ;;
       *"/issues/42/comments"*) cat "$FIXTURE_DIR/discussion-comments.json" ;;
       *"/pulls/42/reviews"*) cat "$FIXTURE_DIR/discussion-reviews.json" ;;
       *"/pulls/42/comments"*) cat "$FIXTURE_DIR/discussion-inline.json" ;;

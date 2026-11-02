@@ -7,6 +7,7 @@ export type LoadedPullRequest = {
   pullRequest: PullRequest;
   patch: string;
   discussion: PullRequestDiscussionItem[];
+  viewedFiles: string[];
 };
 
 export type PublishedReview = {
@@ -37,7 +38,23 @@ export interface GitHubGateway {
     request: PublishRequest,
     comments: ReviewComment[],
   ): Promise<PublishedReview>;
+  setFileViewed(pr: PullRequest, path: string, viewed: boolean): Promise<void>;
 }
+
+const viewedFilesQuery = `query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      files(first: 100, after: $endCursor) {
+        pageInfo { hasNextPage endCursor }
+        nodes { path viewerViewedState }
+      }
+    }
+  }
+}`;
+
+type ViewedFilesPage = {
+  data: { repository: { pullRequest: { files: { nodes: Array<{ path: string; viewerViewedState: string }> } } } };
+};
 
 export class GitHubClient implements GitHubGateway {
   constructor(private readonly runner: CommandRunner) {}
@@ -51,9 +68,9 @@ export class GitHubClient implements GitHubGateway {
     const repository = parsePullRequestUrl(prUrl);
     const fields = [
       "additions", "author", "baseRefName", "baseRefOid", "body", "changedFiles", "commits",
-      "deletions", "files", "headRefName", "headRefOid", "number", "title", "url",
+      "deletions", "files", "headRefName", "headRefOid", "id", "number", "title", "url",
     ].join(",");
-    const [metadata, patch, conversation, reviews, inline] = await Promise.all([
+    const [metadata, patch, conversation, reviews, inline, viewed] = await Promise.all([
       this.runGh(["pr", "view", prUrl, "--json", fields], "Could not load pull request metadata."),
       this.runGh(["pr", "diff", prUrl, "--color", "never"], "Could not load the pull request diff."),
       this.loadDiscussionPage(
@@ -68,11 +85,21 @@ export class GitHubClient implements GitHubGateway {
         `repos/${repository.owner}/${repository.name}/pulls/${repository.number}/comments`,
         "Could not load inline pull request comments.",
       ),
+      this.runGh([
+        "api", "graphql", "--paginate", "--slurp",
+        "-f", `query=${viewedFilesQuery}`,
+        "-f", `owner=${repository.owner}`, "-f", `name=${repository.name}`, "-F", `number=${repository.number}`,
+      ], "Could not load which files you already marked as viewed."),
     ]);
     return {
       pullRequest: pullRequestSchema.parse(JSON.parse(metadata.stdout)),
       patch: patch.stdout,
       discussion: parsePullRequestDiscussion(conversation.stdout, reviews.stdout, inline.stdout),
+      viewedFiles: (JSON.parse(viewed.stdout) as ViewedFilesPage[])
+        .flatMap((page) => page.data.repository.pullRequest.files.nodes)
+        // GitHub reports DISMISSED when the file changed after it was viewed, which counts as unviewed.
+        .filter((file) => file.viewerViewedState === "VIEWED")
+        .map((file) => file.path),
     };
   }
 
@@ -128,6 +155,15 @@ export class GitHubClient implements GitHubGateway {
     );
     const response = JSON.parse(result.stdout) as { id: number; html_url: string; state: string };
     return { id: response.id, url: response.html_url, state: response.state };
+  }
+
+  async setFileViewed(pr: PullRequest, path: string, viewed: boolean): Promise<void> {
+    const mutation = viewed ? "markFileAsViewed" : "unmarkFileAsViewed";
+    await this.runGh([
+      "api", "graphql",
+      "-f", `query=mutation($id: ID!, $path: String!) { ${mutation}(input: { pullRequestId: $id, path: $path }) { clientMutationId } }`,
+      "-f", `id=${pr.id}`, "-f", `path=${path}`,
+    ], `Could not update the viewed state of ${path} on GitHub.`);
   }
 
   private async runGh(args: string[], errorMessage: string, input?: string) {

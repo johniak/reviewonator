@@ -23,6 +23,7 @@ export const pullRequestSchema = z.object({
   }).passthrough()),
   headRefName: z.string(),
   headRefOid: z.string(),
+  id: z.string(),
   number: z.number(),
   title: z.string(),
   url: z.url(),

@@ -8,6 +8,7 @@ import { FileDiff } from "@pierre/diffs/react";
 import {
   AlignJustify,
   Check,
+  ChevronRight,
   Columns2,
   ExternalLink,
   FileCode2,
@@ -46,6 +47,8 @@ type Props = CommentActions & LineCommentDraftActions & UserThreadActions & {
   onDiffStyleChange: (style: "unified" | "split") => void;
   theme?: "light" | "dark";
   loadFileContext: (path: string) => Promise<FileContext>;
+  viewedPaths: ReadonlySet<string>;
+  onViewedChange: (path: string, viewed: boolean) => void;
 };
 
 export function DiffPanel({
@@ -63,6 +66,8 @@ export function DiffPanel({
   onDiffStyleChange,
   theme = "light",
   loadFileContext,
+  viewedPaths,
+  onViewedChange,
   drafts,
   onCreateDraft,
   onChangeDraft,
@@ -173,6 +178,8 @@ export function DiffPanel({
               diffStyle={diffStyle}
               theme={theme}
               loadFileContext={loadFileContext}
+              viewed={viewedPaths.has(file.name)}
+              onViewedChange={onViewedChange}
               onCreateDraft={onCreateDraft}
               onChangeDraft={onChangeDraft}
               onRemoveDraft={onRemoveDraft}
@@ -245,12 +252,16 @@ function FileDiffCard({
   diffStyle,
   theme,
   loadFileContext,
+  viewed,
+  onViewedChange,
   onCreateDraft,
   onChangeDraft,
   onRemoveDraft,
 }: {
   file: FileDiffMetadata;
   fileUrl: string | undefined;
+  viewed: boolean;
+  onViewedChange: (path: string, viewed: boolean) => void;
   annotations: DiffLineAnnotation<LineAnnotationContent>[];
   reviewerLanguage: string;
   focusedCommentId: string | null;
@@ -265,6 +276,14 @@ function FileDiffCard({
   const [shouldLoad, setShouldLoad] = useState(false);
   const [context, setContext] = useState<FileContext | null>(null);
   const [contextError, setContextError] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState(viewed);
+  const [collapsedForViewed, setCollapsedForViewed] = useState(viewed);
+
+  // Marking a file as viewed collapses it and unmarking expands it; the toggle can still peek in between.
+  if (collapsedForViewed !== viewed) {
+    setCollapsedForViewed(viewed);
+    setCollapsed(viewed);
+  }
 
   useEffect(() => {
     const element = containerRef.current;
@@ -283,7 +302,7 @@ function FileDiffCard({
   }, []);
 
   useEffect(() => {
-    if (!shouldLoad || context || contextError) return;
+    if (!shouldLoad || collapsed || context || contextError) return;
     let active = true;
     loadFileContext(file.name)
       .then((loaded) => { if (active) setContext(loaded); })
@@ -291,7 +310,7 @@ function FileDiffCard({
         if (active) setContextError(error instanceof Error ? error.message : "Context unavailable");
       });
     return () => { active = false; };
-  }, [context, contextError, file.name, loadFileContext, shouldLoad]);
+  }, [collapsed, context, contextError, file.name, loadFileContext, shouldLoad]);
 
   const expandableFile = useMemo(
     () => context ? buildExpandableDiff(file, context) : file,
@@ -299,24 +318,46 @@ function FileDiffCard({
   );
 
   return (
-    <section className="diff-panel" id={fileSectionId(file.name)} ref={containerRef}>
+    <section
+      className={`diff-panel ${collapsed ? "collapsed" : ""}`}
+      id={fileSectionId(file.name)}
+      ref={containerRef}
+    >
       <div className="diff-toolbar">
-        <h2>{file.name}</h2>
+        <h2>
+          <button
+            type="button"
+            className="diff-file-toggle"
+            aria-expanded={!collapsed}
+            onClick={() => setCollapsed((current) => !current)}
+          >
+            <ChevronRight aria-hidden="true" size={14} />
+            <span>{file.name}</span>
+          </button>
+        </h2>
         <div className="diff-toolbar-actions">
-          {!context && !contextError && (
+          {!collapsed && !context && !contextError && (
             <span className="context-status"><LoaderCircle className="spin" size={13} /> Loading context</span>
           )}
-          {context && (
+          {!collapsed && context && (
             <span className="context-status context-ready"><Check size={13} /> Expandable context</span>
           )}
-          {contextError && <span className="context-status context-error" title={contextError}>Context unavailable</span>}
+          {!collapsed && contextError && <span className="context-status context-error" title={contextError}>Context unavailable</span>}
           <a className="secondary-button" href={fileUrl} target="_blank" rel="noreferrer">
             View full file on GitHub
             <ExternalLink aria-hidden="true" size={15} />
           </a>
+          <label className="viewed-toggle">
+            <input
+              type="checkbox"
+              checked={viewed}
+              onChange={(event) => onViewedChange(file.name, event.target.checked)}
+            />
+            Viewed
+          </label>
         </div>
       </div>
-      <div className="diff-surface">
+      {!collapsed && <div className="diff-surface">
         <RenderedFileDiff
           file={expandableFile}
           annotations={annotations}
@@ -332,7 +373,7 @@ function FileDiffCard({
           onChangeDraft={onChangeDraft}
           onRemoveDraft={onRemoveDraft}
         />
-      </div>
+      </div>}
     </section>
   );
 }
