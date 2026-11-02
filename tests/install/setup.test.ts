@@ -2,7 +2,7 @@
 
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 import { readConfig, type InstallConfig } from "../../src/install/config";
 import type { Prompter } from "../../src/install/prompt";
@@ -175,6 +175,31 @@ describe("reviewonator setup", () => {
     });
     expect(await readSkillMarker(legacy)).toEqual({ managed: true, version: "0.8.0" });
     expect(await skillText(fixture.claudeRoot)).toContain(languagesIn("German", "French"));
+  });
+
+  it("saves an absolute skill root when given a relative one", async () => {
+    const fixture = await setupFixture();
+    const target = join(fixture.root, "relative-claude");
+
+    await runSetup(
+      { targets: "claude", claudeSkillDir: relative(process.cwd(), target) },
+      fixture.context(new ScriptedPrompter(), false),
+    );
+
+    expect((await readConfig(fixture.env))?.skillRoots.claude).toBe(target);
+    expect(await readSkillMarker(join(target, "reviewonator"))).toEqual({ managed: true, version: "0.8.0" });
+  });
+
+  it("treats empty languages as unset", async () => {
+    const fixture = await setupFixture();
+
+    await runSetup(
+      { targets: "claude", commentLanguage: "" },
+      fixture.context(new ScriptedPrompter(), false, { REVIEWONATOR_REVIEWER_LANGUAGE: "" }),
+    );
+
+    expect((await readConfig(fixture.env))?.languages).toEqual({ comments: "English", reviewerNotes: "English" });
+    expect(await skillText(fixture.claudeRoot)).toContain(languagesIn("English", "English"));
   });
 
   it("fails with the config path when config.json is corrupt", async () => {

@@ -1,6 +1,6 @@
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { z } from "zod";
 
 export type Target = "claude" | "codex";
@@ -26,8 +26,8 @@ export function configPath(env: NodeJS.ProcessEnv = process.env): string {
 
 export function defaultSkillRoots(env: NodeJS.ProcessEnv = process.env): Record<Target, string> {
   return {
-    claude: env.REVIEWONATOR_CLAUDE_SKILL_DIR ?? env.REVIEWONATOR_SKILL_DIR ?? join(homedir(), ".claude", "skills"),
-    codex: env.REVIEWONATOR_CODEX_SKILL_DIR ?? join(homedir(), ".agents", "skills"),
+    claude: resolve(env.REVIEWONATOR_CLAUDE_SKILL_DIR || env.REVIEWONATOR_SKILL_DIR || join(homedir(), ".claude", "skills")),
+    codex: resolve(env.REVIEWONATOR_CODEX_SKILL_DIR || join(homedir(), ".agents", "skills")),
   };
 }
 

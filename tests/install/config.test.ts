@@ -2,7 +2,7 @@
 
 import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   configPath,
@@ -44,6 +44,11 @@ describe("install config", () => {
       REVIEWONATOR_SKILL_DIR: "/legacy",
       REVIEWONATOR_CODEX_SKILL_DIR: "/codex",
     })).toEqual({ claude: "/claude", codex: "/codex" });
+  });
+
+  it("resolves relative skill roots against the current directory", () => {
+    expect(defaultSkillRoots({ REVIEWONATOR_CLAUDE_SKILL_DIR: "relative/claude", REVIEWONATOR_CODEX_SKILL_DIR: "codex" }))
+      .toEqual({ claude: resolve("relative/claude"), codex: resolve("codex") });
   });
 
   it("parses every accepted target spelling", () => {

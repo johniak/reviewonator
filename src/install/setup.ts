@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import {
   defaultSkillRoots,
   parseTargets,
@@ -38,12 +39,12 @@ export async function runSetup(options: SetupOptions, context: SetupContext): Pr
   const existing = await readConfig(env) ?? await deriveLegacyConfig(env);
   const defaults = defaultSkillRoots(env);
   const skillRoots: Record<Target, string> = {
-    claude: options.claudeSkillDir ?? existing?.skillRoots.claude ?? defaults.claude,
-    codex: options.codexSkillDir ?? existing?.skillRoots.codex ?? defaults.codex,
+    claude: resolve(options.claudeSkillDir || existing?.skillRoots.claude || defaults.claude),
+    codex: resolve(options.codexSkillDir || existing?.skillRoots.codex || defaults.codex),
   };
-  const givenTargets = options.targets ?? env.REVIEWONATOR_TARGETS;
-  const givenComments = options.commentLanguage ?? env.REVIEWONATOR_COMMENT_LANGUAGE;
-  const givenReviewer = options.reviewerLanguage ?? env.REVIEWONATOR_REVIEWER_LANGUAGE;
+  const givenTargets = options.targets || env.REVIEWONATOR_TARGETS;
+  const givenComments = options.commentLanguage?.trim() || env.REVIEWONATOR_COMMENT_LANGUAGE?.trim() || undefined;
+  const givenReviewer = options.reviewerLanguage?.trim() || env.REVIEWONATOR_REVIEWER_LANGUAGE?.trim() || undefined;
   const ask = context.interactive && (!existing || Boolean(options.reconfigure));
 
   let targets: Target[];
