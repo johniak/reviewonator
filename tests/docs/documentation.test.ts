@@ -38,6 +38,27 @@ describe("project documentation", () => {
     expect(readme).toContain("stays open for follow-up rounds");
   });
 
+  it("documents Homebrew, the install script, update and uninstall", () => {
+    const readme = readFileSync("README.md", "utf8");
+
+    expect(readme).toContain("brew install johniak/tap/reviewonator\nreviewonator setup");
+    expect(readme).toContain(
+      'sh -c "$(curl -fsSL https://github.com/johniak/reviewonator/releases/latest/download/install.sh)"',
+    );
+    expect(readme).toContain(
+      'sh -c "$(wget -qO- https://github.com/johniak/reviewonator/releases/latest/download/install.sh)"',
+    );
+    expect(readme).toContain('install.sh)" "" --targets claude,codex');
+    expect(readme).toContain("Updates never ask for your targets or languages again.");
+    expect(readme).toContain("reviewonator update");
+    expect(readme).toContain("reviewonator setup --reconfigure");
+    expect(readme).toContain("reviewonator uninstall");
+    expect(readme).toContain("./scripts/install.sh --local");
+    expect(readme).toContain("REVIEWONATOR_NO_UPDATE_CHECK=1");
+    expect(readme).not.toContain("gh repo clone johniak/reviewonator");
+    expect(readme).not.toContain("uninstall.sh");
+  });
+
   it.each([mainAsset, overviewAsset, discussionAsset, liveDiscussionAsset])("ships a substantial PNG at %s", (asset) => {
     const image = readFileSync(asset);
 

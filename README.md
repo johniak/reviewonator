@@ -52,35 +52,45 @@ Your GitHub credentials remain in the CLI process. They are never embedded in th
 
 ## Install
 
-Clone the repository and run the installer:
+### Homebrew
 
 ```sh
-gh repo clone johniak/reviewonator
-cd reviewonator
-./scripts/install.sh
+brew install johniak/tap/reviewonator
+reviewonator setup
 ```
 
-The installer first requires an explicit multi-select choice for Claude Code, Codex, or both. It never chooses an agent integration silently. It then asks which language the agent should use for comments published to GitHub and for private reviewer notes. Both language choices default to English.
+Homebrew installs the executable and the GitHub CLI. `reviewonator setup` then installs the agent skill.
 
-When a local build is not present, the installer downloads the latest binary for your platform from GitHub Releases. It installs:
+### Install script
 
-- the executable in `~/.local/bin/reviewonator`;
+Without Homebrew, run the install script with `curl` or `wget`. No clone is needed:
+
+```sh
+sh -c "$(curl -fsSL https://github.com/johniak/reviewonator/releases/latest/download/install.sh)"
+```
+
+```sh
+sh -c "$(wget -qO- https://github.com/johniak/reviewonator/releases/latest/download/install.sh)"
+```
+
+The script downloads the latest release for your platform, verifies its SHA-256 checksum, installs the executable in `~/.local/bin/reviewonator`, and runs `reviewonator setup`. Make sure `~/.local/bin` is on your `PATH`, or pass `--bin-dir DIR`.
+
+### Setup
+
+`reviewonator setup` first requires an explicit multi-select choice for Claude Code, Codex, or both. It never chooses an agent integration silently. It then asks which language the agent should use for comments published to GitHub and for private reviewer notes. Both language choices default to English. It installs:
+
 - the Claude Code skill in `~/.claude/skills/reviewonator`, when selected;
 - the Codex skill in `~/.agents/skills/reviewonator`, when selected.
 
-Make sure `~/.local/bin` is on your `PATH`. Custom locations are supported:
+Your choices are saved in `~/.config/reviewonator/config.json`. Updates never ask for your targets or languages again. Run `reviewonator setup --reconfigure` to change them.
+
+Non-interactive installation must provide `--targets` or `REVIEWONATOR_TARGETS`; setup never guesses. `--targets` accepts `claude`, `codex`, or a comma-separated selection. `REVIEWONATOR_COMMENT_LANGUAGE` and `REVIEWONATOR_REVIEWER_LANGUAGE` provide the remaining non-interactive configuration. Custom skill locations are supported with `--claude-skill-dir` and `--codex-skill-dir`. The install script passes these options to setup:
 
 ```sh
-./scripts/install.sh \
-  --targets claude,codex \
-  --bin-dir "$HOME/bin" \
-  --claude-skill-dir "$HOME/.claude/skills" \
-  --codex-skill-dir "$HOME/.agents/skills" \
+sh -c "$(curl -fsSL https://github.com/johniak/reviewonator/releases/latest/download/install.sh)" "" --targets claude,codex \
   --comment-language English \
   --reviewer-language English
 ```
-
-`--targets` accepts `claude`, `codex`, or a comma-separated selection. Non-interactive installation must provide `--targets` or `REVIEWONATOR_TARGETS`; the installer never guesses. `REVIEWONATOR_COMMENT_LANGUAGE` and `REVIEWONATOR_REVIEWER_LANGUAGE` provide the remaining non-interactive configuration. The older `--skill-dir` option remains an alias for `--claude-skill-dir` and does not implicitly select Claude Code.
 
 To install from a source checkout instead:
 
@@ -90,7 +100,7 @@ bun run build
 ./scripts/install.sh --local
 ```
 
-The installer and uninstaller use ownership markers and refuse to overwrite or remove files they do not manage.
+Reviewonator uses ownership markers and refuses to overwrite or remove files it does not manage.
 
 ### Codex and GitHub authentication
 
@@ -129,13 +139,15 @@ The review summary is optional for every event, including **Approve** and **Requ
 
 ## Update and uninstall
 
-Run the installer again to check GitHub Releases and update an older managed installation:
+Update to the latest release with:
 
 ```sh
-./scripts/install.sh
+reviewonator update
 ```
 
-The installer reports the installed and latest versions, skips the download when already current, preserves the existing language choices, and refuses to downgrade a newer build. Use `--force` only when you intentionally want to reinstall or downgrade to the latest release. Use `--local` to install the executable and skill from the current source checkout instead of GitHub Releases.
+For a Homebrew installation this runs `brew upgrade reviewonator`; otherwise Reviewonator downloads the latest release, verifies its checksum, and replaces itself. Either way, the installed skills are refreshed with your saved languages. An update waits until an open live review has finished; `--force` overrides this and, for an install-script installation, also reinstalls or downgrades to the latest release. Running the install script again works too.
+
+When a newer release exists, the review page shows a small notice with the update command. Set `REVIEWONATOR_NO_UPDATE_CHECK=1` to turn the check off.
 
 Check the installed version with:
 
@@ -143,13 +155,14 @@ Check the installed version with:
 reviewonator --version
 ```
 
-Run the uninstaller and select one or both agent integrations to remove:
+Remove one or both agent integrations with:
 
 ```sh
-./scripts/uninstall.sh
+reviewonator uninstall
+reviewonator uninstall --targets codex
 ```
 
-The same `--targets`, `--bin-dir`, `--claude-skill-dir`, and `--codex-skill-dir` options are available when uninstalling. The executable remains installed while another managed integration still uses it.
+The executable remains installed while another managed integration still uses it. A Homebrew installation is then removed with `brew uninstall reviewonator`.
 
 ## Development
 
@@ -183,7 +196,7 @@ Tests exercise domain validation, GitHub integration boundaries, the HTTP server
 2. Ensure `bun run check` passes.
 3. Create and push a tag such as `v0.1.0`.
 
-The release workflow builds binaries for macOS and Linux on x64 and ARM64, packages the skill and license notices, creates SHA-256 checksums, and publishes a GitHub Release.
+The release workflow builds binaries for macOS and Linux on x64 and ARM64, packages the skill and license notices, creates SHA-256 checksums, and publishes a GitHub Release with `install.sh`. It then updates the formula in [johniak/homebrew-tap](https://github.com/johniak/homebrew-tap), which requires the `HOMEBREW_TAP_TOKEN` repository secret: a fine-grained token with contents write access to the tap.
 
 ## Project status
 

@@ -67,4 +67,4 @@ Publication requires a separate confirmation checkbox. Closing the dialog or can
 
 ## Use the same workflow with Claude Code or Codex
 
-The installer can target Claude Code, Codex, or both. It also configures the language used for public comments and the separate language used for private reviewer notes; both default to English. The review schema and human confirmation flow remain the same across supported agents.
+`reviewonator setup` can target Claude Code, Codex, or both. It also configures the language used for public comments and the separate language used for private reviewer notes; both default to English. `reviewonator update` keeps these choices and refreshes the installed skills. The review schema and human confirmation flow remain the same across supported agents.
