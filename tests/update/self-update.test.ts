@@ -27,16 +27,17 @@ afterEach(() => {
 class ProcessRunner implements CommandRunner {
   constructor(private readonly env: NodeJS.ProcessEnv, private readonly terminal: string[]) {}
 
-  run(command: string, args: string[], input?: string, options: RunOptions = {}): Promise<CommandResult> {
+  run(command: string, args: string[], _input?: string, options: RunOptions = {}): Promise<CommandResult> {
     return new Promise((resolve, reject) => {
-      const child = spawn(command, args, { env: this.env, stdio: ["pipe", "pipe", "pipe"] });
+      // No update command reads stdin. Like BunCommandRunner without input, never open it:
+      // ending the stdin of a child that already exited raises an unhandled EPIPE on Linux.
+      const child = spawn(command, args, { env: this.env, stdio: ["ignore", "pipe", "pipe"] });
       let stdout = "";
       let stderr = "";
       child.stdout.on("data", (chunk) => { if (options.inheritOutput) this.terminal.push(String(chunk)); else stdout += chunk; });
       child.stderr.on("data", (chunk) => { if (options.inheritOutput) this.terminal.push(String(chunk)); else stderr += chunk; });
       child.once("error", reject);
       child.once("close", (exitCode) => resolve({ stdout, stderr, exitCode: exitCode ?? 1 }));
-      child.stdin.end(input ?? "");
     });
   }
 }
