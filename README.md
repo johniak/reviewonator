@@ -84,7 +84,7 @@ The script downloads the latest release for your platform, verifies its SHA-256 
 
 Your choices are saved in `~/.config/reviewonator/config.json`. Updates never ask for your targets or languages again. Run `reviewonator setup --reconfigure` to change them.
 
-Non-interactive installation must provide `--targets` or `REVIEWONATOR_TARGETS`; setup never guesses. `--targets` accepts `claude`, `codex`, or a comma-separated selection. `REVIEWONATOR_COMMENT_LANGUAGE` and `REVIEWONATOR_REVIEWER_LANGUAGE` provide the remaining non-interactive configuration. Custom skill locations are supported with `--claude-skill-dir` and `--codex-skill-dir`. The install script passes these options to setup:
+Non-interactive installation must provide `--targets` or `REVIEWONATOR_TARGETS`; setup never guesses. `--targets` accepts `claude`, `codex`, or a comma-separated selection. `--targets` is the complete selection: setup removes the managed skill of any agent you leave out. `REVIEWONATOR_COMMENT_LANGUAGE` and `REVIEWONATOR_REVIEWER_LANGUAGE` provide the remaining non-interactive configuration. Custom skill locations are supported with `--claude-skill-dir` and `--codex-skill-dir`. The install script passes these options to setup:
 
 ```sh
 sh -c "$(curl -fsSL https://github.com/johniak/reviewonator/releases/latest/download/install.sh)" "" --targets claude,codex \

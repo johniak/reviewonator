@@ -52,6 +52,9 @@ describe("project documentation", () => {
     expect(readme).toContain("Updates never ask for your targets or languages again.");
     expect(readme).toContain("reviewonator update");
     expect(readme).toContain("reviewonator setup --reconfigure");
+    expect(readme).toContain(
+      "`--targets` is the complete selection: setup removes the managed skill of any agent you leave out.",
+    );
     expect(readme).toContain("reviewonator uninstall");
     expect(readme).toContain("./scripts/install.sh --local");
     expect(readme).toContain("REVIEWONATOR_NO_UPDATE_CHECK=1");
