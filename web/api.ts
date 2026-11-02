@@ -39,6 +39,10 @@ export const api = {
     method: "POST",
     body: JSON.stringify(input),
   }),
+  setFileViewed: (path: string, viewed: boolean) => request<{ viewedFiles: string[] }>("/api/viewed-files", {
+    method: "POST",
+    body: JSON.stringify({ path, viewed }),
+  }),
   publish: (input: PublishRequest) => request<{ status: string; review: { url: string } }>("/api/publish", {
     method: "POST",
     body: JSON.stringify(input),

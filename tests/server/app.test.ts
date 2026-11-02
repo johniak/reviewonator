@@ -8,7 +8,8 @@ import { discussion, patch, pullRequest, review } from "../fixtures";
 
 class AppGitHub implements GitHubGateway {
   async verifyPrerequisites() {}
-  async loadPullRequest(): Promise<LoadedPullRequest> { return { pullRequest, patch, discussion }; }
+  async loadPullRequest(): Promise<LoadedPullRequest> { return { pullRequest, patch, discussion, viewedFiles: [] }; }
+  async setFileViewed() {}
   async getHeadSha() { return pullRequest.headRefOid; }
   async loadFileContext() { return { oldContent: "old file", newContent: "new file" }; }
   async publishReview(_pr: PullRequest, _request: PublishRequest, _comments: ReviewComment[]): Promise<PublishedReview> {
@@ -49,6 +50,18 @@ describe("Reviewonator HTTP API", () => {
     expect((await response.json()).review.comments).toHaveLength(2);
     expect((await (await app.request("/api/session", { headers: { authorization: "Bearer secret" } })).json()).discussion)
       .toHaveLength(3);
+  });
+
+  it("marks a file as viewed and returns the updated list", async () => {
+    const { app, session } = testApp();
+
+    expect((await app.request("/api/viewed-files", { ...authenticated({ path: "src/example.ts", viewed: true }), headers: {} })).status)
+      .toBe(401);
+    const response = await app.request("/api/viewed-files", authenticated({ path: "src/example.ts", viewed: true }));
+
+    expect(await response.json()).toEqual({ viewedFiles: ["src/example.ts"] });
+    expect(session.snapshot().viewedFiles).toEqual(["src/example.ts"]);
+    expect((await app.request("/api/viewed-files", authenticated({ path: "src/example.ts" }))).status).toBe(400);
   });
 
   it("requires the session token before opening a live event stream", async () => {

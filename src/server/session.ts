@@ -1,4 +1,5 @@
 import { parsePatchFiles } from "@pierre/diffs";
+import { z } from "zod";
 import { buildFileUrl, type PullRequest } from "../domain/pull-request";
 import type { PullRequestDiscussionItem } from "../domain/discussion";
 import {
@@ -29,6 +30,8 @@ export type AgentWaitResult =
   | (Extract<SessionResult, { status: "revision_requested" }> & { review: ReviewDocument })
   | Exclude<SessionResult, { status: "revision_requested" }>;
 
+const viewedFileRequestSchema = z.object({ path: z.string().min(1), viewed: z.boolean() });
+
 export class StalePullRequestError extends Error {}
 export class ClosedSessionError extends Error {}
 
@@ -44,6 +47,7 @@ export class ReviewSession {
   private agentWaiters: ((result: AgentWaitResult) => void)[] = [];
   private changeVersion = 0;
   private changeWaiters: ((version: number | null) => void)[] = [];
+  private readonly viewedFiles: Set<string>;
 
   constructor(
     readonly pullRequest: PullRequest,
@@ -52,8 +56,10 @@ export class ReviewSession {
     private readonly github: GitHubGateway,
     readonly discussion: PullRequestDiscussionItem[] = [],
     readonly live = false,
+    viewedFiles: string[] = [],
   ) {
     this.currentReview = review;
+    this.viewedFiles = new Set(viewedFiles);
     this.resultPromise = new Promise((resolve) => {
       this.resolveResult = resolve;
     });
@@ -88,6 +94,7 @@ export class ReviewSession {
       version: this.version,
       agentPending: Boolean(this.activeAgentRequest || this.pendingAgentRequests.length),
       discussion: this.discussion,
+      viewedFiles: [...this.viewedFiles],
       fileUrls: Object.fromEntries(
         this.pullRequest.files.map((file) => [file.path, buildFileUrl(this.pullRequest, file.path)]),
       ),
@@ -209,6 +216,18 @@ export class ReviewSession {
     this.fileContextCache.set(path, request);
     request.catch(() => this.fileContextCache.delete(path));
     return request;
+  }
+
+  async setFileViewed(input: unknown): Promise<string[]> {
+    this.assertOpen();
+    const { path, viewed } = viewedFileRequestSchema.parse(input);
+    if (!this.fileRevisions.has(path)) {
+      throw new Error(`File is not part of this pull request: ${path}`);
+    }
+    await this.github.setFileViewed(this.pullRequest, path, viewed);
+    if (viewed) this.viewedFiles.add(path);
+    else this.viewedFiles.delete(path);
+    return [...this.viewedFiles];
   }
 
   async publish(input: unknown): Promise<PublishedReview> {

@@ -82,7 +82,7 @@ async function main(): Promise<void> {
   const loaded = await github.loadPullRequest(prUrl);
   validateReviewLocations(review, loaded.patch);
 
-  const session = new ReviewSession(loaded.pullRequest, loaded.patch, review, github, loaded.discussion, values.live);
+  const session = new ReviewSession(loaded.pullRequest, loaded.patch, review, github, loaded.discussion, values.live, loaded.viewedFiles);
   const token = crypto.randomUUID();
   const app = createApp({ html: appHtml, favicon, token, session });
   const requestedPort = values.port ? Number(values.port) : 0;

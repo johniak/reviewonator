@@ -11,7 +11,10 @@ class FakeGitHub implements GitHubGateway {
   contextCalls = 0;
 
   async verifyPrerequisites() {}
-  async loadPullRequest(): Promise<LoadedPullRequest> { return { pullRequest, patch, discussion: [] }; }
+  viewedCalls: Array<{ path: string; viewed: boolean }> = [];
+  viewedError?: Error;
+
+  async loadPullRequest(): Promise<LoadedPullRequest> { return { pullRequest, patch, discussion: [], viewedFiles: [] }; }
   async getHeadSha() { return this.headSha; }
   async loadFileContext() {
     this.contextCalls += 1;
@@ -21,9 +24,50 @@ class FakeGitHub implements GitHubGateway {
     this.published = { pr, request, comments };
     return { id: 99, url: "https://github.com/acme/widgets/pull/42#review-99", state: "COMMENTED" };
   }
+  async setFileViewed(_pr: PullRequest, path: string, viewed: boolean) {
+    if (this.viewedError) throw this.viewedError;
+    this.viewedCalls.push({ path, viewed });
+  }
 }
 
 describe("ReviewSession", () => {
+  it("starts with the files GitHub already marks as viewed for this user", () => {
+    const session = new ReviewSession(pullRequest, patch, review, new FakeGitHub(), [], false, ["src/example.ts"]);
+
+    expect(session.snapshot().viewedFiles).toEqual(["src/example.ts"]);
+  });
+
+  it("marks and unmarks a file as viewed on GitHub", async () => {
+    const github = new FakeGitHub();
+    const session = new ReviewSession(pullRequest, patch, review, github);
+
+    await expect(session.setFileViewed({ path: "src/example.ts", viewed: true })).resolves.toEqual(["src/example.ts"]);
+    expect(session.snapshot().viewedFiles).toEqual(["src/example.ts"]);
+    await expect(session.setFileViewed({ path: "src/example.ts", viewed: false })).resolves.toEqual([]);
+    expect(github.viewedCalls).toEqual([
+      { path: "src/example.ts", viewed: true },
+      { path: "src/example.ts", viewed: false },
+    ]);
+  });
+
+  it("keeps the previous viewed state when GitHub rejects the change", async () => {
+    const github = new FakeGitHub();
+    github.viewedError = new Error("GitHub said no.");
+    const session = new ReviewSession(pullRequest, patch, review, github);
+
+    await expect(session.setFileViewed({ path: "src/example.ts", viewed: true })).rejects.toThrow("GitHub said no.");
+    expect(session.snapshot().viewedFiles).toEqual([]);
+  });
+
+  it("only marks files that belong to the pull request", async () => {
+    const github = new FakeGitHub();
+    const session = new ReviewSession(pullRequest, patch, review, github);
+
+    await expect(session.setFileViewed({ path: "src/other.ts", viewed: true }))
+      .rejects.toThrow("File is not part of this pull request: src/other.ts");
+    expect(github.viewedCalls).toEqual([]);
+  });
+
   it("returns revision requests to the agent without publishing", async () => {
     const github = new FakeGitHub();
     const session = new ReviewSession(pullRequest, patch, review, github);

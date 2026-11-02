@@ -18,6 +18,10 @@ class RecordingRunner implements CommandRunner {
 
 const success = (stdout = ""): CommandResult => ({ stdout, stderr: "", exitCode: 0 });
 
+const viewedStatePage = (nodes: Array<{ path: string; viewerViewedState: string }>, hasNextPage: boolean) => ({
+  data: { repository: { pullRequest: { files: { pageInfo: { hasNextPage, endCursor: "cursor" }, nodes } } } },
+});
+
 describe("GitHubClient", () => {
   it("checks both the gh executable and authentication", async () => {
     const runner = new RecordingRunner([success(), success()]);
@@ -66,9 +70,19 @@ describe("GitHubClient", () => {
           position: 1,
         },
       ]])),
+      success(JSON.stringify([
+        viewedStatePage([
+          { path: "src/example.ts", viewerViewedState: "VIEWED" },
+          { path: "src/changed-since.ts", viewerViewedState: "DISMISSED" },
+        ], true),
+        viewedStatePage([
+          { path: "README.md", viewerViewedState: "UNVIEWED" },
+          { path: "docs/guide.md", viewerViewedState: "VIEWED" },
+        ], false),
+      ])),
     ]);
     const loaded = await new GitHubClient(runner).loadPullRequest(pullRequest.url);
-    expect(loaded).toEqual({ pullRequest, patch, discussion });
+    expect(loaded).toEqual({ pullRequest, patch, discussion, viewedFiles: ["src/example.ts", "docs/guide.md"] });
     expect(runner.calls[0].args.slice(0, 3)).toEqual(["pr", "view", pullRequest.url]);
     expect(runner.calls[1].args).toEqual(["pr", "diff", pullRequest.url, "--color", "never"]);
     expect(runner.calls[1].args).not.toContain("--patch");
@@ -76,7 +90,39 @@ describe("GitHubClient", () => {
       ["api", "--paginate", "--slurp", "repos/acme/widgets/issues/42/comments"],
       ["api", "--paginate", "--slurp", "repos/acme/widgets/pulls/42/reviews"],
       ["api", "--paginate", "--slurp", "repos/acme/widgets/pulls/42/comments"],
+      [
+        "api", "graphql", "--paginate", "--slurp",
+        "-f", expect.stringContaining("viewerViewedState"),
+        "-f", "owner=acme", "-f", "name=widgets", "-F", "number=42",
+      ],
     ]);
+    expect(runner.calls[5].args[5]).toContain("pageInfo { hasNextPage endCursor }");
+  });
+
+  it("marks and unmarks a file as viewed for the signed-in GitHub user", async () => {
+    const runner = new RecordingRunner([success("{}"), success("{}")]);
+    const client = new GitHubClient(runner);
+
+    await client.setFileViewed(pullRequest, "src/example.ts", true);
+    await client.setFileViewed(pullRequest, "src/example.ts", false);
+
+    expect(runner.calls.map(({ args }) => args)).toEqual([
+      [
+        "api", "graphql", "-f", expect.stringContaining("markFileAsViewed(input: { pullRequestId: $id, path: $path })"),
+        "-f", `id=${pullRequest.id}`, "-f", "path=src/example.ts",
+      ],
+      [
+        "api", "graphql", "-f", expect.stringContaining("unmarkFileAsViewed(input: { pullRequestId: $id, path: $path })"),
+        "-f", `id=${pullRequest.id}`, "-f", "path=src/example.ts",
+      ],
+    ]);
+  });
+
+  it("reports when GitHub refuses to change the viewed state", async () => {
+    const runner = new RecordingRunner([{ stdout: "", stderr: "HTTP 403: Resource not accessible", exitCode: 1 }]);
+
+    await expect(new GitHubClient(runner).setFileViewed(pullRequest, "src/example.ts", true))
+      .rejects.toThrow("Could not update the viewed state of src/example.ts on GitHub. HTTP 403: Resource not accessible");
   });
 
   it("publishes one atomic GitHub review with selected inline comments", async () => {

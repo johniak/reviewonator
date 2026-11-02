@@ -114,7 +114,15 @@ describe("Reviewonator CLI end-to-end", () => {
     const { baseUrl, token } = await process.ready;
     const session = await authenticatedFetch(baseUrl, token, "/api/session");
     expect(session.status).toBe(200);
-    expect((await session.json()).discussion).toHaveLength(3);
+    const snapshot = await session.json();
+    expect(snapshot.discussion).toHaveLength(3);
+    expect(snapshot.viewedFiles).toEqual(["src/config.ts"]);
+
+    const viewed = await authenticatedFetch(baseUrl, token, "/api/viewed-files", {
+      method: "POST",
+      body: JSON.stringify({ path: "src/payments/retry.ts", viewed: true }),
+    });
+    expect(await viewed.json()).toEqual({ viewedFiles: ["src/config.ts", "src/payments/retry.ts"] });
 
     const revision = await authenticatedFetch(baseUrl, token, "/api/revision", {
       method: "POST",

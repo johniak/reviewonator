@@ -13,7 +13,10 @@ You can:
 - expand ten lines of context above or below a patch;
 - open the complete file or pull request on GitHub;
 - navigate directly between findings from the left sidebar;
-- start your own private discussion with the AI agent on any diff line.
+- start your own private discussion with the AI agent on any diff line;
+- tick **Viewed** on files you have understood, so you can move on and come back to the rest.
+
+**Viewed** is the same per-user flag as on GitHub. Files you already marked there arrive ticked and collapsed, and ticking or unticking a file in Reviewonator updates GitHub immediately. When the author pushes a new change to a viewed file, GitHub clears the flag and the file comes back unviewed. The **Files changed** heading counts how many files you have viewed, and a viewed file can still be expanded with the arrow next to its name.
 
 Context expansion is handled by the local Reviewonator process through your authenticated GitHub CLI session. GitHub credentials are never sent to the browser.
 

@@ -61,6 +61,7 @@ export function App() {
   const [publishing, setPublishing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [completion, setCompletion] = useState<Completion | null>(null);
+  const [viewedPaths, setViewedPaths] = useState<Set<string>>(new Set());
   const [panelTab, setPanelTab] = useState<"review" | "discussion">("review");
   const [themePreference, resolvedTheme, setThemePreference] = useTheme();
 
@@ -69,6 +70,7 @@ export function App() {
       .then((loaded) => {
         setSession(loaded);
         setActivePath(loaded.pullRequest.files[0]?.path ?? "");
+        setViewedPaths(new Set(loaded.viewedFiles));
         setSelectedIds(new Set(
           loaded.review.comments.filter((comment) => comment.included).map((comment) => comment.id),
         ));
@@ -279,6 +281,19 @@ export function App() {
   const commitBaseUrl = pullRequest.url.replace(/\/pull\/\d+\/?$/, "/commit/");
   const publishBody = buildPublishBody(review.summary, selectedComments);
 
+  const viewedCount = pullRequest.files.filter((file) => viewedPaths.has(file.path)).length;
+
+  async function setFileViewed(path: string, viewed: boolean) {
+    setActionError(null);
+    setViewedPaths((current) => withPath(current, path, viewed));
+    try {
+      await api.setFileViewed(path, viewed);
+    } catch (error) {
+      setViewedPaths((current) => withPath(current, path, !viewed));
+      setActionError(error instanceof Error ? error.message : "Could not update the viewed state on GitHub.");
+    }
+  }
+
   async function sendRevisionRequests() {
     setActionError(null);
     try {
@@ -454,7 +469,7 @@ export function App() {
         <aside className="navigation-panel">
           <div className="panel-section-heading">
             <span><FileDiff size={15} /> Files changed</span>
-            <strong>{pullRequest.changedFiles}</strong>
+            <strong>{viewedCount} / {pullRequest.changedFiles} viewed</strong>
           </div>
           <nav className="file-list" aria-label="Changed files">
             {pullRequest.files.map((file) => {
@@ -463,7 +478,10 @@ export function App() {
                 <button
                   type="button"
                   key={file.path}
-                  className={activePath === file.path ? "active" : ""}
+                  className={[
+                    activePath === file.path ? "active" : "",
+                    viewedPaths.has(file.path) ? "viewed" : "",
+                  ].filter(Boolean).join(" ")}
                   aria-label={`Open ${file.path}`}
                   title={file.path}
                   onClick={() => selectFile(file.path)}
@@ -472,7 +490,10 @@ export function App() {
                     <strong>{path.name}</strong>
                     <span>{path.directory}</span>
                   </span>
-                  <small className="file-changes"><b>+{file.additions}</b><i>−{file.deletions}</i></small>
+                  <small className="file-changes">
+                    {viewedPaths.has(file.path) && <CheckCircle2 className="file-viewed-mark" aria-hidden="true" size={13} />}
+                    <b>+{file.additions}</b><i>−{file.deletions}</i>
+                  </small>
                 </button>
               );
             })}
@@ -528,6 +549,8 @@ export function App() {
             onDiffStyleChange={setDiffStyle}
             theme={resolvedTheme}
             loadFileContext={api.loadFileContext}
+            viewedPaths={viewedPaths}
+            onViewedChange={setFileViewed}
             drafts={Object.values(lineCommentDrafts)}
             onCreateDraft={createLineCommentDraft}
             onChangeDraft={changeLineCommentDraft}
@@ -812,4 +835,11 @@ function getCompletionContent(completion: Completion) {
     className: "completion-commented",
     icon: <MessageSquareText />,
   };
+}
+
+function withPath(paths: Set<string>, path: string, present: boolean): Set<string> {
+  const next = new Set(paths);
+  if (present) next.add(path);
+  else next.delete(path);
+  return next;
 }

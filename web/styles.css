@@ -195,7 +195,8 @@ textarea:focus-visible, input:focus-visible {
 .thread-dismissal-field button,
 .line-comment-draft-heading button,
 .cancel-auto-close,
-.discussion-location {
+.discussion-location,
+.viewed-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -222,7 +223,8 @@ textarea:focus-visible, input:focus-visible {
 .thread-dismissal-field button:hover,
 .line-comment-draft-heading button:hover,
 .cancel-auto-close:hover,
-.discussion-location:hover {
+.discussion-location:hover,
+.viewed-toggle:hover {
   background: var(--pc-bg-hover);
   border-color: var(--pc-border-strong);
 }
@@ -450,6 +452,8 @@ textarea:focus { border-color: var(--pc-accent); }
 .file-list small { flex: 0 0 auto; display: flex; gap: 6px; font-size: var(--pc-text-small); line-height: 20px; font-variant-numeric: tabular-nums; }
 .file-list b { color: var(--pc-success); font-weight: 500; }
 .file-list i { color: var(--pc-danger); font-style: normal; }
+.file-list button.viewed:not(.active) .file-identity strong { color: var(--pc-fg-muted); font-weight: 400; }
+.file-list .file-viewed-mark { align-self: center; color: var(--pc-success); }
 
 .my-comment-list > p, .finding-list > p {
   margin: 0 8px 8px;
@@ -559,6 +563,33 @@ textarea:focus { border-color: var(--pc-accent); }
 .context-status { display: inline-flex; align-items: center; gap: 5px; color: var(--pc-fg-muted); font-size: var(--pc-text-small); white-space: nowrap; }
 .context-ready { color: var(--pc-success); }
 .context-error { color: var(--pc-warning); cursor: help; }
+
+.diff-file-toggle {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.diff-file-toggle svg { margin-top: 3px; color: var(--pc-fg-muted); transition: transform 150ms ease-out; }
+.diff-file-toggle[aria-expanded="true"] svg { transform: rotate(90deg); }
+.diff-file-toggle span { min-width: 0; overflow-wrap: anywhere; }
+.diff-file-toggle:hover svg { color: var(--pc-fg-default); }
+.diff-panel.collapsed .diff-toolbar { border-bottom: 0; }
+.diff-panel.collapsed .diff-file-toggle span { color: var(--pc-fg-muted); }
+
+.viewed-toggle { cursor: pointer; user-select: none; }
+.viewed-toggle input { width: 14px; height: 14px; margin: 0; accent-color: var(--pc-success); cursor: pointer; }
+.viewed-toggle:has(input:checked) { color: var(--pc-success); border-color: var(--pc-success); background: var(--pc-success-subtle); }
+.viewed-toggle:has(input:focus-visible) { outline: var(--pc-focus-width) solid var(--pc-accent); outline-offset: 2px; }
+.viewed-toggle input:focus-visible { outline: none; }
+@media (prefers-reduced-motion: reduce) { .diff-file-toggle svg { transition: none; } }
 
 .diff-surface { overflow: auto; }
 .diff-surface diffs-container {

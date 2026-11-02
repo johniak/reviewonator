@@ -46,6 +46,10 @@ export function createApp({ html, favicon, token, session }: AppDependencies): H
     return context.json(await session.loadFileContext(path));
   });
 
+  app.post("/api/viewed-files", async (context) => {
+    return context.json({ viewedFiles: await session.setFileViewed(await context.req.json()) });
+  });
+
   app.post("/api/revision", async (context) => {
     session.requestRevision(await context.req.json());
     return context.json({ status: "revision_requested", session: session.snapshot() });
