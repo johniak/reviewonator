@@ -11,6 +11,7 @@ import { embeddedSkillFiles } from "./install/embedded-skill";
 import { createStdinPrompter } from "./install/prompt";
 import { runSetup } from "./install/setup";
 import { detectInstallMethod } from "./install/install-method";
+import { runUninstall } from "./install/uninstall";
 import { skillUpdateHint, syncSkills, type SyncResult } from "./install/sync";
 import type { ReviewDocument } from "./domain/review";
 import {
@@ -89,6 +90,16 @@ async function main(): Promise<void> {
     } finally {
       prompter.close?.();
     }
+    return;
+  }
+
+  if (positionals[0] === "uninstall") {
+    if (positionals.length !== 1) throw new Error(help);
+    await runUninstall({ targets: values.targets }, {
+      env: process.env,
+      installMethod: await detectInstallMethod(process.execPath),
+      log: (line) => process.stdout.write(`${line}\n`),
+    });
     return;
   }
 

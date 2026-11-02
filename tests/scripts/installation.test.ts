@@ -31,7 +31,6 @@ async function installationFixture() {
   await mkdir(join(project, "dist"), { recursive: true });
   await mkdir(join(project, "skills", "reviewonator"), { recursive: true });
   await cp("scripts/install.sh", join(project, "scripts", "install.sh"));
-  await cp("scripts/uninstall.sh", join(project, "scripts", "uninstall.sh"));
   await writeFile(join(project, "dist", "reviewonator"), "#!/bin/sh\nprintf reviewonator\n");
   await chmod(join(project, "dist", "reviewonator"), 0o755);
   await writeFile(
@@ -124,26 +123,6 @@ fi
 }
 
 describe("installation scripts", () => {
-  it("installs and uninstalls only Reviewonator-managed files", async () => {
-    const fixture = await installationFixture();
-    const options = [
-      "--targets", "claude",
-      "--bin-dir", fixture.binDir,
-      "--skill-dir", fixture.skillDir,
-      "--codex-skill-dir", fixture.codexSkillDir,
-    ];
-    await run(join(fixture.project, "scripts", "install.sh"), [...options, "--local"]);
-
-    expect(await readFile(join(fixture.binDir, "reviewonator"), "utf8")).toContain("reviewonator");
-    const skill = await readFile(join(fixture.skillDir, "reviewonator", "SKILL.md"), "utf8");
-    expect(skill).toContain("name: reviewonator");
-    expect(skill).toContain("review summary in English; write private reviewer explanations in English");
-
-    await run(join(fixture.project, "scripts", "uninstall.sh"), options);
-    await expect(readFile(join(fixture.binDir, "reviewonator"))).rejects.toThrow();
-    await expect(readFile(join(fixture.skillDir, "reviewonator", "SKILL.md"))).rejects.toThrow();
-  });
-
   it("refuses to overwrite an unmanaged executable", async () => {
     const fixture = await installationFixture();
     await mkdir(fixture.binDir, { recursive: true });
@@ -230,35 +209,6 @@ describe("installation scripts", () => {
       code: 2,
       stderr: expect.stringContaining("No installation target was provided"),
     });
-  });
-
-  it("keeps the executable until every selected agent integration is removed", async () => {
-    const fixture = await installationFixture();
-    const options = [
-      "--targets", "claude,codex",
-      "--bin-dir", fixture.binDir,
-      "--claude-skill-dir", fixture.skillDir,
-      "--codex-skill-dir", fixture.codexSkillDir,
-    ];
-    await run(join(fixture.project, "scripts", "install.sh"), [...options, "--local"]);
-
-    await run(join(fixture.project, "scripts", "uninstall.sh"), [
-      "--targets", "claude",
-      "--bin-dir", fixture.binDir,
-      "--claude-skill-dir", fixture.skillDir,
-      "--codex-skill-dir", fixture.codexSkillDir,
-    ]);
-    await expect(readFile(join(fixture.skillDir, "reviewonator", "SKILL.md"))).rejects.toThrow();
-    expect(await readFile(join(fixture.binDir, "reviewonator"), "utf8")).toContain("reviewonator");
-
-    await run(join(fixture.project, "scripts", "uninstall.sh"), [
-      "--targets", "codex",
-      "--bin-dir", fixture.binDir,
-      "--claude-skill-dir", fixture.skillDir,
-      "--codex-skill-dir", fixture.codexSkillDir,
-    ]);
-    await expect(readFile(join(fixture.codexSkillDir, "reviewonator", "SKILL.md"))).rejects.toThrow();
-    await expect(readFile(join(fixture.binDir, "reviewonator"))).rejects.toThrow();
   });
 
   it("updates an older managed release and preserves its language choices", async () => {
