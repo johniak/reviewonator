@@ -9,7 +9,7 @@ import { delimiter, join } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 import type { InstallMethod } from "../../src/install/install-method";
-import type { CommandResult, CommandRunner } from "../../src/platform/command";
+import type { CommandResult, CommandRunner, RunOptions } from "../../src/platform/command";
 import { writeLiveState } from "../../src/server/live-state";
 import { platformName, type ReleaseSource } from "../../src/update/releases";
 import { runUpdate } from "../../src/update/self-update";
@@ -23,16 +23,17 @@ afterEach(() => {
   for (const cleanup of cleanups.splice(0)) cleanup();
 });
 
+/** Runs real processes; output requested as inherited lands in `terminal`, as it would on screen. */
 class ProcessRunner implements CommandRunner {
-  constructor(private readonly env: NodeJS.ProcessEnv) {}
+  constructor(private readonly env: NodeJS.ProcessEnv, private readonly terminal: string[]) {}
 
-  run(command: string, args: string[], input?: string): Promise<CommandResult> {
+  run(command: string, args: string[], input?: string, options: RunOptions = {}): Promise<CommandResult> {
     return new Promise((resolve, reject) => {
       const child = spawn(command, args, { env: this.env, stdio: ["pipe", "pipe", "pipe"] });
       let stdout = "";
       let stderr = "";
-      child.stdout.on("data", (chunk) => { stdout += chunk; });
-      child.stderr.on("data", (chunk) => { stderr += chunk; });
+      child.stdout.on("data", (chunk) => { if (options.inheritOutput) this.terminal.push(String(chunk)); else stdout += chunk; });
+      child.stderr.on("data", (chunk) => { if (options.inheritOutput) this.terminal.push(String(chunk)); else stderr += chunk; });
       child.once("error", reject);
       child.once("close", (exitCode) => resolve({ stdout, stderr, exitCode: exitCode ?? 1 }));
       child.stdin.end(input ?? "");
@@ -58,7 +59,12 @@ class FixtureReleases implements ReleaseSource {
 function stubExecutable(version: string): string {
   return `#!/bin/sh
 if [ "\${1:-}" = "--version" ]; then printf 'Reviewonator ${version}\\n'; exit 0; fi
-if [ "\${1:-}" = "setup" ]; then printf '%s\\n' "$0 $*" > "$REVIEWONATOR_TEST_SETUP_LOG"; printf 'setup done\\n'; exit 0; fi
+if [ "\${1:-}" = "setup" ]; then
+  printf '%s\\n' "$0 $*" > "$REVIEWONATOR_TEST_SETUP_LOG"
+  if [ "\${REVIEWONATOR_TEST_SETUP_FAIL:-}" = "1" ]; then printf 'config broken\\n' >&2; exit 1; fi
+  printf 'setup done\\n'
+  exit 0
+fi
 exit 3
 `;
 }
@@ -90,11 +96,12 @@ async function updateFixture(options: { current?: string; latest?: string; kind?
   };
   const releases = new FixtureReleases(latest, releaseDir);
   const lines: string[] = [];
+  const terminal: string[] = [];
   const update = (force = false, overrides: { env?: NodeJS.ProcessEnv; installMethod?: InstallMethod } = {}) => {
     const updateEnv = overrides.env ?? env;
     return runUpdate({ force }, {
       installMethod: overrides.installMethod ?? { kind: options.kind ?? "script", executablePath },
-      runner: new ProcessRunner(updateEnv),
+      runner: new ProcessRunner(updateEnv, terminal),
       releases,
       version: current,
       env: updateEnv,
@@ -102,7 +109,7 @@ async function updateFixture(options: { current?: string; latest?: string; kind?
       platform,
     });
   };
-  return { root, releaseDir, binDir, executablePath, env, setupLog, releases, lines, update };
+  return { root, releaseDir, binDir, executablePath, env, setupLog, releases, lines, terminal, update };
 }
 
 const exists = (path: string) => access(path).then(() => true, () => false);
@@ -121,6 +128,16 @@ describe("reviewonator update", () => {
     expect(fixture.lines).toContain("Updated Reviewonator 0.7.0 to 0.8.0.");
     expect(await stagedFiles(fixture.binDir)).toEqual([]);
     expect(await exists(fixture.releases.downloads[0])).toBe(false);
+  });
+
+  it("shows setup errors after an update", async () => {
+    const fixture = await updateFixture();
+
+    await fixture.update(false, { env: { ...fixture.env, REVIEWONATOR_TEST_SETUP_FAIL: "1" } });
+
+    expect(await readFile(fixture.executablePath, "utf8")).toContain("Reviewonator 0.8.0");
+    expect(fixture.terminal.join("")).toContain("config broken");
+    expect(fixture.lines).toContain("Run reviewonator setup to install the Reviewonator skill for Claude Code or Codex.");
   });
 
   it("reports an up-to-date install without downloading", async () => {
@@ -214,8 +231,8 @@ esac
 
     await fixture.update(false, { env });
 
-    expect(fixture.lines).toContain("Upgrading reviewonator 0.7.0 -> 0.8.0");
-    expect(fixture.lines).toContain("setup done");
+    expect(fixture.terminal.join("")).toContain("Upgrading reviewonator 0.7.0 -> 0.8.0");
+    expect(fixture.terminal.join("")).toContain("setup done");
     expect(await readFile(fixture.setupLog, "utf8")).toBe(`${join(prefix, "bin", "reviewonator")} setup\n`);
     expect(fixture.lines.some((line) => line.startsWith("Another reviewonator"))).toBe(false);
   });

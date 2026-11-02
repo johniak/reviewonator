@@ -34,10 +34,8 @@ export async function runUpdate(options: { force: boolean }, context: UpdateCont
 }
 
 async function updateWithHomebrew(context: UpdateContext): Promise<string> {
-  const { runner, log } = context;
-  const upgrade = await runner.run("brew", ["upgrade", "reviewonator"]);
-  logLines(upgrade.stdout, log);
-  logLines(upgrade.stderr, log);
+  const { runner } = context;
+  const upgrade = await runner.run("brew", ["upgrade", "reviewonator"], undefined, { inheritOutput: true });
   if (upgrade.exitCode !== 0) throw new Error("brew upgrade reviewonator failed.");
   const prefix = await runner.run("brew", ["--prefix", "reviewonator"]);
   if (prefix.exitCode !== 0) throw new Error(`Could not locate the Homebrew installation: ${prefix.stderr.trim()}`);
@@ -94,8 +92,7 @@ async function updateScriptInstall(executablePath: string, force: boolean, conte
 }
 
 async function refreshSkills(executable: string, context: UpdateContext): Promise<void> {
-  const setup = await context.runner.run(executable, ["setup"]);
-  logLines(setup.stdout, context.log);
+  const setup = await context.runner.run(executable, ["setup"], undefined, { inheritOutput: true });
   if (setup.exitCode !== 0) {
     context.log("Run reviewonator setup to install the Reviewonator skill for Claude Code or Codex.");
   }
@@ -115,8 +112,4 @@ async function warnAboutShadowing(updatedPath: string, context: UpdateContext): 
     }
     return;
   }
-}
-
-function logLines(output: string, log: (line: string) => void): void {
-  for (const line of output.split("\n")) if (line.trim()) log(line.trimEnd());
 }
