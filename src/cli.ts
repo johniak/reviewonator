@@ -12,6 +12,8 @@ import { createStdinPrompter } from "./install/prompt";
 import { runSetup } from "./install/setup";
 import { detectInstallMethod } from "./install/install-method";
 import { runUninstall } from "./install/uninstall";
+import { GhReleaseSource } from "./update/releases";
+import { runUpdate } from "./update/self-update";
 import { skillUpdateHint, syncSkills, type SyncResult } from "./install/sync";
 import type { ReviewDocument } from "./domain/review";
 import {
@@ -90,6 +92,20 @@ async function main(): Promise<void> {
     } finally {
       prompter.close?.();
     }
+    return;
+  }
+
+  if (positionals[0] === "update") {
+    if (positionals.length !== 1) throw new Error(help);
+    const runner = new BunCommandRunner();
+    await runUpdate({ force: values.force }, {
+      installMethod: await detectInstallMethod(process.execPath),
+      runner,
+      releases: new GhReleaseSource(runner),
+      version: packageJson.version,
+      env: process.env,
+      log: (line) => process.stdout.write(`${line}\n`),
+    });
     return;
   }
 

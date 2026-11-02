@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { SessionResult } from "./session";
@@ -66,4 +66,33 @@ export async function removeLiveState(
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<void> {
   await rm(liveStatePath(prUrl, env), { force: true });
+}
+
+/** Returns a live session whose server still answers, so an update never swaps the binary under it. */
+export async function findActiveLiveSession(
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<LiveSessionState | null> {
+  const directory = liveStateDirectory(env);
+  let names: string[];
+  try {
+    names = await readdir(directory);
+  } catch {
+    return null;
+  }
+  for (const name of names.filter((entry) => /^[0-9a-f]{24}\.json$/.test(entry))) {
+    let state: LiveSessionState;
+    try {
+      state = JSON.parse(await readFile(join(directory, name), "utf8")) as LiveSessionState;
+    } catch {
+      continue;
+    }
+    if (state.result || typeof state.baseUrl !== "string") continue;
+    try {
+      const response = await fetch(new URL("/health", state.baseUrl), { signal: AbortSignal.timeout(1_000) });
+      if (response.ok) return state;
+    } catch {
+      // An unreachable server means the saved session is stale.
+    }
+  }
+  return null;
 }

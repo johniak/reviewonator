@@ -78,4 +78,12 @@ describe("reviewonator setup end-to-end", () => {
     expect(await readFile(join(skill, "SKILL.md"), "utf8")).toBe("outdated skill");
     expect(await readFile(join(skill, ".reviewonator-managed"), "utf8")).toBe("Installed by Reviewonator 0.0.1\n");
   });
+
+  it("update refuses to touch a development run", async () => {
+    const { env } = await isolatedEnv();
+
+    await expect(run("bun", ["src/cli.ts", "update"], { cwd: process.cwd(), env })).rejects.toMatchObject({
+      stderr: expect.stringContaining("Reviewonator can only update installations made with Homebrew or the install script."),
+    });
+  });
 });

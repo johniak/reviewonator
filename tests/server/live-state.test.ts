@@ -1,10 +1,12 @@
 // @vitest-environment node
 
-import { mkdtemp, stat } from "node:fs/promises";
+import { mkdtemp, stat, writeFile } from "node:fs/promises";
+import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  findActiveLiveSession,
   liveStatePath,
   readLiveState,
   removeLiveState,
@@ -47,4 +49,38 @@ describe("live session state", () => {
 
     await expect(readLiveState(prUrl, env)).rejects.toThrow(/No live Reviewonator session/);
   });
+
+  it("finds an active live session and ignores finished, unreachable and non-session files", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "reviewonator-state-"));
+    const env = { REVIEWONATOR_STATE_DIR: directory };
+    expect(await findActiveLiveSession(env)).toBeNull();
+    const server = await listen();
+    const closed = await listen();
+    await new Promise((resolve) => closed.server.close(resolve));
+    const base = { token: "secret", pid: 1, startedAt: "2026-11-02T00:00:00.000Z" };
+    await writeLiveState({ ...base, prUrl: "https://github.com/acme/widgets/pull/1", baseUrl: closed.url }, env);
+    await writeLiveState({
+      ...base,
+      prUrl: "https://github.com/acme/widgets/pull/2",
+      baseUrl: server.url,
+      result: { status: "cancelled" },
+    }, env);
+    await writeFile(join(directory, "update-check.json"), JSON.stringify({ baseUrl: server.url }));
+    expect(await findActiveLiveSession(env)).toBeNull();
+
+    await writeLiveState({ ...base, prUrl: "https://github.com/acme/widgets/pull/3", baseUrl: server.url }, env);
+
+    expect((await findActiveLiveSession(env))?.prUrl).toBe("https://github.com/acme/widgets/pull/3");
+    server.server.close();
+  });
 });
+
+async function listen(): Promise<{ server: Server; url: string }> {
+  const server = createServer((request, response) => {
+    response.writeHead(request.url === "/health" ? 200 : 404).end("{}");
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("No server address.");
+  return { server, url: `http://127.0.0.1:${address.port}` };
+}
