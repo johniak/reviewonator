@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { execFile } from "node:child_process";
-import { access, chmod, constants, cp, mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
+import { access, chmod, constants, cp, mkdir, mkdtemp, readdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { promisify } from "node:util";
@@ -13,12 +13,13 @@ const platform = `${process.platform === "darwin" ? "darwin" : "linux"}-${proces
 const systemPath = ["/usr/bin", "/bin", "/usr/sbin", "/sbin"].join(delimiter);
 const coreTools = [
   "sh", "uname", "mktemp", "tar", "gzip", "shasum", "sha256sum", "perl", "awk", "sed",
-  "mkdir", "rm", "install", "chmod", "cat", "dirname", "cp", "head", "tr", "grep", "cut",
+  "mkdir", "rm", "mv", "install", "chmod", "cat", "dirname", "cp", "head", "tr", "grep", "cut",
 ];
 
 function stubExecutable(version: string): string {
   return `#!/bin/sh
 if [ "\${1:-}" = "--version" ]; then
+  if [ -n "\${REVIEWONATOR_TEST_VERSION_LOG:-}" ]; then printf '%s\\n' "$0" >> "$REVIEWONATOR_TEST_VERSION_LOG"; fi
   printf 'Reviewonator ${version}\\n'
   exit 0
 fi
@@ -154,6 +155,41 @@ describe("bootstrap installer", { timeout: 20_000 }, () => {
       stderr: expect.stringContaining(`Checksum verification failed for reviewonator-${platform}.tar.gz.`),
     });
     await expect(access(join(fixture.binDir, "reviewonator"))).rejects.toThrow();
+  });
+
+  it("reports a failed curl download", async () => {
+    const fixture = await releaseFixture();
+
+    await expect(fixture.install(["--targets", "claude"], {
+      REVIEWONATOR_DOWNLOAD_URL: `file://${join(fixture.root, "missing")}`,
+    })).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining(`Could not download file://${join(fixture.root, "missing")}/reviewonator-${platform}.tar.gz.`),
+    });
+  });
+
+  it("reports a failed wget download", async () => {
+    const fixture = await releaseFixture();
+    const path = await minimalPath(fixture.root, { wget: "#!/bin/sh\nexit 8\n" });
+
+    await expect(fixture.install(["--targets", "claude"], { PATH: path })).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining(`Could not download file://${fixture.release}/reviewonator-${platform}.tar.gz.`),
+    });
+  });
+
+  it("never runs the downloaded executable from the temporary directory", async () => {
+    const fixture = await releaseFixture();
+    const temporary = join(fixture.root, "tmp");
+    const versionLog = join(fixture.root, "version.log");
+    await mkdir(temporary);
+
+    await fixture.install(["--targets", "claude"], { TMPDIR: temporary, REVIEWONATOR_TEST_VERSION_LOG: versionLog });
+
+    const runs = (await readFile(versionLog, "utf8")).trim().split("\n");
+    expect(runs.length).toBeGreaterThan(0);
+    for (const path of runs) expect(path.startsWith(temporary)).toBe(false);
+    expect((await readdir(fixture.binDir)).sort()).toEqual(["reviewonator", "reviewonator.reviewonator-managed"]);
   });
 
   it("refuses to replace an unmanaged executable", async () => {

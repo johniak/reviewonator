@@ -11,6 +11,7 @@ BIN_DIR=${REVIEWONATOR_BIN_DIR:-"$HOME/.local/bin"}
 LOCAL_BUILD=false
 FORCE=false
 TEMP_DIR=""
+STAGED=""
 
 usage() {
   printf '%s\n' "Usage: install.sh [--bin-dir DIR] [--force] [--local] [reviewonator setup options]"
@@ -50,6 +51,7 @@ BIN_MARKER="$BIN_PATH.reviewonator-managed"
 
 cleanup() {
   if [ -n "$TEMP_DIR" ] && [ -d "$TEMP_DIR" ]; then rm -rf "$TEMP_DIR"; fi
+  if [ -n "$STAGED" ]; then rm -f "$STAGED"; fi
 }
 trap cleanup EXIT
 trap 'cleanup; exit 130' INT TERM
@@ -88,9 +90,9 @@ platform_name() {
 
 download() {
   if command -v curl >/dev/null 2>&1; then
-    curl -fsSL -o "$2" "$1"
+    curl -fsSL -o "$2" "$1" || fail "Could not download $1."
   else
-    wget -qO "$2" "$1"
+    wget -qO "$2" "$1" || fail "Could not download $1."
   fi
 }
 
@@ -148,7 +150,12 @@ else
   fi
 fi
 
-NEW_VERSION=$(binary_version "$BINARY_SOURCE")
+# Stage next to the destination: the temporary directory may be mounted noexec,
+# and a rename within one directory replaces the executable atomically.
+mkdir -p "$BIN_DIR"
+STAGED="$BIN_DIR/.reviewonator-install.$$"
+install -m 755 "$BINARY_SOURCE" "$STAGED"
+NEW_VERSION=$(binary_version "$STAGED")
 if [ -z "$NEW_VERSION" ]; then
   fail "Could not read the version of the downloaded Reviewonator executable."
 fi
@@ -170,8 +177,8 @@ else
   else
     printf 'Installing Reviewonator %s…\n' "$NEW_VERSION"
   fi
-  mkdir -p "$BIN_DIR"
-  install -m 755 "$BINARY_SOURCE" "$BIN_PATH"
+  mv -f "$STAGED" "$BIN_PATH"
+  STAGED=""
   printf '%s\n' "Installed by Reviewonator" > "$BIN_MARKER"
   printf 'Installed Reviewonator executable: %s\n' "$BIN_PATH"
 fi
