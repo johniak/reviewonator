@@ -115,4 +115,14 @@ describe("reviewonator setup end-to-end", () => {
       languages: { comments: "German", reviewerNotes: "French" },
     });
   }, 15_000);
+
+  it("lists the setup commands and skill directory options in --help", async () => {
+    const { stdout } = await run("bun", ["src/cli.ts", "--help"], { cwd: process.cwd() });
+
+    expect(stdout).toContain("reviewonator setup [--targets claude,codex]");
+    expect(stdout).toContain("--claude-skill-dir DIR");
+    expect(stdout).toContain("--codex-skill-dir DIR");
+    expect(stdout).toContain("reviewonator update [--force]");
+    expect(stdout).toContain("reviewonator uninstall [--targets claude,codex]");
+  });
 });

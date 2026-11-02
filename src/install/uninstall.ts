@@ -1,4 +1,6 @@
 import { rm } from "node:fs/promises";
+import { join } from "node:path";
+import { liveStateDirectory } from "../server/live-state";
 import {
   defaultSkillRoots,
   parseTargets,
@@ -45,6 +47,7 @@ export async function runUninstall(options: UninstallOptions, context: Uninstall
     const remaining = config.targets.filter((target) => !selected.includes(target));
     if (remaining.length === 0) {
       await removeConfig(env);
+      await rm(join(liveStateDirectory(env), "update-check.json"), { force: true });
     } else {
       await writeConfig({
         ...config,

@@ -23,7 +23,10 @@ async function uninstallFixture(kind: InstallMethod["kind"] = "script") {
     REVIEWONATOR_CONFIG_DIR: join(root, "config"),
     REVIEWONATOR_CLAUDE_SKILL_DIR: claudeRoot,
     REVIEWONATOR_CODEX_SKILL_DIR: codexRoot,
+    REVIEWONATOR_STATE_DIR: join(root, "state"),
   };
+  await mkdir(join(root, "state"));
+  await writeFile(join(root, "state", "update-check.json"), "{}");
   const executablePath = join(root, "bin", "reviewonator");
   await mkdir(join(root, "bin"));
   await writeFile(executablePath, "#!/bin/sh\n");
@@ -58,6 +61,7 @@ describe("reviewonator uninstall", () => {
     expect(await readSkillMarker(join(fixture.codexRoot, "reviewonator"))).toEqual({ managed: true, version: "0.8.0" });
     expect(await exists(fixture.executablePath)).toBe(true);
     expect((await readConfig(fixture.env))?.targets).toEqual(["codex"]);
+    expect(await exists(join(fixture.root, "state", "update-check.json"))).toBe(true);
     expect(fixture.lines).toEqual([
       `Removed Claude Code skill: ${join(fixture.claudeRoot, "reviewonator")}`,
       "Kept Reviewonator executable because another installed integration still uses it.",
@@ -95,12 +99,13 @@ describe("reviewonator uninstall", () => {
     expect(fixture.lines).toContain(`Kept unmanaged skill: ${codexSkill}`);
   });
 
-  it("removes the config after the last integration", async () => {
+  it("removes the config and update cache after the last integration", async () => {
     const fixture = await uninstallFixture("unmanaged");
 
     await fixture.uninstall("claude,codex");
 
     expect(await readConfig(fixture.env)).toBeNull();
+    expect(await exists(join(fixture.root, "state", "update-check.json"))).toBe(false);
     expect(await exists(fixture.executablePath)).toBe(true);
   });
 

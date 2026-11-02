@@ -31,6 +31,7 @@ Usage:
   reviewonator wait <PR_URL>
   reviewonator respond <PR_URL> --review-file <PATH>
   reviewonator setup [--targets claude,codex] [--comment-language L] [--reviewer-language L] [--reconfigure]
+                     [--claude-skill-dir DIR] [--codex-skill-dir DIR]
   reviewonator update [--force]
   reviewonator uninstall [--targets claude,codex]
   reviewonator --version
