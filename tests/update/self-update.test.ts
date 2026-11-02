@@ -1,6 +1,7 @@
 // @vitest-environment node
 
 import { execFile, spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { access, chmod, cp, mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
@@ -105,6 +106,7 @@ async function updateFixture(options: { current?: string; latest?: string; kind?
 }
 
 const exists = (path: string) => access(path).then(() => true, () => false);
+const sha256 = async (path: string) => createHash("sha256").update(await readFile(path)).digest("hex");
 const stagedFiles = async (directory: string) =>
   (await readdir(directory)).filter((name) => name.startsWith(".reviewonator-update-"));
 
@@ -153,6 +155,34 @@ describe("reviewonator update", () => {
     expect(await readFile(fixture.executablePath, "utf8")).toContain("Reviewonator 0.7.0");
     expect(await stagedFiles(fixture.binDir)).toEqual([]);
     expect(await exists(fixture.releases.downloads[0])).toBe(false);
+  });
+
+  it("fails clearly when the downloaded archive cannot be extracted", async () => {
+    const fixture = await updateFixture();
+    const archive = join(fixture.releaseDir, `reviewonator-${platform}.tar.gz`);
+    await writeFile(archive, "not a gzip archive");
+    await writeFile(`${archive}.sha256`, `${await sha256(archive)}  reviewonator-${platform}.tar.gz\n`);
+
+    await expect(fixture.update()).rejects.toThrow(`Could not extract reviewonator-${platform}.tar.gz`);
+
+    expect(await readFile(fixture.executablePath, "utf8")).toContain("Reviewonator 0.7.0");
+    expect(await stagedFiles(fixture.binDir)).toEqual([]);
+    expect(await exists(fixture.releases.downloads[0])).toBe(false);
+  });
+
+  it("fails clearly when the archive has no executable", async () => {
+    const fixture = await updateFixture();
+    const payload = join(fixture.root, "empty-payload");
+    const archive = join(fixture.releaseDir, `reviewonator-${platform}.tar.gz`);
+    await mkdir(payload);
+    await writeFile(join(payload, "LICENSE"), "MIT");
+    await run("tar", ["-czf", archive, "-C", payload, "."]);
+    await writeFile(`${archive}.sha256`, `${await sha256(archive)}  reviewonator-${platform}.tar.gz\n`);
+
+    await expect(fixture.update()).rejects.toThrow(
+      `The downloaded reviewonator-${platform}.tar.gz does not contain the Reviewonator executable.`,
+    );
+    expect(await readFile(fixture.executablePath, "utf8")).toContain("Reviewonator 0.7.0");
   });
 
   it.skipIf(process.getuid?.() === 0)("fails clearly when the binary directory is not writable", async () => {

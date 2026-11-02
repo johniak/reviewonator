@@ -76,6 +76,11 @@ async function updateScriptInstall(executablePath: string, force: boolean, conte
     if (!expected || expected !== actual) throw new Error(`Checksum verification failed for ${archive}.`);
     const extracted = await context.runner.run("tar", ["-xzf", join(workspace, archive), "-C", workspace]);
     if (extracted.exitCode !== 0) throw new Error(`Could not extract ${archive}: ${extracted.stderr.trim()}`);
+    try {
+      await access(join(workspace, "reviewonator"), constants.X_OK);
+    } catch {
+      throw new Error(`The downloaded ${archive} does not contain the Reviewonator executable.`);
+    }
     await copyFile(join(workspace, "reviewonator"), staged);
     await chmod(staged, 0o755);
     await rename(staged, executablePath);
