@@ -1,12 +1,6 @@
-import {
-  defaultSkillRoots,
-  readConfig,
-  targetLabels,
-  writeConfig,
-  type InstallConfig,
-  type Target,
-} from "./config";
-import { readInstalledLanguages, readSkillMarker, skillDirectory, writeSkill, type SkillFile } from "./skill";
+import { readConfig, targetLabels, writeConfig, type InstallConfig, type Target } from "./config";
+import { deriveLegacyConfig } from "./legacy";
+import { readSkillMarker, skillDirectory, writeSkill, type SkillFile } from "./skill";
 import { compareVersions } from "./version";
 
 export type SyncResult = { updated: Target[]; migrated: boolean; warnings: string[] };
@@ -62,24 +56,8 @@ export function skillUpdateHint(result: SyncResult): string | null {
 }
 
 async function migrateLegacyInstall(env: NodeJS.ProcessEnv): Promise<InstallConfig | null> {
-  const roots = defaultSkillRoots(env);
-  const targets: Target[] = [];
-  let languages = null;
-  for (const target of ["claude", "codex"] as const) {
-    const directory = skillDirectory(roots[target]);
-    const marker = await readSkillMarker(directory);
-    if (!marker?.managed) continue;
-    targets.push(target);
-    languages ??= await readInstalledLanguages(directory);
-  }
-  if (targets.length === 0) return null;
-  const config: InstallConfig = {
-    version: 1,
-    targets,
-    skillRoots: Object.fromEntries(targets.map((target) => [target, roots[target]])),
-    languages: languages ?? { comments: "English", reviewerNotes: "English" },
-  };
-  await writeConfig(config, env);
+  const config = await deriveLegacyConfig(env);
+  if (config) await writeConfig(config, env);
   return config;
 }
 

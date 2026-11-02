@@ -8,6 +8,7 @@ import {
   type Languages,
   type Target,
 } from "./config";
+import { deriveLegacyConfig } from "./legacy";
 import type { Prompter } from "./prompt";
 import { readInstalledLanguages, readSkillMarker, removeSkill, skillDirectory, writeSkill, type SkillFile } from "./skill";
 
@@ -34,7 +35,7 @@ const MISSING_TARGETS = "No installation target was provided. Pass --targets cla
 
 export async function runSetup(options: SetupOptions, context: SetupContext): Promise<InstallConfig> {
   const { env, prompter } = context;
-  const existing = await readConfig(env);
+  const existing = await readConfig(env) ?? await deriveLegacyConfig(env);
   const defaults = defaultSkillRoots(env);
   const skillRoots: Record<Target, string> = {
     claude: options.claudeSkillDir ?? existing?.skillRoots.claude ?? defaults.claude,

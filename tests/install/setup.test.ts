@@ -158,19 +158,23 @@ describe("reviewonator setup", () => {
     expect(fixture.lines).toContain(`Removed Codex skill: ${join(fixture.codexRoot, "reviewonator")}`);
   });
 
-  it("reuses languages from a legacy v0.7 skill as prompt defaults", async () => {
+  it("adopts a v0.7 install without prompting again", async () => {
     const fixture = await setupFixture();
     const legacy = join(fixture.claudeRoot, "reviewonator");
     await mkdir(legacy, { recursive: true });
     await writeFile(join(legacy, ".reviewonator-managed"), "Installed by Reviewonator\n");
     await writeFile(join(legacy, "SKILL.md"), files[0].content.replace(languagesIn("English", "English"), languagesIn("German", "French")));
-    const prompter = new ScriptedPrompter(["1", "", ""]);
 
-    await runSetup({}, fixture.context(prompter));
+    await runSetup({}, fixture.context(new ScriptedPrompter()));
 
-    expect(prompter.questions[1]).toBe("Language for comments published to GitHub [German]: ");
-    expect((await readConfig(fixture.env))?.languages).toEqual({ comments: "German", reviewerNotes: "French" });
+    expect(await readConfig(fixture.env)).toEqual({
+      version: 1,
+      targets: ["claude"],
+      skillRoots: { claude: fixture.claudeRoot },
+      languages: { comments: "German", reviewerNotes: "French" },
+    });
     expect(await readSkillMarker(legacy)).toEqual({ managed: true, version: "0.8.0" });
+    expect(await skillText(fixture.claudeRoot)).toContain(languagesIn("German", "French"));
   });
 
   it("fails with the config path when config.json is corrupt", async () => {
