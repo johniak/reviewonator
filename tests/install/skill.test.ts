@@ -70,6 +70,36 @@ describe("managed skill files", () => {
     expect(await readSkillMarker(directory)).toEqual({ managed: false });
   });
 
+  it("writes language names literally, even with replacement patterns", async () => {
+    const directory = skillDirectory(await skillRoot());
+
+    await writeSkill(directory, files, { comments: "C$& one", reviewerNotes: "R$1 two" }, "0.8.0");
+
+    expect(await readFile(join(directory, "SKILL.md"), "utf8")).toContain(
+      "review summary in C$& one; write private reviewer explanations in R$1 two.",
+    );
+  });
+
+  it("stages hidden and removes a staging directory left by an interrupted write", async () => {
+    const root = await skillRoot();
+    await mkdir(join(root, ".reviewonator-staging-2147483646"), { recursive: true });
+    await writeFile(join(root, ".reviewonator-staging-2147483646", "SKILL.md"), "half-written");
+
+    await writeSkill(skillDirectory(root), files, languages, "0.8.0");
+
+    expect(await readdir(root)).toEqual(["reviewonator"]);
+  });
+
+  it("keeps the staging directory of another running process", async () => {
+    const root = await skillRoot();
+    const live = `.reviewonator-staging-${process.ppid}`;
+    await mkdir(join(root, live), { recursive: true });
+
+    await writeSkill(skillDirectory(root), files, languages, "0.8.0");
+
+    expect((await readdir(root)).sort()).toEqual([live, "reviewonator"]);
+  });
+
   it("refuses a skill without the language configuration marker", async () => {
     const directory = skillDirectory(await skillRoot());
 

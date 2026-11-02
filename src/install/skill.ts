@@ -1,4 +1,4 @@
-import { lstat, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { Languages } from "./config";
 
@@ -8,6 +8,8 @@ export type SkillMarker = { managed: false } | { managed: true; version: string 
 export class UnmanagedSkillError extends Error {}
 
 const MARKER = ".reviewonator-managed";
+/** Hidden, so an interrupted write never looks like a second skill to Claude Code or Codex. */
+const STAGING_PREFIX = ".reviewonator-staging-";
 const LANGUAGE_LINE = /^Review language configuration: write public pull request comments and the review summary in (.+); write private reviewer explanations in (.+)\.$/m;
 const LEGACY_COMMENTS = /^- Write public pull request comments and the review summary in (.+)\.$/m;
 const LEGACY_REVIEWER = /^- Write private reviewer explanations in (.+)\.$/m;
@@ -44,12 +46,13 @@ export async function writeSkill(
     throw new Error("The Reviewonator skill is missing its language configuration marker.");
   }
 
-  const staging = `${skillDir}.${process.pid}.tmp`;
-  await rm(staging, { recursive: true, force: true });
+  const root = dirname(skillDir);
+  await removeStaleStaging(root);
+  const staging = join(root, `${STAGING_PREFIX}${process.pid}`);
   try {
     for (const file of files) {
       const destination = join(staging, file.path);
-      const content = file === skill ? file.content.replace(LANGUAGE_LINE, languageLine(languages)) : file.content;
+      const content = file === skill ? file.content.replace(LANGUAGE_LINE, () => languageLine(languages)) : file.content;
       await mkdir(dirname(destination), { recursive: true });
       await writeFile(destination, content);
     }
@@ -78,6 +81,29 @@ export async function removeSkill(skillDir: string): Promise<"removed" | "unmana
   if (!marker.managed) return "unmanaged";
   await rm(skillDir, { recursive: true, force: true });
   return "removed";
+}
+
+async function removeStaleStaging(root: string): Promise<void> {
+  let entries: string[];
+  try {
+    entries = await readdir(root);
+  } catch {
+    return;
+  }
+  for (const entry of entries.filter((name) => name.startsWith(STAGING_PREFIX))) {
+    if (isRunning(Number(entry.slice(STAGING_PREFIX.length)))) continue;
+    await rm(join(root, entry), { recursive: true, force: true });
+  }
+}
+
+function isRunning(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error instanceof Error && "code" in error && error.code === "EPERM";
+  }
 }
 
 async function readOptional(path: string): Promise<string | null> {
