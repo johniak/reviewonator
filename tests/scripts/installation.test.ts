@@ -9,6 +9,8 @@ import { describe, expect, it } from "vitest";
 
 const run = promisify(execFile);
 const platform = `${process.platform === "darwin" ? "darwin" : "linux"}-${process.arch === "arm64" ? "arm64" : "x64"}`;
+/** System tools only: no real brew, gh, or reviewonator from the developer's PATH. */
+const systemPath = ["/usr/bin", "/bin", "/usr/sbin", "/sbin"].join(delimiter);
 const coreTools = [
   "sh", "uname", "mktemp", "tar", "gzip", "shasum", "sha256sum", "perl", "awk", "sed",
   "mkdir", "rm", "install", "chmod", "cat", "dirname", "cp", "head", "tr", "grep", "cut",
@@ -57,6 +59,7 @@ async function releaseFixture(releaseVersion = "0.8.0") {
   const setupLog = join(root, "setup.log");
   const env: NodeJS.ProcessEnv = {
     ...process.env,
+    PATH: systemPath,
     REVIEWONATOR_DOWNLOAD_URL: `file://${release}`,
     REVIEWONATOR_TEST_SETUP_LOG: setupLog,
   };
@@ -96,7 +99,7 @@ done
 cp "\${url#file://}" "$destination"
 `;
 
-describe("bootstrap installer", () => {
+describe("bootstrap installer", { timeout: 20_000 }, () => {
   it("installs from the release under sh -c and forwards setup arguments", async () => {
     const fixture = await releaseFixture();
 
@@ -197,12 +200,27 @@ describe("bootstrap installer", () => {
     await writeExecutable(join(brewBin, "brew"), `#!/bin/sh\n[ "$1" = "--prefix" ] && printf '%s\\n' '${prefix}'\n`);
 
     await expect(fixture.install(["--targets", "claude"], {
-      PATH: [join(prefix, "bin"), brewBin, process.env.PATH].join(delimiter),
+      PATH: [join(prefix, "bin"), brewBin, systemPath].join(delimiter),
     })).rejects.toMatchObject({
       code: 1,
       stderr: expect.stringContaining("Reviewonator is installed with Homebrew. Run brew upgrade reviewonator instead."),
     });
     await expect(access(join(fixture.binDir, "reviewonator"))).rejects.toThrow();
+  });
+
+  it("updates a managed script install that lives under the Homebrew prefix", async () => {
+    const fixture = await releaseFixture("0.8.0");
+    const brewBin = join(fixture.root, "brew-command");
+    await mkdir(brewBin);
+    await fixture.installed("0.7.0");
+    await writeExecutable(join(brewBin, "brew"), `#!/bin/sh\n[ "$1" = "--prefix" ] && printf '%s\\n' '${fixture.root}'\n`);
+
+    const { stdout } = await fixture.install(["--targets", "claude"], {
+      PATH: [fixture.binDir, brewBin, systemPath].join(delimiter),
+    });
+
+    expect(stdout).toContain("Updating Reviewonator 0.7.0 to 0.8.0…");
+    expect(await readFile(join(fixture.binDir, "reviewonator"), "utf8")).toContain("Reviewonator 0.8.0");
   });
 
   it("installs the local build with --local", async () => {

@@ -58,7 +58,8 @@ if ! command -v gh >/dev/null 2>&1; then
   printf '%s\n' "GitHub CLI is required to use Reviewonator. Install it from https://cli.github.com/" >&2
 fi
 
-if command -v brew >/dev/null 2>&1 && existing=$(command -v reviewonator 2>/dev/null); then
+if command -v brew >/dev/null 2>&1 && existing=$(command -v reviewonator 2>/dev/null) \
+  && [ ! -f "$existing.reviewonator-managed" ]; then
   brew_prefix=$(brew --prefix 2>/dev/null || true)
   if [ -n "$brew_prefix" ]; then
     case "$existing" in
