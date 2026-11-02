@@ -10,6 +10,9 @@ import { ReviewSession } from "./server/session";
 import { embeddedSkillFiles } from "./install/embedded-skill";
 import { createStdinPrompter } from "./install/prompt";
 import { runSetup } from "./install/setup";
+import { detectInstallMethod } from "./install/install-method";
+import { skillUpdateHint, syncSkills, type SyncResult } from "./install/sync";
+import type { ReviewDocument } from "./domain/review";
 import {
   readLiveState,
   removeLiveState,
@@ -89,6 +92,8 @@ async function main(): Promise<void> {
     return;
   }
 
+  const sync = await syncInstalledSkills();
+
   if (positionals[0] === "wait") {
     if (!positionals[1] || positionals.length !== 2) throw new Error(help);
     await waitForLiveRequest(positionals[1]);
@@ -97,7 +102,7 @@ async function main(): Promise<void> {
 
   if (positionals[0] === "respond") {
     if (!positionals[1] || positionals.length !== 2 || !values["review-file"]) throw new Error(help);
-    await respondToLiveRequest(positionals[1], values["review-file"]);
+    await respondToLiveRequest(positionals[1], values["review-file"], sync);
     return;
   }
 
@@ -113,7 +118,7 @@ async function main(): Promise<void> {
   const github = new GitHubClient(runner);
   await github.verifyPrerequisites();
 
-  const review = reviewDocumentSchema.parse(await Bun.file(reviewFile).json());
+  const review = await readReviewFile(reviewFile, sync);
   if (new URL(review.prUrl).href !== new URL(prUrl).href) {
     throw new Error("The review JSON belongs to a different pull request URL.");
   }
@@ -161,6 +166,25 @@ async function main(): Promise<void> {
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }
 
+/** Refreshes managed skills after an upgrade; development runs never touch installed skills. */
+async function syncInstalledSkills(): Promise<SyncResult | null> {
+  const method = await detectInstallMethod(process.execPath);
+  if (method.kind === "unmanaged") return null;
+  const result = await syncSkills({ env: process.env, files: embeddedSkillFiles, version: packageJson.version });
+  for (const warning of result.warnings) process.stderr.write(`${warning}\n`);
+  return result;
+}
+
+async function readReviewFile(path: string, sync: SyncResult | null): Promise<ReviewDocument> {
+  try {
+    return reviewDocumentSchema.parse(await Bun.file(path).json());
+  } catch (error) {
+    const hint = sync && skillUpdateHint(sync);
+    if (!hint) throw error;
+    throw new Error(`${error instanceof Error ? error.message : String(error)}\n${hint}`);
+  }
+}
+
 async function waitForLiveRequest(prUrl: string): Promise<void> {
   const state = await readLiveState(prUrl);
   if (state.result) {
@@ -174,11 +198,11 @@ async function waitForLiveRequest(prUrl: string): Promise<void> {
   if (isFinalResult(result)) await removeLiveState(prUrl);
 }
 
-async function respondToLiveRequest(prUrl: string, reviewFile: string): Promise<void> {
+async function respondToLiveRequest(prUrl: string, reviewFile: string, sync: SyncResult | null): Promise<void> {
   const state = await readLiveState(prUrl);
   if (state.result) throw new Error("This live Reviewonator session has already finished.");
   await assertLiveServerReachable(state);
-  const review = reviewDocumentSchema.parse(await Bun.file(reviewFile).json());
+  const review = await readReviewFile(reviewFile, sync);
   if (new URL(review.prUrl).href !== new URL(prUrl).href) {
     throw new Error("The review JSON belongs to a different pull request URL.");
   }

@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { execFile } from "node:child_process";
-import { mkdtemp, readdir, readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { promisify } from "node:util";
@@ -56,5 +56,26 @@ describe("reviewonator setup end-to-end", () => {
     }
     expect(await readFile(join(target, "reviewonator", ".reviewonator-managed"), "utf8"))
       .toBe(`Installed by Reviewonator ${packageJson.version}\n`);
+  });
+
+  it("a development run never syncs the installed skill", async () => {
+    const { root, env } = await isolatedEnv();
+    const skill = join(root, "claude", "reviewonator");
+    await mkdir(skill, { recursive: true });
+    await writeFile(join(skill, ".reviewonator-managed"), "Installed by Reviewonator 0.0.1\n");
+    await writeFile(join(skill, "SKILL.md"), "outdated skill");
+    await mkdir(env.REVIEWONATOR_CONFIG_DIR, { recursive: true });
+    await writeFile(join(env.REVIEWONATOR_CONFIG_DIR, "config.json"), JSON.stringify({
+      version: 1,
+      targets: ["claude"],
+      skillRoots: { claude: join(root, "claude") },
+      languages: { comments: "English", reviewerNotes: "English" },
+    }));
+
+    await expect(run("bun", ["src/cli.ts", "wait", "https://github.com/acme/widgets/pull/42"], { cwd: process.cwd(), env }))
+      .rejects.toMatchObject({ stderr: expect.stringContaining("No live Reviewonator session") });
+
+    expect(await readFile(join(skill, "SKILL.md"), "utf8")).toBe("outdated skill");
+    expect(await readFile(join(skill, ".reviewonator-managed"), "utf8")).toBe("Installed by Reviewonator 0.0.1\n");
   });
 });
