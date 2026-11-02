@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
@@ -86,4 +86,33 @@ describe("reviewonator setup end-to-end", () => {
       stderr: expect.stringContaining("Reviewonator can only update installations made with Homebrew or the install script."),
     });
   });
+
+  it("prompts through stdin on first setup and exits when done", async () => {
+    const { root, env } = await isolatedEnv();
+    const child = spawn("bun", ["src/cli.ts", "setup"], {
+      cwd: process.cwd(),
+      env: { ...env, REVIEWONATOR_INTERACTIVE: "1" },
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    let stderr = "";
+    child.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
+    child.stdin.write("1,2\nGerman\nFrench\n");
+
+    const exitCode = await new Promise<number | null>((resolveExit, reject) => {
+      const timer = setTimeout(() => {
+        child.kill();
+        reject(new Error(`setup did not exit after answering every prompt. ${stderr}`));
+      }, 10_000);
+      child.once("exit", (code) => { clearTimeout(timer); resolveExit(code); });
+    });
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toContain("Select one or more targets (comma-separated, for example 1,2): ");
+    expect(stderr).toContain("Language for comments published to GitHub [English]: ");
+    expect(stderr).toContain("Language for private reviewer notes [English]: ");
+    expect(JSON.parse(await readFile(join(root, "config", "config.json"), "utf8"))).toMatchObject({
+      targets: ["claude", "codex"],
+      languages: { comments: "German", reviewerNotes: "French" },
+    });
+  }, 15_000);
 });
