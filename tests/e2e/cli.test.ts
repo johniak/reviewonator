@@ -36,6 +36,8 @@ async function startReviewonator(extraEnv: NodeJS.ProcessEnv = {}, live = false)
     cwd: process.cwd(),
     env: {
       ...process.env,
+      REVIEWONATOR_NO_UPDATE_CHECK: "1",
+      REVIEWONATOR_STATE_DIR: join(tmpdir(), `reviewonator-e2e-state-${process.pid}`),
       ...extraEnv,
       PATH: `${fixtureDir}${delimiter}${process.env.PATH}`,
     },
@@ -107,6 +109,19 @@ describe("Reviewonator CLI end-to-end", () => {
     const { stdout } = await run("bun", ["src/cli.ts", "--version"], { cwd: process.cwd() });
 
     expect(stdout).toBe(`Reviewonator ${packageJson.version}\n`);
+  });
+
+  it("serves an update notice for a newer release found through gh", async () => {
+    const stateDirectory = await mkdtemp(join(tmpdir(), "reviewonator-update-notice-"));
+    const process = await startReviewonator({ REVIEWONATOR_NO_UPDATE_CHECK: "", REVIEWONATOR_STATE_DIR: stateDirectory });
+    const { baseUrl, token } = await process.ready;
+
+    const response = await authenticatedFetch(baseUrl, token, "/api/update-notice");
+
+    expect((await response.json()).notice).toMatchObject({
+      latest: "99.0.0",
+      releaseUrl: "https://github.com/johniak/reviewonator/releases/tag/v99.0.0",
+    });
   });
 
   it("returns human revision requests to the AI agent as structured JSON", async () => {

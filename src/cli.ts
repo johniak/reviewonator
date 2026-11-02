@@ -14,6 +14,7 @@ import { detectInstallMethod } from "./install/install-method";
 import { runUninstall } from "./install/uninstall";
 import { GhReleaseSource } from "./update/releases";
 import { runUpdate } from "./update/self-update";
+import { UpdateChecker } from "./update/update-check";
 import { skillUpdateHint, syncSkills, type SyncResult } from "./install/sync";
 import type { ReviewDocument } from "./domain/review";
 import {
@@ -142,6 +143,12 @@ async function main(): Promise<void> {
   if (values.live) await ensureNoActiveLiveSession(prUrl);
 
   const runner = new BunCommandRunner();
+  const updates = new UpdateChecker({
+    version: packageJson.version,
+    env: process.env,
+    releases: new GhReleaseSource(runner),
+  });
+  updates.start();
   const github = new GitHubClient(runner);
   await github.verifyPrerequisites();
 
@@ -155,7 +162,7 @@ async function main(): Promise<void> {
 
   const session = new ReviewSession(loaded.pullRequest, loaded.patch, review, github, loaded.discussion, values.live);
   const token = crypto.randomUUID();
-  const app = createApp({ html: appHtml, favicon, token, session });
+  const app = createApp({ html: appHtml, favicon, token, session, updates });
   const requestedPort = values.port ? Number(values.port) : 0;
   if (!Number.isInteger(requestedPort) || requestedPort < 0 || requestedPort > 65_535) {
     throw new Error("--port must be an integer between 0 and 65535.");

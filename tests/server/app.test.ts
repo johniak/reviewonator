@@ -16,10 +16,19 @@ class AppGitHub implements GitHubGateway {
   }
 }
 
-function testApp(live = false) {
+function testApp(live = false, updates?: Parameters<typeof createApp>[0]["updates"]) {
   const session = new ReviewSession(pullRequest, patch, review, new AppGitHub(), discussion, live);
-  return { app: createApp({ html: "<html>Reviewonator</html>", favicon: "<svg>R</svg>", token: "secret", session }), session };
+  return {
+    app: createApp({ html: "<html>Reviewonator</html>", favicon: "<svg>R</svg>", token: "secret", session, updates }),
+    session,
+  };
 }
+
+const updateNotice = {
+  current: "0.7.0",
+  latest: "0.8.0",
+  releaseUrl: "https://github.com/johniak/reviewonator/releases/tag/v0.8.0",
+};
 
 const authenticated = (body?: unknown) => ({
   method: "POST",
@@ -28,6 +37,39 @@ const authenticated = (body?: unknown) => ({
 });
 
 describe("Reviewonator HTTP API", () => {
+  it("requires the session token for the update notice", async () => {
+    const { app } = testApp(false, { notice: async () => updateNotice, dismiss: async () => {} });
+
+    expect((await app.request("/api/update-notice")).status).toBe(401);
+    expect((await app.request("/api/update-notice/dismiss", { method: "POST", body: "{}" })).status).toBe(401);
+  });
+
+  it("returns the update notice and records a dismissal", async () => {
+    const dismissed: string[] = [];
+    const { app } = testApp(false, { notice: async () => updateNotice, dismiss: async (version) => { dismissed.push(version); } });
+
+    const notice = await app.request("/api/update-notice", { headers: { authorization: "Bearer secret" } });
+    expect(await notice.json()).toEqual({ notice: updateNotice });
+
+    const dismissal = await app.request("/api/update-notice/dismiss", authenticated({ version: "0.8.0" }));
+    expect(await dismissal.json()).toEqual({ status: "dismissed" });
+    expect(dismissed).toEqual(["0.8.0"]);
+  });
+
+  it("rejects a dismissal without a version", async () => {
+    const dismissed: string[] = [];
+    const { app } = testApp(false, { notice: async () => updateNotice, dismiss: async (version) => { dismissed.push(version); } });
+
+    expect((await app.request("/api/update-notice/dismiss", authenticated({}))).status).toBe(400);
+    expect(dismissed).toEqual([]);
+  });
+
+  it("returns no notice when no checker is configured", async () => {
+    const response = await testApp().app.request("/api/update-notice", { headers: { authorization: "Bearer secret" } });
+
+    expect(await response.json()).toEqual({ notice: null });
+  });
+
   it("serves the app and health endpoint without exposing session data", async () => {
     const { app } = testApp();
     expect(await (await app.request("/")).text()).toContain("Reviewonator");

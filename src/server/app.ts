@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
-import { ZodError } from "zod";
+import { z, ZodError } from "zod";
+import type { UpdateNoticeSource } from "../domain/update";
 import { ClosedSessionError, ReviewSession, StalePullRequestError } from "./session";
 
 type AppDependencies = {
@@ -8,9 +9,12 @@ type AppDependencies = {
   favicon: string;
   token: string;
   session: ReviewSession;
+  updates?: UpdateNoticeSource;
 };
 
-export function createApp({ html, favicon, token, session }: AppDependencies): Hono {
+const dismissalSchema = z.object({ version: z.string().min(1) });
+
+export function createApp({ html, favicon, token, session, updates }: AppDependencies): Hono {
   const app = new Hono();
 
   app.get("/", (context) => context.html(html));
@@ -39,6 +43,14 @@ export function createApp({ html, favicon, token, session }: AppDependencies): H
   });
 
   app.get("/api/session", (context) => context.json(session.snapshot()));
+
+  app.get("/api/update-notice", async (context) => context.json({ notice: (await updates?.notice()) ?? null }));
+
+  app.post("/api/update-notice/dismiss", async (context) => {
+    const { version } = dismissalSchema.parse(await context.req.json());
+    await updates?.dismiss(version);
+    return context.json({ status: "dismissed" });
+  });
 
   app.get("/api/file-context", async (context) => {
     const path = context.req.query("path");
