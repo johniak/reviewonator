@@ -52,7 +52,6 @@ export function PublishDialog({
         <Dialog.Content className="publish-dialog" aria-describedby="publish-description">
           <div className="dialog-heading">
             <div>
-              <span className="eyebrow">Final confirmation</span>
               <Dialog.Title>Publish this review to GitHub?</Dialog.Title>
               <Dialog.Description id="publish-description">
                 Nothing is sent until you confirm the exact review below.
@@ -67,7 +66,7 @@ export function PublishDialog({
             <fieldset className="event-options">
               <legend>Review decision</legend>
               {(Object.keys(eventLabels) as ReviewEvent[]).map((value) => (
-                <label key={value} className={event === value ? "event-selected" : ""}>
+                <label key={value} className={`event-${value.toLowerCase()} ${event === value ? "event-selected" : ""}`}>
                   <input
                     type="radio"
                     name="review-event"

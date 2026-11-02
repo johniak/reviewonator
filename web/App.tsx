@@ -26,6 +26,9 @@ import { MyCommentNavigation } from "./components/MyCommentNavigation";
 import { commentCardId, ReviewCommentCard } from "./components/ReviewCommentCard";
 import { ReviewFindingNavigation } from "./components/ReviewFindingNavigation";
 import { userThreadCardId } from "./components/UserCommentThread";
+import markDark from "./brand/mark-dark.png";
+import markLight from "./brand/mark-light.png";
+import { ThemeSwitcher, useTheme } from "./theme";
 import type {
   LineCommentDraft,
   LineCommentLocation,
@@ -59,6 +62,7 @@ export function App() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [completion, setCompletion] = useState<Completion | null>(null);
   const [panelTab, setPanelTab] = useState<"review" | "discussion">("review");
+  const [themePreference, resolvedTheme, setThemePreference] = useTheme();
 
   useEffect(() => {
     api.loadSession()
@@ -419,8 +423,8 @@ export function App() {
     <div className="app-shell">
       <header className="app-header">
         <div className="brand-lockup">
-          <img className="brand-mark" src="/favicon.svg" alt="" />
-          <div><strong>Reviewonator</strong><span>AI review, human decision</span></div>
+          <img className="brand-mark" src={resolvedTheme === "dark" ? markDark : markLight} alt="" />
+          <strong>Reviewonator</strong>
         </div>
         <div className="pr-heading">
           <span>#{pullRequest.number}</span>
@@ -431,15 +435,18 @@ export function App() {
             <ExternalLink size={13} />
           </a>
         </div>
-        <div className="diff-stats">
-          {session.live && (
-            <span className={`live-session-badge ${session.agentPending ? "working" : ""}`}>
-              <Radio aria-hidden="true" size={12} />
-              {session.agentPending ? "AI working" : "Live"}
-            </span>
-          )}
-          <span className="additions">+{pullRequest.additions}</span>
-          <span className="deletions">−{pullRequest.deletions}</span>
+        <div className="header-tools">
+          <div className="diff-stats">
+            {session.live && (
+              <span className={`live-session-badge ${session.agentPending ? "working" : ""}`}>
+                <Radio aria-hidden="true" size={12} />
+                {session.agentPending ? "AI working" : "Live"}
+              </span>
+            )}
+            <span className="additions">+{pullRequest.additions}</span>
+            <span className="deletions">−{pullRequest.deletions}</span>
+          </div>
+          <ThemeSwitcher preference={themePreference} onChange={setThemePreference} />
         </div>
       </header>
 
@@ -519,6 +526,7 @@ export function App() {
             onViewModeChange={setViewMode}
             diffStyle={diffStyle}
             onDiffStyleChange={setDiffStyle}
+            theme={resolvedTheme}
             loadFileContext={api.loadFileContext}
             drafts={Object.values(lineCommentDrafts)}
             onCreateDraft={createLineCommentDraft}
@@ -555,10 +563,9 @@ export function App() {
             {panelTab === "review" ? (
               <>
                 <section className="review-summary">
-                  <span className="eyebrow">AI assessment</span>
                   <h2>Review summary</h2>
                   <p>{review.summary}</p>
-                  <div className="recommendation">
+                  <div className={`recommendation recommendation-${review.recommendation.toLowerCase()}`}>
                     <MessageSquareText size={16} />
                     Recommended decision
                     <strong>{formatEvent(review.recommendation)}</strong>
@@ -741,7 +748,6 @@ export function CompletionScreen({
   return (
     <div className="centered-screen completion-screen">
       <div className={`completion-icon ${content.className}`}>{content.icon}</div>
-      <span className="eyebrow">Reviewonator</span>
       <h1>{content.title}</h1>
       <p>{content.body}</p>
       {completion.type === "published" && (

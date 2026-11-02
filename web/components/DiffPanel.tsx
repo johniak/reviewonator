@@ -44,6 +44,7 @@ type Props = CommentActions & LineCommentDraftActions & UserThreadActions & {
   onViewModeChange: (mode: "single" | "all") => void;
   diffStyle: "unified" | "split";
   onDiffStyleChange: (style: "unified" | "split") => void;
+  theme?: "light" | "dark";
   loadFileContext: (path: string) => Promise<FileContext>;
 };
 
@@ -60,6 +61,7 @@ export function DiffPanel({
   onViewModeChange,
   diffStyle,
   onDiffStyleChange,
+  theme = "light",
   loadFileContext,
   drafts,
   onCreateDraft,
@@ -169,6 +171,7 @@ export function DiffPanel({
                 onSelectFinding,
               }}
               diffStyle={diffStyle}
+              theme={theme}
               loadFileContext={loadFileContext}
               onCreateDraft={onCreateDraft}
               onChangeDraft={onChangeDraft}
@@ -240,6 +243,7 @@ function FileDiffCard({
   commentActions,
   threadActions,
   diffStyle,
+  theme,
   loadFileContext,
   onCreateDraft,
   onChangeDraft,
@@ -254,6 +258,7 @@ function FileDiffCard({
   commentActions: CommentActions;
   threadActions: UserThreadActions;
   diffStyle: "unified" | "split";
+  theme: "light" | "dark";
   loadFileContext: (path: string) => Promise<FileContext>;
 } & Pick<LineCommentDraftActions, "onCreateDraft" | "onChangeDraft" | "onRemoveDraft">) {
   const containerRef = useRef<HTMLElement>(null);
@@ -296,10 +301,7 @@ function FileDiffCard({
   return (
     <section className="diff-panel" id={fileSectionId(file.name)} ref={containerRef}>
       <div className="diff-toolbar">
-        <div>
-          <span className="eyebrow">Changed file</span>
-          <h2>{file.name}</h2>
-        </div>
+        <h2>{file.name}</h2>
         <div className="diff-toolbar-actions">
           {!context && !contextError && (
             <span className="context-status"><LoaderCircle className="spin" size={13} /> Loading context</span>
@@ -324,6 +326,7 @@ function FileDiffCard({
           commentActions={commentActions}
           threadActions={threadActions}
           diffStyle={diffStyle}
+          theme={theme}
           path={file.name}
           onCreateDraft={onCreateDraft}
           onChangeDraft={onChangeDraft}
@@ -336,7 +339,7 @@ function FileDiffCard({
 
 export function buildExpandableDiff(file: FileDiffMetadata, context: FileContext): FileDiffMetadata {
   try {
-    return parseDiffFromFile(
+    const expanded = parseDiffFromFile(
       {
         name: file.prevName ?? file.name,
         contents: context.oldContent ?? "",
@@ -350,6 +353,9 @@ export function buildExpandableDiff(file: FileDiffMetadata, context: FileContext
       { context: 3 },
       true,
     );
+    // Full-file contents that do not reproduce the patch (a stale or wrong revision) would render an
+    // empty diff, so the GitHub patch stays authoritative in that case.
+    return expanded.hunks.length > 0 ? expanded : file;
   } catch {
     return file;
   }
@@ -364,6 +370,7 @@ function RenderedFileDiff({
   commentActions,
   threadActions,
   diffStyle,
+  theme,
   path,
   onCreateDraft,
   onChangeDraft,
@@ -377,16 +384,17 @@ function RenderedFileDiff({
   commentActions: CommentActions;
   threadActions: UserThreadActions;
   diffStyle: "unified" | "split";
+  theme: "light" | "dark";
   path: string;
 } & Pick<LineCommentDraftActions, "onCreateDraft" | "onChangeDraft" | "onRemoveDraft">) {
   return (
     <FileDiff<LineAnnotationContent>
       fileDiff={file}
       options={{
-        themeType: "dark",
-        theme: "github-dark",
+        themeType: theme,
+        theme: { light: "github-light", dark: "github-dark" },
         diffStyle,
-        diffIndicators: "bars",
+        diffIndicators: "classic",
         hunkSeparators: "line-info",
         expansionLineCount: 10,
         overflow: "scroll",

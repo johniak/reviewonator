@@ -70,6 +70,16 @@ describe("DiffPanel view modes", () => {
     expect(expanded.additionLines.length).toBeGreaterThan(file.additionLines.length);
   });
 
+  it("keeps the GitHub patch when the loaded file contents do not contain the change", () => {
+    const file = parsePatchFiles(patch, "test", true)[0].files[0];
+    const unrelated = "export const unrelated = true;\n";
+
+    const expanded = buildExpandableDiff(file, { oldContent: unrelated, newContent: unrelated });
+
+    expect(expanded).toBe(file);
+    expect(expanded.hunks).toHaveLength(1);
+  });
+
   it("renders only the active file in single-file mode", () => {
     const { rerender } = render(
       <DiffPanel

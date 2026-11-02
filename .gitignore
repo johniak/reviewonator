@@ -11,3 +11,5 @@ web-dist/
 coverage/
 test-results/
 playwright-report/
+.taste-skill/
+*.bun-build

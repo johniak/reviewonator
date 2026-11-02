@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="web/favicon.svg" width="88" height="88" alt="Reviewonator logo">
+  <img src="docs/assets/logo-cream.png" width="120" height="120" alt="Reviewonator logo">
   <h1>Reviewonator</h1>
   <p><strong>AI review, human decision.</strong></p>
 

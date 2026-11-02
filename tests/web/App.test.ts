@@ -61,7 +61,7 @@ describe("GitHub review body", () => {
 
     await waitFor(() => expect(
       document.querySelector<HTMLImageElement>(".brand-mark")?.getAttribute("src"),
-    ).toBe("/favicon.svg"));
+    ).toMatch(/mark-light\.png$/));
     expect(await screen.findByText((_content, element) => Boolean(
       element?.classList.contains("selection-summary")
       && element.textContent?.replace(/\s+/g, " ").includes("0 of 2 comments selected") === true
@@ -203,6 +203,32 @@ describe("GitHub review body", () => {
       status: "revision_requested",
       threadReplies: [{ threadId: "U1" }],
     });
+    session.cancel();
+  });
+
+  it("keeps the draft discussion text when the colour theme changes", async () => {
+    const session = new ReviewSession(pullRequest, patch, review, new AppGateway(), discussion);
+    const serverApp = createApp({ html: "<html></html>", favicon: "<svg></svg>", token: "secret", session });
+    vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+      const value = input instanceof Request ? input.url : input.toString();
+      const url = new URL(value, "http://reviewonator.local");
+      return serverApp.request(`${url.pathname}${url.search}`, init);
+    });
+    window.location.hash = "secret";
+    render(createElement(App));
+
+    await screen.findByRole("heading", { name: pullRequest.title });
+    fireEvent.click(screen.getAllByRole("button", { name: "Discuss with AI" })[0]);
+    fireEvent.change(screen.getByLabelText("What do you want to discuss with the AI agent?"), {
+      target: { value: "Keep me across the theme switch" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Dark" }));
+
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(document.querySelector<HTMLImageElement>(".brand-mark")?.getAttribute("src")).toMatch(/mark-dark\.png$/);
+    expect(screen.getByLabelText("What do you want to discuss with the AI agent?")).toHaveValue("Keep me across the theme switch");
+    fireEvent.click(screen.getByRole("button", { name: "System" }));
     session.cancel();
   });
 

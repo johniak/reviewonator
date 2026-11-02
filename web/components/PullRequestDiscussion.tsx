@@ -30,7 +30,6 @@ export function PullRequestDiscussion({
   return (
     <section className="discussion-timeline" aria-label="Existing pull request discussion">
       <div className="discussion-intro">
-        <span className="eyebrow">GitHub activity</span>
         <h2>Existing discussion</h2>
         <p>Comments and reviews already published on this pull request.</p>
       </div>
