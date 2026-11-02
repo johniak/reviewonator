@@ -3,15 +3,20 @@ import type { CommandRunner } from "../platform/command";
 export const REPOSITORY = "johniak/reviewonator";
 
 export interface ReleaseSource {
-  latestVersion(): Promise<string>;
+  latestVersion(signal?: AbortSignal): Promise<string>;
   download(version: string, assets: string[], directory: string): Promise<void>;
 }
 
 export class GhReleaseSource implements ReleaseSource {
   constructor(private readonly runner: CommandRunner) {}
 
-  async latestVersion(): Promise<string> {
-    const result = await this.runner.run("gh", ["api", `repos/${REPOSITORY}/releases/latest`, "--jq", ".tag_name"]);
+  async latestVersion(signal?: AbortSignal): Promise<string> {
+    const result = await this.runner.run(
+      "gh",
+      ["api", `repos/${REPOSITORY}/releases/latest`, "--jq", ".tag_name"],
+      undefined,
+      signal ? { signal } : undefined,
+    );
     if (result.exitCode !== 0) {
       throw new Error(`Could not read the latest Reviewonator release: ${result.stderr.trim()}`);
     }

@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
-import type { CommandResult, CommandRunner } from "../../src/platform/command";
+import type { CommandResult, CommandRunner, RunOptions } from "../../src/platform/command";
 import { GhReleaseSource, platformName, releaseUrl } from "../../src/update/releases";
 
 class RecordingRunner implements CommandRunner {
   readonly calls: Array<{ command: string; args: string[] }> = [];
+  readonly options: Array<RunOptions | undefined> = [];
 
   constructor(private readonly results: CommandResult[]) {}
 
-  async run(command: string, args: string[]): Promise<CommandResult> {
+  async run(command: string, args: string[], _input?: string, options?: RunOptions): Promise<CommandResult> {
     this.calls.push({ command, args });
+    this.options.push(options);
     const result = this.results.shift();
     if (!result) throw new Error("No command result was prepared for this call.");
     return result;
@@ -25,6 +27,15 @@ describe("GitHub release source", () => {
     expect(runner.calls).toEqual([
       { command: "gh", args: ["api", "repos/johniak/reviewonator/releases/latest", "--jq", ".tag_name"] },
     ]);
+  });
+
+  it("passes the abort signal to gh", async () => {
+    const runner = new RecordingRunner([result("v0.8.0\n")]);
+    const controller = new AbortController();
+
+    await new GhReleaseSource(runner).latestVersion(controller.signal);
+
+    expect(runner.options[0]?.signal).toBe(controller.signal);
   });
 
   it("rejects an unexpected tag or a failed lookup", async () => {

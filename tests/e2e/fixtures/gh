@@ -45,7 +45,10 @@ case "$1" in
       *"/contents/src%2Fpayments%2Fretry.ts?ref=head-sha"*) cat "$FIXTURE_DIR/retry.new.txt" ;;
       *"/contents/src%2Fconfig.ts?ref=base-sha"*) cat "$FIXTURE_DIR/config.old.txt" ;;
       *"/contents/src%2Fconfig.ts?ref=head-sha"*) cat "$FIXTURE_DIR/config.new.txt" ;;
-      *"repos/johniak/reviewonator/releases/latest"*) printf '%s\n' "v99.0.0" ;;
+      *"repos/johniak/reviewonator/releases/latest"*)
+        if [ "${REVIEWONATOR_TEST_SLOW_RELEASE:-}" = "1" ]; then exec sleep 30; fi
+        printf '%s\n' "v99.0.0"
+        ;;
       *)
         if [ -n "${REVIEWONATOR_PUBLISH_CAPTURE:-}" ]; then
           cat > "$REVIEWONATOR_PUBLISH_CAPTURE"

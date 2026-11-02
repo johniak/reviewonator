@@ -11,21 +11,27 @@ const hoursAgo = (hours: number) => new Date(now.getTime() - hours * 3_600_000).
 
 class Releases {
   calls = 0;
+  signal: AbortSignal | undefined;
 
   constructor(private readonly answer: () => Promise<string>) {}
 
-  latestVersion() {
+  latestVersion(signal?: AbortSignal) {
     this.calls += 1;
+    this.signal = signal;
     return this.answer();
   }
 }
 
-async function checkerFixture(answer: () => Promise<string> = async () => "0.8.0", extraEnv: NodeJS.ProcessEnv = {}) {
+async function checkerFixture(
+  answer: () => Promise<string> = async () => "0.8.0",
+  extraEnv: NodeJS.ProcessEnv = {},
+  timeoutMs?: number,
+) {
   const stateDir = await mkdtemp(join(tmpdir(), "reviewonator-update-check-"));
   const env = { REVIEWONATOR_STATE_DIR: stateDir, ...extraEnv };
   const releases = new Releases(answer);
   const cachePath = join(stateDir, "update-check.json");
-  const create = () => new UpdateChecker({ version: "0.7.0", env, releases, now: () => now });
+  const create = () => new UpdateChecker({ version: "0.7.0", env, releases, now: () => now, timeoutMs });
   const writeCache = async (cache: unknown) => {
     await mkdir(stateDir, { recursive: true });
     await writeFile(cachePath, typeof cache === "string" ? cache : JSON.stringify(cache));
@@ -97,6 +103,28 @@ describe("UpdateChecker", () => {
 
     expect(await fixture.create().notice(50)).toBeNull();
     expect(Date.now() - started).toBeLessThan(500);
+  });
+
+  it("aborts a slow lookup once the timeout passes", async () => {
+    const fixture = await checkerFixture(() => new Promise<string>(() => {}), {}, 50);
+    const checker = fixture.create();
+
+    checker.start();
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    expect(fixture.releases.signal?.aborted).toBe(true);
+    expect(await checker.notice(10)).toBeNull();
+  });
+
+  it("stop aborts an in-flight lookup", async () => {
+    const fixture = await checkerFixture(() => new Promise<string>(() => {}), {}, 60_000);
+    const checker = fixture.create();
+    checker.start();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    checker.stop();
+
+    expect(fixture.releases.signal?.aborted).toBe(true);
   });
 
   it("does nothing when REVIEWONATOR_NO_UPDATE_CHECK is set", async () => {

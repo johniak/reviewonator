@@ -25,6 +25,7 @@ type UpdateCache = z.infer<typeof cacheSchema>;
 /** Looks up the latest release in the background; every failure stays silent. */
 export class UpdateChecker implements UpdateNoticeSource {
   private pending: Promise<void> | null = null;
+  private readonly lookup = new AbortController();
   private latest: string | null = null;
   private dismissed: string | undefined;
 
@@ -45,6 +46,11 @@ export class UpdateChecker implements UpdateNoticeSource {
   start(): void {
     if (this.disabled || this.pending) return;
     this.pending = this.check().catch(() => {});
+  }
+
+  /** Kills an in-flight lookup so a slow `gh` never keeps the finished CLI alive. */
+  stop(): void {
+    this.lookup.abort();
   }
 
   async notice(waitMs = 3_000): Promise<UpdateNotice | null> {
@@ -80,7 +86,16 @@ export class UpdateChecker implements UpdateNoticeSource {
     this.dismissed ??= cache?.dismissedVersion;
     if (cache) this.latest = cache.latestVersion;
     if (cache && this.now().getTime() - Date.parse(cache.checkedAt) < CACHE_TTL_MS) return;
-    const latest = await raceTimeout(this.context.releases.latestVersion(), this.context.timeoutMs ?? 5_000);
+    const timer = setTimeout(() => this.lookup.abort(), this.context.timeoutMs ?? 5_000);
+    let latest: string | undefined;
+    try {
+      latest = await Promise.race([
+        this.context.releases.latestVersion(this.lookup.signal),
+        abortion(this.lookup.signal),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
     if (!latest) return;
     this.latest = latest;
     await this.writeCache({
@@ -106,6 +121,13 @@ export class UpdateChecker implements UpdateNoticeSource {
     await chmod(temporary, 0o600);
     await rename(temporary, this.cachePath);
   }
+}
+
+function abortion(signal: AbortSignal): Promise<undefined> {
+  return new Promise((resolve) => {
+    if (signal.aborted) resolve(undefined);
+    else signal.addEventListener("abort", () => resolve(undefined), { once: true });
+  });
 }
 
 async function raceTimeout<T>(promise: Promise<T>, milliseconds: number): Promise<T | undefined> {

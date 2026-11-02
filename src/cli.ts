@@ -195,6 +195,7 @@ async function main(): Promise<void> {
   }
 
   const result = await session.waitForResult();
+  updates.stop();
   if (liveState && result.status !== "revision_requested") await writeLiveState({ ...liveState, result });
   await Bun.sleep(100);
   server.stop(true);

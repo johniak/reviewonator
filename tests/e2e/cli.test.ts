@@ -124,6 +124,23 @@ describe("Reviewonator CLI end-to-end", () => {
     });
   });
 
+  it("exits right after its result even when the release lookup hangs", async () => {
+    const stateDirectory = await mkdtemp(join(tmpdir(), "reviewonator-slow-release-"));
+    const process = await startReviewonator({
+      REVIEWONATOR_NO_UPDATE_CHECK: "",
+      REVIEWONATOR_STATE_DIR: stateDirectory,
+      REVIEWONATOR_TEST_SLOW_RELEASE: "1",
+    });
+    const { baseUrl, token } = await process.ready;
+
+    const started = Date.now();
+    await authenticatedFetch(baseUrl, token, "/api/cancel", { method: "POST", body: "{}" });
+    await waitForExit(process.child);
+
+    expect(JSON.parse(process.output())).toEqual({ status: "cancelled" });
+    expect(Date.now() - started).toBeLessThan(3_000);
+  }, 15_000);
+
   it("returns human revision requests to the AI agent as structured JSON", async () => {
     const process = await startReviewonator();
     const { baseUrl, token } = await process.ready;
