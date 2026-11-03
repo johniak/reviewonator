@@ -37,6 +37,12 @@ Only you can dismiss a discussion, and Reviewonator requires your reason. Drafts
 
 The workspace stays open while you talk to the agent. After you send a comment, its status changes to **Waiting for agent** and the header shows **AI working**. The agent's reply appears in the same diff and browser session as soon as it is ready. You can continue the conversation for as many rounds as needed before publishing or cancelling the review.
 
+## Write and edit comments yourself
+
+Choose **Add comment** on your line comment to put it straight into the review, on any line of the diff, without an agent round. It is marked **You**, has no severity until you pick one, and starts pending like every finding, with the same **Include**, **Reject**, and **Discuss with AI** actions.
+
+Edit any comment with the pencil on its card. Reviewonator keeps your wording across agent rounds unless you discuss that comment with the agent. An AI finding you changed is marked **Edited**. You can delete comments you wrote; AI findings are rejected instead.
+
 ## Decide what happens to every finding
 
 Nothing is included by default. Every proposed comment has an explicit state:

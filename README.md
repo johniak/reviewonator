@@ -138,11 +138,13 @@ The shorter `rr` alias runs the same skill: `/rr https://github.com/owner/reposi
 The agent completes the review first, then launches one live Reviewonator workspace. In the application:
 
 1. Read the private reviewer explanation for each finding.
-2. Edit the public comment if needed.
+2. Edit the public comment with the pencil on its card if needed.
 3. Select only the findings you want to publish.
 4. Add an optional general comment.
 5. Open the publish preview and choose the GitHub review event.
 6. Confirm the exact payload.
+
+Click **+** beside a diff line, write your comment, and choose **Add comment** to put it straight into the review, or **Send to AI** to have the agent check it first. Your own comments are marked **You**, start pending like every finding, and the agent never changes them or your edits unless you discuss that comment with it.
 
 You can start a private live discussion either on an AI finding or on any diff line. The open workspace sends your message to the agent, shows its answer in place, and stays open for follow-up rounds. These discussions are never published directly to GitHub.
 

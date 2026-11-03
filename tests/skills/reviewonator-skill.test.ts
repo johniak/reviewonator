@@ -195,4 +195,19 @@ describe("Reviewonator skill", () => {
     expect(skill).toContain("Use an empty string whenever no separate overall message adds value");
     expect(skill).toContain("Never manufacture a summary merely to justify");
   });
+
+  it("keeps comments the user wrote or edited", async () => {
+    const skill = await readFile("skills/reviewonator/SKILL.md", "utf8");
+    const schema = await readFile("skills/reviewonator/references/review-schema.md", "utf8");
+
+    expect(skill).toContain(
+      'Comments with "author": "user" or "edited": true belong to the user: keep them, and change their body or severity only when the user discussed that comment in this round.',
+    );
+    expect(skill).toContain(
+      'Never set "author": "user" or "edited" yourself, and never use IDs that start with H; Reviewonator restores the user\'s version of user-owned comments.',
+    );
+    expect(schema).toContain(
+      '`author` is `"agent"` (default) or `"user"`. A user-written comment may omit `severity` and `reviewerExplanation`, and may target any line inside the diff on either side.',
+    );
+  });
 });

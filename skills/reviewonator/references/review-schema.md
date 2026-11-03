@@ -84,12 +84,14 @@ Write UTF-8 JSON matching this shape:
 - A thread with `findingId` must link to an existing finding and end with an agent response.
 - Comment IDs must be unique and stable across revision rounds.
 - `type` must be `line` or `general`.
-- `severity` must be `security`, `bug`, `warning`, `suggestion`, or `nit`.
+- `author` is `"agent"` (default) or `"user"`. A user-written comment may omit `severity` and `reviewerExplanation`, and may target any line inside the diff on either side. Reviewonator creates these comments with IDs that start with `H`; never create one yourself.
+- `edited: true` marks a comment whose wording the user changed. Never set or clear it.
+- `severity` must be `security`, `bug`, `warning`, `suggestion`, or `nit`. Agent findings require it.
 - `included` and `rejected` are optional and default to `false`. A new comment with neither flag starts as pending. Set exactly one flag to `true` only when the comment ID appears in the corresponding `selectedCommentIds` or `rejectedCommentIds` returned by Reviewonator during the previous revision round. Never set both flags on one comment.
-- A line comment must include `path`, `line`, and `side: "RIGHT"`. The line must be an added line in the current PR diff.
+- An agent line comment must include `path`, `line`, and `side: "RIGHT"`. The line must be an added line in the current PR diff. A user-written line comment keeps the `side` and line the user chose.
 - A general comment must not contain `path`, `line`, or `side`.
 - `body` is the exact canonical text proposed for GitHub in the configured comment language.
-- `reviewerExplanation` is mandatory private context in the configured reviewer-note language. Use natural equivalents of `What: ... Why: ...` to explain what is wrong or should change and the concrete consequence. It is not a translation and is never published to GitHub.
+- `reviewerExplanation` is mandatory for agent findings: private context in the configured reviewer-note language. Use natural equivalents of `What: ... Why: ...` to explain what is wrong or should change and the concrete consequence. It is not a translation and is never published to GitHub.
 - `discussion` is an optional private conversation about that finding. It starts with a user message and alternates between `user` and `agent`. Preserve all IDs and earlier messages verbatim. For every finding in `requests`, append exactly one agent response and keep the finding so its discussion remains visible. The agent may update `body` and `reviewerExplanation` when the new evidence changes the finding. Discussion messages are never published to GitHub.
 - Use an empty `comments` array when there are no actionable findings.
 
@@ -98,5 +100,7 @@ Reviewonator validates the schema and diff locations before opening the browser.
 ## Live review rounds
 
 `reviewonator wait <PR_URL>` returns a `revision_requested` object with an authoritative `review` field. That document already includes the user's newest finding-discussion messages, line-comment messages, dismissals, and finding decisions. Use it as the base for the response; do not reconstruct history from the separate request arrays.
+
+Comments the user wrote or edited stay exactly as the user left them unless the user discussed that comment in the round. The user may also add, edit, or delete comments while you work; Reviewonator keeps the user's version, restores user comments missing from your response, and drops ones the user deleted.
 
 Submit the updated document with `reviewonator respond <PR_URL> --review-file <PATH>`. Reviewonator rejects responses that edit or remove user messages, move or create user threads, change user-owned dismissals or finding decisions, or fail to answer a thread whose last message is from the user. A valid response appends exactly one agent message to each waiting thread. The browser receives the accepted document without closing or reopening the session.
