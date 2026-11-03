@@ -1,6 +1,7 @@
 import type { PullRequest } from "../src/domain/pull-request";
 import type { PullRequestDiscussionItem } from "../src/domain/discussion";
 import type {
+  CommentEdit,
   ReviewComment,
   ReviewDocument,
   ReviewEvent,
@@ -28,6 +29,8 @@ export type CommentActions = {
   onToggleRejected: (id: string) => void;
   onRevisionChange: (id: string, message: string) => void;
   onSendRevision: (id: string) => Promise<void>;
+  onEditComment: (id: string, edit: CommentEdit) => Promise<boolean>;
+  onDeleteComment: (id: string) => Promise<void>;
 };
 
 export type LineCommentDraft = {

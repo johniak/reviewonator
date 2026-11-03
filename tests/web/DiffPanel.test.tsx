@@ -38,6 +38,8 @@ const actions = {
   onRemoveDraft: vi.fn(),
   onSendDraft: vi.fn(),
   onAddComment: vi.fn(),
+  onEditComment: vi.fn(async () => true),
+  onDeleteComment: vi.fn(async () => {}),
   viewedPaths: new Set<string>(),
   onViewedChange: vi.fn(),
 };

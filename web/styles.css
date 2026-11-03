@@ -194,6 +194,7 @@ textarea:focus-visible, input:focus-visible {
 .thread-dismiss-button,
 .thread-dismissal-field button,
 .line-comment-draft-heading button,
+.comment-tools button,
 .cancel-auto-close,
 .discussion-location,
 .viewed-toggle {
@@ -222,6 +223,7 @@ textarea:focus-visible, input:focus-visible {
 .thread-dismiss-button:hover,
 .thread-dismissal-field button:hover,
 .line-comment-draft-heading button:hover,
+.comment-tools button:hover:not(:disabled),
 .cancel-auto-close:hover,
 .discussion-location:hover,
 .viewed-toggle:hover {
@@ -285,6 +287,7 @@ textarea:focus { border-color: var(--pc-accent); }
 
 .pill,
 .severity-badge,
+.author-badge,
 .finding-status,
 .user-thread-status,
 .live-session-badge,
@@ -309,6 +312,8 @@ textarea:focus { border-color: var(--pc-accent); }
 .severity-warning { color: var(--pc-warning); background: var(--pc-warning-subtle); }
 .severity-suggestion { color: var(--pc-info); background: var(--pc-info-subtle); }
 .severity-nit { color: var(--pc-fg-muted); background: var(--pc-bg-subtle); }
+/* Hand-written comments: copper identifies the user, never a review verdict. */
+.author-badge { color: var(--pc-accent); background: var(--pc-accent-subtle); }
 
 /* ---------- Shell: tinted frame, sheet in the middle ---------- */
 
@@ -674,6 +679,25 @@ textarea:focus { border-color: var(--pc-accent); }
 
 .comment-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .comment-id { color: var(--pc-fg-muted); font-size: var(--pc-text-small); font-weight: 500; }
+.comment-labels, .comment-tools { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.comment-edited { color: var(--pc-fg-muted); font-size: var(--pc-text-small); }
+.comment-tools button { width: var(--pc-control-compact); padding: 0; color: var(--pc-fg-muted); }
+.comment-tools button:disabled { opacity: 0.5; cursor: not-allowed; }
+.comment-tools .comment-delete:hover { color: var(--pc-danger); }
+.comment-editor { display: grid; gap: 8px; margin: 8px 0 12px; }
+.comment-editor-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.comment-editor-actions .finding-discussion-send { margin-left: 0; }
+.comment-severity-field { display: inline-flex; align-items: center; gap: 6px; margin-right: auto; color: var(--pc-fg-muted); font-size: var(--pc-text-small); }
+.comment-severity-field select {
+  min-height: var(--pc-control-compact);
+  padding: 0 8px;
+  color: var(--pc-fg-default);
+  background: var(--pc-bg-surface);
+  border: var(--pc-border-width) solid var(--pc-border-strong);
+  border-radius: var(--pc-radius-sm);
+  font: inherit;
+  font-size: 13px;
+}
 .comment-body { margin: 8px 0 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 .reviewer-explanation {

@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
+import type { ReviewComment } from "../../src/domain/review";
 import { ReviewCommentCard } from "../../web/components/ReviewCommentCard";
 import { review } from "../fixtures";
 
@@ -21,6 +22,8 @@ describe("ReviewCommentCard", () => {
         onToggleRejected={vi.fn()}
         onRevisionChange={vi.fn()}
         onSendRevision={vi.fn(async () => {})}
+        onEditComment={vi.fn(async () => true)}
+        onDeleteComment={vi.fn(async () => {})}
       />,
     );
     expect(screen.getByText(comment.body)).toBeVisible();
@@ -46,6 +49,8 @@ describe("ReviewCommentCard", () => {
         onToggleRejected={onToggleRejected}
         onRevisionChange={vi.fn()}
         onSendRevision={vi.fn(async () => {})}
+        onEditComment={vi.fn(async () => true)}
+        onDeleteComment={vi.fn(async () => {})}
       />,
     );
     await userEvent.click(screen.getByRole("button", { name: "Include" }));
@@ -73,6 +78,8 @@ describe("ReviewCommentCard", () => {
             onRevisionChange(id, value);
           }}
           onSendRevision={onSendRevision}
+          onEditComment={vi.fn(async () => true)}
+          onDeleteComment={vi.fn(async () => {})}
         />
       );
     }
@@ -106,6 +113,8 @@ describe("ReviewCommentCard", () => {
       onToggleRejected={vi.fn()}
       onRevisionChange={onRevisionChange}
       onSendRevision={vi.fn(async () => {})}
+      onEditComment={vi.fn(async () => true)}
+      onDeleteComment={vi.fn(async () => {})}
     />);
 
     expect(screen.getByText("Did you check the caller?")).toBeVisible();
@@ -131,9 +140,101 @@ describe("ReviewCommentCard", () => {
       onToggleRejected={vi.fn()}
       onRevisionChange={vi.fn()}
       onSendRevision={vi.fn(async () => {})}
+      onEditComment={vi.fn(async () => true)}
+      onDeleteComment={vi.fn(async () => {})}
     />);
 
     expect(screen.getByRole("button", { name: "Waiting for AI" })).toBeDisabled();
     expect(screen.getByText("The AI agent is checking this finding.")).toBeVisible();
+  });
+
+  describe("hand-written comments and edits", () => {
+    const mine: ReviewComment = {
+      id: "H1",
+      type: "line",
+      author: "user",
+      path: "src/example.ts",
+      line: 2,
+      side: "LEFT",
+      body: "Keep the old constant for now.",
+    };
+    const props = (comment: ReviewComment) => ({
+      comment,
+      agentPending: false,
+      selectedIds: new Set<string>(),
+      rejectedIds: new Set<string>(),
+      revisionMessages: {},
+      onToggleSelected: vi.fn(),
+      onToggleRejected: vi.fn(),
+      onRevisionChange: vi.fn(),
+      onSendRevision: vi.fn(async () => {}),
+      onEditComment: vi.fn(async () => true),
+      onDeleteComment: vi.fn(async () => {}),
+    });
+
+    it("marks a hand-written comment as yours without severity or private explanation", () => {
+      render(<ReviewCommentCard {...props(mine)} />);
+
+      expect(screen.getByText("You")).toBeVisible();
+      expect(screen.getByRole("article")).toHaveClass("comment-author-user");
+      expect(screen.queryByText("For reviewer only")).not.toBeInTheDocument();
+      expect(screen.queryByText(/^(Security|Bug|Warning|Suggestion|Nit)$/)).not.toBeInTheDocument();
+    });
+
+    it("edits the wording and severity of a hand-written comment", async () => {
+      const cardProps = props(mine);
+      render(<ReviewCommentCard {...cardProps} />);
+
+      await userEvent.click(screen.getByRole("button", { name: "Edit comment" }));
+      const field = screen.getByRole("textbox", { name: "Public comment" });
+      expect(field).toHaveValue("Keep the old constant for now.");
+      expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+      await userEvent.clear(field);
+      await userEvent.type(field, "Keep the old constant until callers migrate.");
+      await userEvent.selectOptions(screen.getByRole("combobox", { name: "Severity" }), "Warning");
+      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(cardProps.onEditComment).toHaveBeenCalledWith("H1", {
+        body: "Keep the old constant until callers migrate.",
+        severity: "warning",
+      });
+      expect(screen.queryByRole("textbox", { name: "Public comment" })).not.toBeInTheDocument();
+    });
+
+    it("edits only the wording of an agent finding and shows that it was edited", async () => {
+      const cardProps = props({ ...review.comments[0], edited: true });
+      render(<ReviewCommentCard {...cardProps} />);
+
+      expect(screen.getByText("Edited")).toBeVisible();
+      await userEvent.click(screen.getByRole("button", { name: "Edit comment" }));
+      expect(screen.queryByRole("combobox", { name: "Severity" })).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(screen.queryByRole("textbox", { name: "Public comment" })).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: "Edit comment" }));
+      await userEvent.type(screen.getByRole("textbox", { name: "Public comment" }), " Please.");
+      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+      expect(cardProps.onEditComment).toHaveBeenCalledWith("S1", { body: `${review.comments[0].body} Please.` });
+    });
+
+    it("locks editing while the AI agent checks the comment", () => {
+      render(<ReviewCommentCard {...props({
+        ...review.comments[0],
+        discussion: [{ id: "S1-D1", author: "user", body: "Is this right?" }],
+      })} />);
+
+      expect(screen.getByRole("button", { name: "Edit comment" })).toBeDisabled();
+    });
+
+    it("deletes only hand-written comments", async () => {
+      const { unmount } = render(<ReviewCommentCard {...props(review.comments[0])} />);
+      expect(screen.queryByRole("button", { name: "Delete comment" })).not.toBeInTheDocument();
+      unmount();
+
+      const cardProps = props(mine);
+      render(<ReviewCommentCard {...cardProps} />);
+      await userEvent.click(screen.getByRole("button", { name: "Delete comment" }));
+      expect(cardProps.onDeleteComment).toHaveBeenCalledWith("H1");
+    });
   });
 });

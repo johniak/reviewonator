@@ -1,6 +1,6 @@
 import { Check, Circle, MessageSquareReply, MessagesSquare, RotateCcw, X } from "lucide-react";
 import type { ReviewComment } from "../types";
-import { SeverityBadge } from "./SeverityBadge";
+import { AuthorBadge, SeverityBadge } from "./SeverityBadge";
 
 type Props = {
   comments: ReviewComment[];
@@ -39,11 +39,12 @@ export function ReviewFindingNavigation({
             <button
               key={comment.id}
               type="button"
-              className={`finding-severity-${comment.severity} finding-${status.kind} ${activeCommentId === comment.id ? "active" : ""}`}
+              className={`finding-severity-${comment.severity ?? "none"} finding-${status.kind} ${activeCommentId === comment.id ? "active" : ""}`}
               aria-current={activeCommentId === comment.id ? "true" : undefined}
               onClick={() => onSelect(comment)}
             >
               <span className="finding-heading">
+                {comment.author === "user" && <AuthorBadge />}
                 <SeverityBadge severity={comment.severity} />
                 <span className={`finding-status finding-status-${status.kind}`}>
                   {status.icon}

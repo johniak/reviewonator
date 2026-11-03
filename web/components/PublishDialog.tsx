@@ -3,7 +3,7 @@ import { CheckCircle2, EyeOff, ExternalLink, Send, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ReviewEvent } from "../../src/domain/review";
 import type { ReviewComment } from "../types";
-import { SeverityBadge } from "./SeverityBadge";
+import { AuthorBadge, SeverityBadge } from "./SeverityBadge";
 
 type Props = {
   open: boolean;
@@ -101,6 +101,7 @@ export function PublishDialog({
                 ) : comments.map((comment) => (
                   <div className="publish-comment" key={comment.id}>
                     <div>
+                      {comment.author === "user" && <AuthorBadge />}
                       <SeverityBadge severity={comment.severity} />
                       <span className="comment-location">
                         {comment.type === "line" ? `${comment.path}:${comment.line}` : "General comment"}

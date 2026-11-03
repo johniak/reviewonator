@@ -1,7 +1,8 @@
-import { Bot, Check, EyeOff, MessageSquareReply, RotateCcw, Send, UserRound, X } from "lucide-react";
+import { Bot, Check, EyeOff, MessageSquareReply, Pencil, RotateCcw, Send, Trash2, UserRound, X } from "lucide-react";
 import { useState } from "react";
+import type { CommentEdit, Severity } from "../../src/domain/review";
 import type { CommentActions, ReviewComment } from "../types";
-import { SeverityBadge } from "./SeverityBadge";
+import { AuthorBadge, SeverityBadge, severityLabel, severityOrder } from "./SeverityBadge";
 
 type Props = CommentActions & {
   comment: ReviewComment;
@@ -23,8 +24,12 @@ export function ReviewCommentCard({
   onToggleRejected,
   onRevisionChange,
   onSendRevision,
+  onEditComment,
+  onDeleteComment,
 }: Props) {
   const [showRevision, setShowRevision] = useState(Boolean(revisionMessages[comment.id]));
+  const [editing, setEditing] = useState(false);
+  const byUser = comment.author === "user";
   const selected = selectedIds.has(comment.id);
   const rejected = rejectedIds.has(comment.id);
   const revision = revisionMessages[comment.id] ?? "";
@@ -35,21 +40,57 @@ export function ReviewCommentCard({
   return (
     <article
       id={commentCardId(comment.id)}
-      className={`comment-card comment-severity-${comment.severity} ${selected ? "comment-selected" : ""} ${rejected ? "comment-rejected" : ""} ${focused ? "comment-focused" : ""} ${compact ? "compact" : ""}`}
+      className={`comment-card comment-severity-${comment.severity ?? "none"} ${byUser ? "comment-author-user" : ""} ${selected ? "comment-selected" : ""} ${rejected ? "comment-rejected" : ""} ${focused ? "comment-focused" : ""} ${compact ? "compact" : ""}`}
       tabIndex={focused ? -1 : undefined}
     >
       <div className="comment-heading">
-        <SeverityBadge severity={comment.severity} />
-        <span className="comment-id">{comment.id}</span>
+        <span className="comment-labels">
+          {byUser && <AuthorBadge />}
+          <SeverityBadge severity={comment.severity} />
+          {comment.edited && <span className="comment-edited">Edited</span>}
+        </span>
+        <span className="comment-tools">
+          <span className="comment-id">{comment.id}</span>
+          <button
+            type="button"
+            aria-label="Edit comment"
+            title={waitingForAgent ? "The AI agent is checking this comment" : "Edit comment"}
+            disabled={waitingForAgent || editing}
+            onClick={() => setEditing(true)}
+          >
+            <Pencil aria-hidden="true" size={13} />
+          </button>
+          {byUser && (
+            <button
+              type="button"
+              className="comment-delete"
+              aria-label="Delete comment"
+              title="Delete comment"
+              onClick={() => void onDeleteComment(comment.id)}
+            >
+              <Trash2 aria-hidden="true" size={13} />
+            </button>
+          )}
+        </span>
       </div>
-      <p className="comment-body">{comment.body}</p>
-      <div className="reviewer-explanation">
-        <div className="reviewer-explanation-heading">
-          <span><EyeOff aria-hidden="true" size={13} /> For reviewer only</span>
-          <small>Private · {reviewerLanguage}</small>
+      {editing ? (
+        <CommentEditor
+          comment={comment}
+          onCancel={() => setEditing(false)}
+          onSave={async (edit) => { if (await onEditComment(comment.id, edit)) setEditing(false); }}
+        />
+      ) : (
+        <p className="comment-body">{comment.body}</p>
+      )}
+      {comment.reviewerExplanation && (
+        <div className="reviewer-explanation">
+          <div className="reviewer-explanation-heading">
+            <span><EyeOff aria-hidden="true" size={13} /> For reviewer only</span>
+            <small>Private · {reviewerLanguage}</small>
+          </div>
+          <p>{comment.reviewerExplanation}</p>
         </div>
-        <p>{comment.reviewerExplanation}</p>
-      </div>
+      )}
       {discussion.length > 0 && (
         <div className="finding-discussion" aria-label={`Discussion about finding ${comment.id}`}>
           <div className="finding-discussion-heading">
@@ -127,6 +168,50 @@ export function ReviewCommentCard({
         <p className="finding-discussion-waiting"><RotateCcw aria-hidden="true" size={12} /> The AI agent is checking this finding.</p>
       )}
     </article>
+  );
+}
+
+function CommentEditor({
+  comment,
+  onCancel,
+  onSave,
+}: {
+  comment: ReviewComment;
+  onCancel: () => void;
+  onSave: (edit: CommentEdit) => Promise<void>;
+}) {
+  const byUser = comment.author === "user";
+  const [body, setBody] = useState(comment.body);
+  const [severity, setSeverity] = useState<Severity | "">(comment.severity ?? "");
+  const changed = body.trim() !== comment.body || (byUser && severity !== (comment.severity ?? ""));
+  const fieldId = `${commentCardId(comment.id)}-edit`;
+
+  return (
+    <form
+      className="comment-editor"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void onSave(byUser ? { body: body.trim(), severity: severity || null } : { body: body.trim() });
+      }}
+    >
+      <label className="revision-field" htmlFor={fieldId}>
+        <span>Public comment</span>
+        <textarea id={fieldId} rows={4} value={body} autoFocus onChange={(event) => setBody(event.target.value)} />
+      </label>
+      <div className="comment-editor-actions">
+        {byUser && (
+          <label className="comment-severity-field">
+            <span>Severity</span>
+            <select value={severity} onChange={(event) => setSeverity(event.target.value as Severity | "")}>
+              <option value="">None</option>
+              {severityOrder.map((value) => <option key={value} value={value}>{severityLabel(value)}</option>)}
+            </select>
+          </label>
+        )}
+        <button className="secondary-button" type="button" onClick={onCancel}>Cancel</button>
+        <button className="finding-discussion-send" type="submit" disabled={!body.trim() || !changed}>Save</button>
+      </div>
+    </form>
   );
 }
 

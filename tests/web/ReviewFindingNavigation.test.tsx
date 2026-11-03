@@ -59,4 +59,19 @@ describe("ReviewFindingNavigation", () => {
     expect(screen.getByRole("button", { name: /Bug Rejected S1/ })).toBeVisible();
     expect(screen.getByRole("button", { name: /Warning Pending G1/ })).toBeVisible();
   });
+
+  it("marks hand-written comments as yours", () => {
+    render(
+      <ReviewFindingNavigation
+        comments={[{ id: "H1", type: "line", author: "user", path: "src/example.ts", line: 2, side: "LEFT", body: "Mine." }]}
+        activeCommentId={null}
+        selectedIds={new Set()}
+        rejectedIds={new Set()}
+        revisionMessages={{}}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /You Pending H1 src\/example\.ts:2/ })).toBeVisible();
+  });
 });

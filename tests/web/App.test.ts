@@ -430,6 +430,60 @@ describe("GitHub review body", () => {
     session.cancel();
   });
 
+  async function liveApp(prepare?: (session: ReviewSession) => void) {
+    vi.stubGlobal("EventSource", class { addEventListener() {} close() {} });
+    const session = new ReviewSession(pullRequest, patch, review, new AppGateway(), discussion, true);
+    prepare?.(session);
+    const serverApp = createApp({ html: "<html></html>", favicon: "<svg></svg>", token: "secret", session });
+    vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+      const value = input instanceof Request ? input.url : input.toString();
+      const url = new URL(value, "http://reviewonator.local");
+      return serverApp.request(`${url.pathname}${url.search}`, init);
+    });
+    window.location.hash = "secret";
+    render(createElement(App));
+    await screen.findByText("Live");
+    return session;
+  }
+
+  it("edits a finding by hand and keeps the new wording in the session", async () => {
+    const session = await liveApp();
+    const card = screen.getByText(review.comments[0].body).closest("article")!;
+
+    fireEvent.click(within(card).getByRole("button", { name: "Edit comment" }));
+    fireEvent.change(within(card).getByRole("textbox", { name: "Public comment" }), {
+      target: { value: "Take the value from the caller." },
+    });
+    fireEvent.click(within(card).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(session.review.comments.find(({ id }) => id === "S1"))
+      .toMatchObject({ body: "Take the value from the caller.", edited: true }));
+    expect(await within(card).findByText("Edited")).toBeVisible();
+    session.cancel();
+  });
+
+  it("deletes a hand-written comment and drops it from the selection", async () => {
+    const session = await liveApp((current) => current.addUserComment({
+      path: "src/example.ts",
+      line: 2,
+      side: "LEFT",
+      body: "Keep the old constant for now.",
+    }));
+    const card = screen.getByText("Keep the old constant for now.").closest("article")!;
+    fireEvent.click(within(card).getByRole("button", { name: "Include" }));
+    fireEvent.click(within(card).getByRole("button", { name: "Delete comment" }));
+    await waitFor(() => expect(screen.queryByText("Keep the old constant for now.")).toBeNull());
+    expect(session.review.comments.map(({ id }) => id)).not.toContain("H1");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Discuss with AI" })[0]);
+    fireEvent.change(screen.getByLabelText("What do you want to discuss with the AI agent?"), {
+      target: { value: "Is this right?" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send to AI" }));
+    await expect(session.waitForAgentRequest()).resolves.toMatchObject({ selectedCommentIds: [] });
+    session.cancel();
+  });
+
   async function liveAppWithDraft(line: number) {
     vi.stubGlobal("EventSource", class { addEventListener() {} close() {} });
     const session = new ReviewSession(pullRequest, patch, review, new AppGateway(), discussion, true);

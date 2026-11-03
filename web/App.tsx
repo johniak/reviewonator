@@ -17,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import type { ReviewComment, ReviewEvent, RevisionRequest } from "../src/domain/review";
+import type { CommentEdit, ReviewComment, ReviewEvent, RevisionRequest } from "../src/domain/review";
 import type { UpdateNotice } from "../src/domain/update";
 import { api } from "./api";
 import { DiffPanel, fileSectionId } from "./components/DiffPanel";
@@ -184,6 +184,8 @@ export function App() {
     onToggleRejected: toggleRejected,
     onRevisionChange: changeRevision,
     onSendRevision: sendSingleRevisionRequest,
+    onEditComment: editComment,
+    onDeleteComment: deleteComment,
   };
 
   const threadActions = {
@@ -342,6 +344,29 @@ export function App() {
       () => removeLineCommentDraft(location),
       "Could not send this comment.",
     );
+  }
+
+  async function editComment(id: string, edit: CommentEdit): Promise<boolean> {
+    setActionError(null);
+    try {
+      setSession((await api.editComment(id, edit)).session);
+      return true;
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Could not save this comment.");
+      return false;
+    }
+  }
+
+  async function deleteComment(id: string) {
+    setActionError(null);
+    try {
+      setSession((await api.deleteComment(id)).session);
+      setSelectedIds((current) => withoutId(current, id));
+      setRejectedIds((current) => withoutId(current, id));
+      clearRevision(id);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Could not delete this comment.");
+    }
   }
 
   async function addUserComment(location: LineCommentLocation) {
@@ -894,5 +919,12 @@ function withPath(paths: Set<string>, path: string, present: boolean): Set<strin
   const next = new Set(paths);
   if (present) next.add(path);
   else next.delete(path);
+  return next;
+}
+
+function withoutId(ids: Set<string>, id: string): Set<string> {
+  if (!ids.has(id)) return ids;
+  const next = new Set(ids);
+  next.delete(id);
   return next;
 }
