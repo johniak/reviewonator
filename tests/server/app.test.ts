@@ -251,7 +251,7 @@ describe("saved preferences", () => {
 
     expect(html).toBe(
       '<head><script id="reviewonator-preferences" type="application/json">'
-        + '{"theme":"dark","viewMode":"all","diffStyle":"unified"}</script><script>/* theme */</script></head>',
+        + '{"theme":"dark","viewMode":"all","diffStyle":"unified","collapsedBriefings":[]}</script><script>/* theme */</script></head>',
     );
   });
 
@@ -273,8 +273,8 @@ describe("saved preferences", () => {
 
     const response = await app.request("/api/preferences", authenticated({ diffStyle: "split" }));
 
-    expect(await response.json()).toEqual({ preferences: { theme: "system", viewMode: "single", diffStyle: "split" } });
-    expect(await preferences.read()).toEqual({ theme: "system", viewMode: "single", diffStyle: "split" });
+    expect(await response.json()).toEqual({ preferences: { theme: "system", viewMode: "single", diffStyle: "split", collapsedBriefings: [] } });
+    expect(await preferences.read()).toEqual({ theme: "system", viewMode: "single", diffStyle: "split", collapsedBriefings: [] });
   });
 
   it("rejects an unknown preference or value", async () => {

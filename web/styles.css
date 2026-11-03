@@ -875,29 +875,47 @@ textarea:focus { border-color: var(--pc-accent); }
 .review-panel-content { min-height: 0; flex: 1; overflow-y: auto; }
 
 .pr-briefing {
-  padding: 16px 20px 16px 16px;
+  padding: 10px 16px 14px;
   background: var(--pc-bg-subtle);
   border-bottom: var(--pc-border-width) solid var(--pc-border-default);
+  border-radius: var(--pc-radius-lg) var(--pc-radius-lg) 0 0;
 }
-.pr-briefing-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
-.pr-briefing-heading h2 { font-size: 16px; line-height: 24px; }
+.pr-briefing.collapsed { padding-bottom: 10px; }
+.pr-briefing-heading { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.pr-briefing-heading h2 { font-size: 14px; line-height: 28px; }
+.pr-briefing-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  color: var(--pc-fg-default);
+  background: none;
+  border: 0;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pr-briefing-toggle svg { color: var(--pc-fg-muted); transition: transform 150ms ease-out; }
+.pr-briefing-toggle[aria-expanded="true"] svg { transform: rotate(90deg); }
+.pr-briefing-toggle:hover svg { color: var(--pc-fg-default); }
 .pr-briefing-heading small {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  margin-left: auto;
   color: var(--pc-fg-muted);
   font-size: var(--pc-text-small);
   font-weight: 500;
   white-space: nowrap;
 }
-.briefing-source { color: var(--pc-fg-muted); font-size: var(--pc-text-small); line-height: 18px; margin-bottom: 8px; }
+.briefing-source { color: var(--pc-fg-muted); font-size: var(--pc-text-small); line-height: 20px; }
 .briefing-ticket {
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   max-width: 100%;
-  margin-bottom: 8px;
-  padding: 2px 8px;
+  padding: 1px 8px;
   color: var(--pc-fg-default);
   background: var(--pc-bg-surface);
   border: var(--pc-border-width) solid var(--pc-border-default);
@@ -906,11 +924,11 @@ textarea:focus { border-color: var(--pc-accent); }
   line-height: 20px;
   text-decoration: none;
 }
-.briefing-ticket svg { color: var(--pc-fg-muted); }
+.briefing-ticket svg { flex: none; color: var(--pc-fg-muted); }
 .briefing-ticket strong { font-weight: 600; white-space: nowrap; }
 .briefing-ticket span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--pc-fg-muted); }
 a.briefing-ticket:hover { background: var(--pc-bg-hover); border-color: var(--pc-border-strong); }
-.briefing-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.briefing-text { max-width: 110ch; margin-top: 6px; padding-left: 20px; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 .review-summary { padding: 16px 20px 16px 16px; border-bottom: var(--pc-border-width) solid var(--pc-border-default); }
 .review-summary h2 { font-size: 16px; line-height: 24px; margin-bottom: 8px; }

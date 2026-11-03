@@ -32,6 +32,7 @@ import { userThreadCardId } from "./components/UserCommentThread";
 import markDark from "./brand/mark-dark.png";
 import markLight from "./brand/mark-light.png";
 import { usePreference } from "./preferences";
+import { maximumCollapsedBriefings } from "../src/domain/preferences";
 import { ThemeSwitcher, useTheme } from "./theme";
 import type {
   LineCommentDraft,
@@ -51,6 +52,7 @@ export function App() {
   const [activePath, setActivePath] = useState("");
   const [viewMode, setViewMode] = usePreference("viewMode");
   const [diffStyle, setDiffStyle] = usePreference("diffStyle");
+  const [collapsedBriefings, setCollapsedBriefings] = usePreference("collapsedBriefings");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [rejectedIds, setRejectedIds] = useState<Set<string>>(new Set());
   const [focusedCommentId, setFocusedCommentId] = useState<string | null>(null);
@@ -290,6 +292,11 @@ export function App() {
   const publishBody = buildPublishBody(review.summary, selectedComments);
 
   const viewedCount = pullRequest.files.filter((file) => viewedPaths.has(file.path)).length;
+
+  function setBriefingCollapsed(collapsed: boolean) {
+    const others = collapsedBriefings.filter((url) => url !== review.prUrl);
+    setCollapsedBriefings(collapsed ? [...others, review.prUrl].slice(-maximumCollapsedBriefings) : others);
+  }
 
   async function setFileViewed(path: string, viewed: boolean) {
     setActionError(null);
@@ -611,6 +618,14 @@ export function App() {
         </aside>
 
         <main className="review-canvas">
+          {review.briefing && (
+            <PrBriefing
+              briefing={review.briefing}
+              reviewerLanguage={review.languages.reviewerNotes}
+              collapsed={collapsedBriefings.includes(review.prUrl)}
+              onCollapsedChange={setBriefingCollapsed}
+            />
+          )}
           <DiffPanel
             patch={session.patch}
             activePath={activePath}
@@ -664,10 +679,6 @@ export function App() {
           <div className="review-panel-content">
             {panelTab === "review" ? (
               <>
-                {review.briefing && (
-                  <PrBriefing briefing={review.briefing} reviewerLanguage={review.languages.reviewerNotes} />
-                )}
-
                 <section className="review-summary">
                   <h2>Review summary</h2>
                   <p>{review.summary}</p>

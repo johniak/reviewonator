@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { FilePreferenceStore } from "../../src/server/preferences";
 
-const defaults = { theme: "system", viewMode: "single", diffStyle: "unified" };
+const defaults = { theme: "system", viewMode: "single", diffStyle: "unified", collapsedBriefings: [] };
 
 async function stateDirectory(): Promise<string> {
   return mkdtemp(join(tmpdir(), "reviewonator-preferences-test-"));
@@ -32,7 +32,7 @@ describe("FilePreferenceStore", () => {
     expect(await storeIn(directory).update({ theme: "dark" })).toEqual({ ...defaults, theme: "dark" });
     await storeIn(directory).update({ viewMode: "all" });
 
-    expect(await storeIn(directory).read()).toEqual({ theme: "dark", viewMode: "all", diffStyle: "unified" });
+    expect(await storeIn(directory).read()).toEqual({ ...defaults, theme: "dark", viewMode: "all" });
   });
 
   it("keeps both of two changes made at the same time", async () => {
@@ -41,7 +41,7 @@ describe("FilePreferenceStore", () => {
 
     await Promise.all([store.update({ viewMode: "all" }), store.update({ diffStyle: "split" })]);
 
-    expect(await storeIn(directory).read()).toEqual({ theme: "system", viewMode: "all", diffStyle: "split" });
+    expect(await storeIn(directory).read()).toEqual({ ...defaults, viewMode: "all", diffStyle: "split" });
   });
 
   it("writes a file only the user can read", async () => {
@@ -65,6 +65,22 @@ describe("FilePreferenceStore", () => {
     const directory = await stateDirectory();
     await savedFile(directory, JSON.stringify({ theme: "sepia", viewMode: "all", columns: 3 }));
 
-    expect(await storeIn(directory).read()).toEqual({ theme: "system", viewMode: "all", diffStyle: "unified" });
+    expect(await storeIn(directory).read()).toEqual({ ...defaults, viewMode: "all" });
+  });
+
+  it("remembers which pull requests have their briefing collapsed", async () => {
+    const directory = await stateDirectory();
+    const collapsedBriefings = ["https://github.com/acme/widgets/pull/42"];
+
+    await storeIn(directory).update({ collapsedBriefings });
+
+    expect(await storeIn(directory).read()).toEqual({ ...defaults, collapsedBriefings });
+  });
+
+  it("forgets a malformed list of collapsed briefings without losing the other choices", async () => {
+    const directory = await stateDirectory();
+    await savedFile(directory, JSON.stringify({ viewMode: "all", collapsedBriefings: "all of them" }));
+
+    expect(await storeIn(directory).read()).toEqual({ ...defaults, viewMode: "all" });
   });
 });

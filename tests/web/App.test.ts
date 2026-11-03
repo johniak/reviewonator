@@ -3,7 +3,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createElement } from "react";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PullRequest } from "../../src/domain/pull-request";
 import type { PublishRequest, ReviewComment } from "../../src/domain/review";
@@ -146,7 +146,7 @@ describe("GitHub review body", () => {
     await waitFor(() => expect(dismissed).toEqual(["0.8.0"]));
   });
 
-  it("opens the review panel with the private briefing above the review summary", async () => {
+  it("shows the private briefing above the diff instead of in the review panel", async () => {
     const briefed = {
       ...review,
       briefing: { ticket: { key: "ACME-142" }, text: "Ticket prosi o ponawianie płatności. PR je dodaje." },
@@ -155,11 +155,32 @@ describe("GitHub review body", () => {
 
     render(createElement(App));
 
-    const briefing = await screen.findByRole("region", { name: "What this PR is about" });
+    const briefing = await screen.findByRole("region", { name: "About this PR" });
     expect(briefing).toHaveTextContent("Ticket prosi o ponawianie płatności. PR je dodaje.");
     expect(briefing).toHaveTextContent("Private · Polish");
-    expect(briefing.compareDocumentPosition(screen.getByRole("heading", { name: "Review summary" })))
+    expect(briefing.closest(".review-canvas")).not.toBeNull();
+    expect(briefing.compareDocumentPosition(screen.getByLabelText("Diff view mode")))
       .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it("remembers a collapsed briefing for this pull request on the next run", async () => {
+    const preferences = new FilePreferenceStore({
+      REVIEWONATOR_STATE_DIR: await mkdtemp(join(tmpdir(), "reviewonator-briefing-preferences-")),
+    });
+    const briefed = { ...review, briefing: { text: "PR zmienia nazwę zadania." } };
+    await openPage(serveSession(new ReviewSession(pullRequest, patch, briefed, new AppGateway(), discussion), preferences));
+    render(createElement(App));
+
+    fireEvent.click(await screen.findByRole("button", { name: "About this PR" }));
+
+    expect(screen.queryByText("PR zmienia nazwę zadania.")).not.toBeInTheDocument();
+    await waitFor(async () => expect((await preferences.read()).collapsedBriefings).toEqual([review.prUrl]));
+
+    cleanup();
+    await openPage(serveSession(new ReviewSession(pullRequest, patch, briefed, new AppGateway(), discussion), preferences));
+    render(createElement(App));
+
+    expect(await screen.findByRole("button", { name: "About this PR" })).toHaveAttribute("aria-expanded", "false");
   });
 
   it("leaves the briefing out for reviews written before it existed", async () => {
@@ -168,7 +189,7 @@ describe("GitHub review body", () => {
     render(createElement(App));
 
     await screen.findByRole("heading", { name: "Review summary" });
-    expect(screen.queryByRole("region", { name: "What this PR is about" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "About this PR" })).not.toBeInTheDocument();
   });
 
   it("collapses files viewed on GitHub and keeps the Viewed checkbox in sync", async () => {
@@ -666,6 +687,7 @@ describe("saved view preferences", () => {
       theme: "system",
       viewMode: "single",
       diffStyle: "unified",
+      collapsedBriefings: [],
     }));
   });
 });

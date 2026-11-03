@@ -1,7 +1,12 @@
-import { ExternalLink, EyeOff, Ticket } from "lucide-react";
+import { ChevronRight, ExternalLink, EyeOff, Ticket } from "lucide-react";
 import type { Briefing } from "../../src/domain/review";
 
-export function PrBriefing({ briefing, reviewerLanguage }: { briefing: Briefing; reviewerLanguage: string }) {
+export function PrBriefing({ briefing, reviewerLanguage, collapsed, onCollapsedChange }: {
+  briefing: Briefing;
+  reviewerLanguage: string;
+  collapsed: boolean;
+  onCollapsedChange: (collapsed: boolean) => void;
+}) {
   const { ticket, text } = briefing;
   const ticketLabel = ticket && (
     <>
@@ -12,20 +17,31 @@ export function PrBriefing({ briefing, reviewerLanguage }: { briefing: Briefing;
   );
 
   return (
-    <section className="pr-briefing" aria-labelledby="pr-briefing-title">
+    <section className={`pr-briefing ${collapsed ? "collapsed" : ""}`} aria-labelledby="pr-briefing-title">
       <div className="pr-briefing-heading">
-        <h2 id="pr-briefing-title">What this PR is about</h2>
+        <h2>
+          <button
+            type="button"
+            id="pr-briefing-title"
+            className="pr-briefing-toggle"
+            aria-expanded={!collapsed}
+            onClick={() => onCollapsedChange(!collapsed)}
+          >
+            <ChevronRight aria-hidden="true" size={14} />
+            About this PR
+          </button>
+        </h2>
+        {!ticket && <span className="briefing-source">No ticket found, based on the code only</span>}
+        {ticket?.url && (
+          <a className="briefing-ticket" href={ticket.url} target="_blank" rel="noreferrer" title={ticket.title}>
+            {ticketLabel}
+            <ExternalLink aria-hidden="true" size={13} />
+          </a>
+        )}
+        {ticket && !ticket.url && <span className="briefing-ticket">{ticketLabel}</span>}
         <small><EyeOff aria-hidden="true" size={13} /> Private · {reviewerLanguage}</small>
       </div>
-      {!ticket && <p className="briefing-source">No ticket found, based on the code only</p>}
-      {ticket?.url && (
-        <a className="briefing-ticket" href={ticket.url} target="_blank" rel="noreferrer" title={ticket.title}>
-          {ticketLabel}
-          <ExternalLink aria-hidden="true" size={13} />
-        </a>
-      )}
-      {ticket && !ticket.url && <p className="briefing-ticket">{ticketLabel}</p>}
-      <p className="briefing-text">{text}</p>
+      {!collapsed && <p className="briefing-text">{text}</p>}
     </section>
   );
 }

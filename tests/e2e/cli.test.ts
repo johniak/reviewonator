@@ -141,7 +141,7 @@ describe("Reviewonator CLI end-to-end", () => {
     const embedded = page.match(/<script id="reviewonator-preferences" type="application\/json">([^<]*)<\/script>/)?.[1];
 
     expect(secondRun.baseUrl).not.toBe(firstRun.baseUrl);
-    expect(JSON.parse(embedded ?? "null")).toEqual({ theme: "dark", viewMode: "all", diffStyle: "unified" });
+    expect(JSON.parse(embedded ?? "null")).toEqual({ theme: "dark", viewMode: "all", diffStyle: "unified", collapsedBriefings: [] });
   }, 20_000);
 
   it("exits right after its result even when the release lookup hangs", async () => {
