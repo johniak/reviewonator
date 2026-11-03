@@ -623,7 +623,7 @@ textarea:focus { border-color: var(--pc-accent); }
   --diffs-fg-number-deletion-override: var(--pc-danger);
   --diffs-addition-color-override: var(--pc-success);
   --diffs-deletion-color-override: var(--pc-danger);
-  --diffs-annotation-bg: var(--pc-bg-canvas);
+  --diffs-annotation-bg: var(--pc-bg-surface);
 }
 
 .diff-comment-trigger {
@@ -647,7 +647,7 @@ textarea:focus { border-color: var(--pc-accent); }
   display: grid;
   gap: 8px;
   padding: 8px 12px;
-  background: var(--pc-bg-canvas);
+  background: var(--pc-bg-surface);
   color: var(--pc-fg-default);
   font: var(--pc-text-body) / 21px var(--pc-font-ui);
   font-variant-ligatures: normal;
