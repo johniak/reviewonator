@@ -36,7 +36,8 @@ describe("Homebrew formula", () => {
     expect(formula).toContain('depends_on "gh"');
     expect(formula.indexOf('depends_on "gh"')).toBeLessThan(formula.indexOf("on_macos do"));
     expect(formula).toContain('bin.install "reviewonator"');
-    expect(formula).toContain("Run `reviewonator setup` to install the Reviewonator skill for Claude Code or Codex.");
+    expect(formula).toContain("Run `#{opt_bin}/reviewonator setup` to install the Reviewonator skill for Claude Code or Codex.");
+    expect(formula).toContain("The full path runs this installation even when another reviewonator comes first on your PATH.");
     expect(formula).toContain('assert_match "Reviewonator #{version}", shell_output("#{bin}/reviewonator --version")');
   });
 

@@ -47,7 +47,8 @@ ${asset("linux-x64")}
 
   def caveats
     <<~EOS
-      Run \`reviewonator setup\` to install the Reviewonator skill for Claude Code or Codex.
+      Run \`#{opt_bin}/reviewonator setup\` to install the Reviewonator skill for Claude Code or Codex.
+      The full path runs this installation even when another reviewonator comes first on your PATH.
     EOS
   end
 

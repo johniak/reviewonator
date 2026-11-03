@@ -42,7 +42,16 @@ describe("project documentation", () => {
   it("documents Homebrew, the install script, update and uninstall", () => {
     const readme = readFileSync("README.md", "utf8");
 
-    expect(readme).toContain("brew install johniak/tap/reviewonator\nreviewonator setup");
+    expect(readme).toContain('brew install johniak/tap/reviewonator\n"$(brew --prefix)/bin/reviewonator" setup');
+    expect(readme).toContain(
+      "Setup removes the executable that the install script installed and asks before removing any other `reviewonator`.",
+    );
+    expect(readme).toContain(
+      "If Reviewonator is installed with Homebrew, the script removes that installation once the download is verified.",
+    );
+    expect(readme).toContain(
+      "Before it replaces a `reviewonator` that it did not install, the script asks for confirmation; `--force` replaces it without asking.",
+    );
     expect(readme).toContain(
       'sh -c "$(curl -fsSL https://github.com/johniak/reviewonator/releases/latest/download/install.sh)"',
     );

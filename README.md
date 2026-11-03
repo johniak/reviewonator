@@ -56,10 +56,10 @@ Your GitHub credentials remain in the CLI process. They are never embedded in th
 
 ```sh
 brew install johniak/tap/reviewonator
-reviewonator setup
+"$(brew --prefix)/bin/reviewonator" setup
 ```
 
-Homebrew installs the executable and the GitHub CLI. `reviewonator setup` then installs the agent skill.
+Homebrew installs the executable and the GitHub CLI. Setup then installs the agent skill. The full path runs the Homebrew executable even when an older `reviewonator` comes first on your `PATH`. Setup removes the executable that the install script installed and asks before removing any other `reviewonator`.
 
 ### Install script
 
@@ -74,6 +74,8 @@ sh -c "$(wget -qO- https://github.com/johniak/reviewonator/releases/latest/downl
 ```
 
 The script downloads the latest release for your platform, verifies its SHA-256 checksum, installs the executable in `~/.local/bin/reviewonator`, and runs `reviewonator setup`. Make sure `~/.local/bin` is on your `PATH`, or pass `--bin-dir DIR`.
+
+If Reviewonator is installed with Homebrew, the script removes that installation once the download is verified. Before it replaces a `reviewonator` that it did not install, the script asks for confirmation; `--force` replaces it without asking.
 
 ### Setup
 
