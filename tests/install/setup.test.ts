@@ -16,6 +16,7 @@ const files: SkillFile[] = [
   },
   { path: "references/review-schema.md", content: "# Schema\n" },
 ];
+const aliasFiles: SkillFile[] = [{ path: "SKILL.md", content: "---\nname: rr\n---\n\nFollow the reviewonator skill.\n" }];
 
 class ScriptedPrompter implements Prompter {
   readonly questions: string[] = [];
@@ -43,6 +44,7 @@ async function setupFixture() {
   const context = (prompter: Prompter, interactive = true, extraEnv: NodeJS.ProcessEnv = {}): SetupContext => ({
     env: { ...env, ...extraEnv },
     files,
+    aliasFiles,
     version: "0.8.0",
     interactive,
     prompter,
@@ -155,7 +157,9 @@ describe("reviewonator setup", () => {
 
     expect((await readConfig(fixture.env))?.targets).toEqual(["claude"]);
     expect(await readSkillMarker(join(fixture.codexRoot, "reviewonator"))).toBeNull();
+    expect(await readSkillMarker(join(fixture.codexRoot, "rr"))).toBeNull();
     expect(fixture.lines).toContain(`Removed Codex skill: ${join(fixture.codexRoot, "reviewonator")}`);
+    expect(fixture.lines).toContain(`Removed Codex rr alias: ${join(fixture.codexRoot, "rr")}`);
   });
 
   it("adopts a v0.7 install without prompting again", async () => {
@@ -222,6 +226,33 @@ describe("reviewonator setup", () => {
     expect(await readSkillMarker(join(fixture.claudeRoot, "reviewonator"))).toEqual({ managed: true, version: "0.8.0" });
     expect(fixture.lines.filter((line) => line.startsWith("Installed "))).toEqual([
       `Installed Claude Code skill: ${join(fixture.claudeRoot, "reviewonator")}`,
+      `Installed Claude Code rr alias: ${join(fixture.claudeRoot, "rr")}`,
     ]);
+  });
+
+  it("installs the managed rr alias next to every selected skill", async () => {
+    const fixture = await setupFixture();
+
+    await runSetup({ targets: "claude,codex" }, fixture.context(new ScriptedPrompter(), false));
+
+    for (const [label, root] of [["Claude Code", fixture.claudeRoot], ["Codex", fixture.codexRoot]]) {
+      const alias = join(root, "rr");
+      expect(await readFile(join(alias, "SKILL.md"), "utf8")).toBe(aliasFiles[0].content);
+      expect(await readSkillMarker(alias)).toEqual({ managed: true, version: "0.8.0" });
+      expect(fixture.lines).toContain(`Installed ${label} rr alias: ${alias}`);
+    }
+  });
+
+  it("keeps a user's own rr skill and still installs Reviewonator", async () => {
+    const fixture = await setupFixture();
+    const own = join(fixture.claudeRoot, "rr");
+    await mkdir(own, { recursive: true });
+    await writeFile(join(own, "SKILL.md"), "user-owned");
+
+    await runSetup({ targets: "claude" }, fixture.context(new ScriptedPrompter(), false));
+
+    expect(await readFile(join(own, "SKILL.md"), "utf8")).toBe("user-owned");
+    expect(await readSkillMarker(join(fixture.claudeRoot, "reviewonator"))).toEqual({ managed: true, version: "0.8.0" });
+    expect(fixture.lines).toContain(`Kept your own skill at ${own}; the rr alias was not installed.`);
   });
 });

@@ -39,6 +39,30 @@ describe("project documentation", () => {
     expect(readme).toContain("stays open for follow-up rounds");
   });
 
+  it("documents the rr alias", () => {
+    const readme = readFileSync("README.md", "utf8");
+
+    expect(readme).toContain("- the `rr` alias next to each selected skill;");
+    expect(readme).toContain("/rr https://github.com/owner/repository/pull/123");
+    expect(readme).toContain("$rr https://github.com/owner/repository/pull/123");
+    expect(readme).toContain("If you already have your own `rr` skill, setup keeps it and skips the alias.");
+  });
+
+  it("documents project review rules and the project review skill", () => {
+    const readme = readFileSync("README.md", "utf8");
+
+    expect(readme).toContain("## Project review rules");
+    expect(readme).toContain("`.claude/skills/review/SKILL.md`");
+    expect(readme).toContain("`.agents/skills/review/SKILL.md`");
+    expect(readme).toContain("You do not need to invoke it: run `/reviewonator` or `/rr` as usual and the agent reads it.");
+    expect(readme).toContain("Reviewonator updates never touch these files.");
+    expect(readme).toContain("### Add a project review skill");
+    expect(readme).toContain(
+      "- Review against your project's own rules: add a `review` skill to the repository and every review follows it.",
+    );
+    expect(readme).toContain("> [!TIP]\n> Add a `review` skill to your repository");
+  });
+
   it("documents Homebrew, the install script, update and uninstall", () => {
     const readme = readFileSync("README.md", "utf8");
 

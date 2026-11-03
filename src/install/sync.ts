@@ -1,10 +1,9 @@
 import { readConfig, targetLabels, writeConfig, type InstallConfig, type Target } from "./config";
 import { deriveLegacyConfig } from "./legacy";
-import { readSkillMarker, skillDirectory, writeSkill, type SkillFile } from "./skill";
-import { compareVersions } from "./version";
+import { aliasDirectory, isCurrent, readSkillMarker, skillDirectory, writeAlias, writeSkill, type SkillFile } from "./skill";
 
 export type SyncResult = { updated: Target[]; migrated: boolean; warnings: string[] };
-export type SyncContext = { env: NodeJS.ProcessEnv; files: SkillFile[]; version: string };
+export type SyncContext = { env: NodeJS.ProcessEnv; files: SkillFile[]; aliasFiles: SkillFile[]; version: string };
 
 const NOTHING_FOUND = "No Reviewonator skill was found. Run reviewonator setup, and pass --claude-skill-dir or --codex-skill-dir if your skill lives in a custom directory.";
 
@@ -41,14 +40,29 @@ export async function syncSkills(context: SyncContext): Promise<SyncResult> {
         );
         continue;
       }
-      if (marker && marker.version && compareVersions(context.version, marker.version) <= 0) continue;
-      await writeSkill(directory, context.files, config.languages, context.version);
-      result.updated.push(target);
+      if (!isCurrent(marker, context.version)) {
+        await writeSkill(directory, context.files, config.languages, context.version);
+        result.updated.push(target);
+      }
     } catch (error) {
       result.warnings.push(`Could not update the ${targetLabels[target]} skill at ${directory}: ${messageOf(error)}`);
+      continue;
+    }
+    const alias = aliasDirectory(root);
+    try {
+      await syncAlias(alias, context);
+    } catch (error) {
+      result.warnings.push(`Could not update the ${targetLabels[target]} rr alias at ${alias}: ${messageOf(error)}`);
     }
   }
   return result;
+}
+
+/** A user's own `rr` skill is theirs to keep, so every run skips it without a warning. */
+async function syncAlias(directory: string, context: SyncContext): Promise<void> {
+  const marker = await readSkillMarker(directory);
+  if (marker && !marker.managed) return;
+  if (!isCurrent(marker, context.version)) await writeAlias(directory, context.aliasFiles, context.version);
 }
 
 export function skillUpdateHint(result: SyncResult): string | null {

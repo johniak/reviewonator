@@ -1,6 +1,7 @@
 import { lstat, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { Languages } from "./config";
+import { compareVersions } from "./version";
 
 export type SkillFile = { path: string; content: string };
 export type SkillMarker = { managed: false } | { managed: true; version: string | null };
@@ -16,6 +17,11 @@ const LEGACY_REVIEWER = /^- Write private reviewer explanations in (.+)\.$/m;
 
 export function skillDirectory(root: string): string {
   return join(root, "reviewonator");
+}
+
+/** The short `rr` skill installed next to the main skill; it only points at `../reviewonator/SKILL.md`. */
+export function aliasDirectory(root: string): string {
+  return join(root, "rr");
 }
 
 export function languageLine(languages: Languages): string {
@@ -37,28 +43,43 @@ export async function writeSkill(
   languages: Languages,
   version: string,
 ): Promise<void> {
-  const marker = await readSkillMarker(skillDir);
-  if (marker && !marker.managed) {
-    throw new UnmanagedSkillError(`Refusing to replace unmanaged skill: ${skillDir}`);
-  }
   const skill = files.find((file) => file.path === "SKILL.md");
   if (!skill || !LANGUAGE_LINE.test(skill.content)) {
     throw new Error("The Reviewonator skill is missing its language configuration marker.");
   }
+  const configured = files.map((file) =>
+    file === skill ? { ...file, content: file.content.replace(LANGUAGE_LINE, () => languageLine(languages)) } : file
+  );
+  await writeManagedDirectory(skillDir, configured, version);
+}
 
-  const root = dirname(skillDir);
+export async function writeAlias(aliasDir: string, files: SkillFile[], version: string): Promise<void> {
+  await writeManagedDirectory(aliasDir, files, version);
+}
+
+/** True when a managed marker is at least the given version, so there is nothing to update. */
+export function isCurrent(marker: SkillMarker | null, version: string): boolean {
+  return Boolean(marker?.managed && marker.version && compareVersions(version, marker.version) <= 0);
+}
+
+async function writeManagedDirectory(directory: string, files: SkillFile[], version: string): Promise<void> {
+  const marker = await readSkillMarker(directory);
+  if (marker && !marker.managed) {
+    throw new UnmanagedSkillError(`Refusing to replace unmanaged skill: ${directory}`);
+  }
+
+  const root = dirname(directory);
   await removeStaleStaging(root);
   const staging = join(root, `${STAGING_PREFIX}${process.pid}`);
   try {
     for (const file of files) {
       const destination = join(staging, file.path);
-      const content = file === skill ? file.content.replace(LANGUAGE_LINE, () => languageLine(languages)) : file.content;
       await mkdir(dirname(destination), { recursive: true });
-      await writeFile(destination, content);
+      await writeFile(destination, file.content);
     }
     await writeFile(join(staging, MARKER), `Installed by Reviewonator ${version}\n`);
-    await rm(skillDir, { recursive: true, force: true });
-    await rename(staging, skillDir);
+    await rm(directory, { recursive: true, force: true });
+    await rename(staging, directory);
   } finally {
     await rm(staging, { recursive: true, force: true });
   }

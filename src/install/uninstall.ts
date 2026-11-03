@@ -11,7 +11,7 @@ import {
   type Target,
 } from "./config";
 import type { InstallMethod } from "./install-method";
-import { readSkillMarker, removeSkill, skillDirectory } from "./skill";
+import { aliasDirectory, readSkillMarker, removeSkill, skillDirectory } from "./skill";
 
 export type UninstallOptions = { targets?: string };
 export type UninstallContext = {
@@ -26,7 +26,8 @@ export async function runUninstall(options: UninstallOptions, context: Uninstall
   const { env, log } = context;
   const config = await readConfig(env);
   const defaults = defaultSkillRoots(env);
-  const directoryOf = (target: Target) => skillDirectory(config?.skillRoots[target] ?? defaults[target]);
+  const rootOf = (target: Target) => config?.skillRoots[target] ?? defaults[target];
+  const directoryOf = (target: Target) => skillDirectory(rootOf(target));
 
   const given = options.targets ?? env.REVIEWONATOR_TARGETS;
   const selected = given
@@ -41,6 +42,8 @@ export async function runUninstall(options: UninstallOptions, context: Uninstall
     const outcome = await removeSkill(directory);
     if (outcome === "removed") log(`Removed ${targetLabels[target]} skill: ${directory}`);
     if (outcome === "unmanaged") log(`Kept unmanaged skill: ${directory}`);
+    const alias = aliasDirectory(rootOf(target));
+    if (await removeSkill(alias) === "removed") log(`Removed ${targetLabels[target]} rr alias: ${alias}`);
   }
 
   if (config) {

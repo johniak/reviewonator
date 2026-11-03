@@ -14,6 +14,7 @@ const files: SkillFile[] = [
     content: "---\nname: reviewonator\n---\n\nReview language configuration: write public pull request comments and the review summary in English; write private reviewer explanations in English.\n\nVersion two instructions.\n",
   },
 ];
+const aliasFiles: SkillFile[] = [{ path: "SKILL.md", content: "---\nname: rr\n---\n\nVersion two alias.\n" }];
 const germanFrench = { comments: "German", reviewerNotes: "French" };
 
 async function syncFixture() {
@@ -26,14 +27,15 @@ async function syncFixture() {
     REVIEWONATOR_CODEX_SKILL_DIR: codexRoot,
   };
   const claudeSkill = join(claudeRoot, "reviewonator");
+  const claudeAlias = join(claudeRoot, "rr");
   const config: InstallConfig = {
     version: 1,
     targets: ["claude"],
     skillRoots: { claude: claudeRoot },
     languages: germanFrench,
   };
-  const sync = (version = "0.8.0") => syncSkills({ env, files, version });
-  return { root, env, claudeRoot, codexRoot, claudeSkill, config, sync };
+  const sync = (version = "0.8.0") => syncSkills({ env, files, aliasFiles, version });
+  return { root, env, claudeRoot, codexRoot, claudeSkill, claudeAlias, config, sync };
 }
 
 async function oldSkill(directory: string, marker: string) {
@@ -101,6 +103,40 @@ describe("syncSkills", () => {
       `Skipped the unmanaged skill at ${fixture.claudeSkill}; Reviewonator does not overwrite files it did not install.`,
     ]);
     expect(await readFile(join(fixture.claudeSkill, "SKILL.md"), "utf8")).toBe("user-owned");
+    expect(await readSkillMarker(fixture.claudeAlias)).toBeNull();
+  });
+
+  it("upgrades the rr alias together with the skill", async () => {
+    const fixture = await syncFixture();
+    await writeConfig(fixture.config, fixture.env);
+    await oldSkill(fixture.claudeSkill, "Installed by Reviewonator 0.7.0\n");
+    await mkdir(fixture.claudeAlias, { recursive: true });
+    await writeFile(join(fixture.claudeAlias, ".reviewonator-managed"), "Installed by Reviewonator 0.7.0\n");
+    await writeFile(join(fixture.claudeAlias, "SKILL.md"), "Version one alias.\n");
+
+    expect((await fixture.sync()).updated).toEqual(["claude"]);
+    expect(await readFile(join(fixture.claudeAlias, "SKILL.md"), "utf8")).toBe(aliasFiles[0].content);
+    expect(await readSkillMarker(fixture.claudeAlias)).toEqual({ managed: true, version: "0.8.0" });
+  });
+
+  it("adds a missing rr alias next to a current skill without asking for a restart", async () => {
+    const fixture = await syncFixture();
+    await writeConfig(fixture.config, fixture.env);
+    await writeSkill(fixture.claudeSkill, files, germanFrench, "0.8.0");
+
+    expect(await fixture.sync()).toEqual({ updated: [], migrated: false, warnings: [] });
+    expect(await readSkillMarker(fixture.claudeAlias)).toEqual({ managed: true, version: "0.8.0" });
+  });
+
+  it("leaves a user's own rr skill alone without a warning", async () => {
+    const fixture = await syncFixture();
+    await writeConfig(fixture.config, fixture.env);
+    await oldSkill(fixture.claudeSkill, "Installed by Reviewonator 0.7.0\n");
+    await mkdir(fixture.claudeAlias, { recursive: true });
+    await writeFile(join(fixture.claudeAlias, "SKILL.md"), "user-owned");
+
+    expect(await fixture.sync()).toEqual({ updated: ["claude"], migrated: false, warnings: [] });
+    expect(await readFile(join(fixture.claudeAlias, "SKILL.md"), "utf8")).toBe("user-owned");
   });
 
   it("recreates a configured skill directory that was deleted", async () => {
@@ -163,6 +199,7 @@ describe("syncSkills", () => {
     const result = await fixture.sync();
 
     expect(result.updated).toEqual([]);
+    expect(result.warnings).toHaveLength(1);
     expect(result.warnings[0]).toMatch(/^Could not update the Claude Code skill at /);
   });
 

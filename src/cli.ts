@@ -7,7 +7,7 @@ import { GitHubClient } from "./github/client";
 import { BunCommandRunner, openBrowser } from "./platform/command";
 import { createApp } from "./server/app";
 import { ReviewSession } from "./server/session";
-import { embeddedSkillFiles } from "./install/embedded-skill";
+import { embeddedAliasFiles, embeddedSkillFiles } from "./install/embedded-skill";
 import { createStdinPrompter } from "./install/prompt";
 import { runSetup } from "./install/setup";
 import { detectInstallMethod } from "./install/install-method";
@@ -89,6 +89,7 @@ async function main(): Promise<void> {
       }, {
         env: process.env,
         files: embeddedSkillFiles,
+        aliasFiles: embeddedAliasFiles,
         version: packageJson.version,
         interactive,
         prompter,
@@ -219,7 +220,12 @@ async function main(): Promise<void> {
 async function syncInstalledSkills(): Promise<SyncResult | null> {
   const method = await detectInstallMethod(process.execPath);
   if (method.kind === "unmanaged") return null;
-  const result = await syncSkills({ env: process.env, files: embeddedSkillFiles, version: packageJson.version });
+  const result = await syncSkills({
+    env: process.env,
+    files: embeddedSkillFiles,
+    aliasFiles: embeddedAliasFiles,
+    version: packageJson.version,
+  });
   for (const warning of result.warnings) process.stderr.write(`${warning}\n`);
   return result;
 }

@@ -25,6 +25,7 @@ See the [feature guide](docs/features.md) for a visual walkthrough of the review
 - Browse one file at a time or scroll through all changed files.
 - Switch between unified and side-by-side diffs.
 - Expand context beyond the patch without exposing a GitHub token to the browser.
+- Review against your project's own rules: add a `review` skill to the repository and every review follows it.
 - Keep private reviewer explanations separate from comments sent to the pull request.
 - Discuss any proposed finding with the AI agent live and send a reply directly from its card.
 - Edit, include, or exclude each inline and general comment. Nothing is included by default.
@@ -82,7 +83,10 @@ If Reviewonator is installed with Homebrew, the script removes that installation
 `reviewonator setup` first requires an explicit multi-select choice for Claude Code, Codex, or both. It never chooses an agent integration silently. It then asks which language the agent should use for comments published to GitHub and for private reviewer notes. Both language choices default to English. It installs:
 
 - the Claude Code skill in `~/.claude/skills/reviewonator`, when selected;
-- the Codex skill in `~/.agents/skills/reviewonator`, when selected.
+- the Codex skill in `~/.agents/skills/reviewonator`, when selected;
+- the `rr` alias next to each selected skill; `/rr` and `$rr` start the same review as `/reviewonator` and `$reviewonator`.
+
+If you already have your own `rr` skill, setup keeps it and skips the alias.
 
 Your choices are saved in `~/.config/reviewonator/config.json`. Updates never ask for your targets or languages again. Run `reviewonator setup --reconfigure` to change them.
 
@@ -126,6 +130,11 @@ In Codex:
 $reviewonator https://github.com/owner/repository/pull/123
 ```
 
+The shorter `rr` alias runs the same skill: `/rr https://github.com/owner/repository/pull/123` in Claude Code or `$rr https://github.com/owner/repository/pull/123` in Codex.
+
+> [!TIP]
+> Add a `review` skill to your repository to make every review follow your project's own rules. See [Project review rules](#project-review-rules).
+
 The agent completes the review first, then launches one live Reviewonator workspace. In the application:
 
 1. Read the private reviewer explanation for each finding.
@@ -138,6 +147,31 @@ The agent completes the review first, then launches one live Reviewonator worksp
 You can start a private live discussion either on an AI finding or on any diff line. The open workspace sends your message to the agent, shows its answer in place, and stays open for follow-up rounds. These discussions are never published directly to GitHub.
 
 The review summary is optional for every event, including **Approve** and **Request changes**.
+
+## Project review rules
+
+The agent reviews every pull request against the rules of its repository. Before it writes any finding, it reads:
+
+- `CLAUDE.md`, `AGENTS.md`, and the nested instruction files closest to each changed file;
+- a project review skill in `.claude/skills/review/SKILL.md` (Claude Code) or `.agents/skills/review/SKILL.md` (Codex), when the repository has one.
+
+### Add a project review skill
+
+The project review skill is where review-only requirements belong, for example "every behavior change needs a test" or "use only functional pytest tests". Create `.claude/skills/review/SKILL.md` for Claude Code or `.agents/skills/review/SKILL.md` for Codex:
+
+```markdown
+---
+name: review
+description: Project-specific pull request review rules.
+---
+
+- Every behavior change is covered by tests.
+- Use only functional pytest tests; do not mock the database.
+```
+
+Its process, checklist, and standards are authoritative: the agent turns every applicable rule into a checklist for the changed files and reports a confirmed violation as a finding. Reviewonator decides only the output format, the review workspace, and publishing.
+
+You do not need to invoke it: run `/reviewonator` or `/rr` as usual and the agent reads it. The skill lives in your repository, so Reviewonator updates never touch these files.
 
 ## Update and uninstall
 

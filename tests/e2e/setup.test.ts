@@ -58,6 +58,25 @@ describe("reviewonator setup end-to-end", () => {
       .toBe(`Installed by Reviewonator ${packageJson.version}\n`);
   });
 
+  it("setup installs the embedded rr alias identical to skills/rr", async () => {
+    const { root, env } = await isolatedEnv();
+    const target = join(root, "custom-claude");
+
+    const { stdout } = await run("bun", [
+      "src/cli.ts", "setup",
+      "--targets", "claude",
+      "--claude-skill-dir", target,
+    ], { cwd: process.cwd(), env });
+
+    expect(stdout).toContain(`Installed Claude Code rr alias: ${join(target, "rr")}`);
+    const sourceFiles = await listFiles("skills/rr");
+    expect(sourceFiles).toContain("SKILL.md");
+    expect(await listFiles(join(target, "rr"))).toEqual([...sourceFiles, ".reviewonator-managed"].sort());
+    for (const file of sourceFiles) {
+      expect(await readFile(join(target, "rr", file)), file).toEqual(await readFile(join("skills/rr", file)));
+    }
+  });
+
   it("a development run never syncs the installed skill", async () => {
     const { root, env } = await isolatedEnv();
     const skill = join(root, "claude", "reviewonator");

@@ -11,7 +11,16 @@ import {
 } from "./config";
 import { deriveLegacyConfig } from "./legacy";
 import type { Prompter } from "./prompt";
-import { readInstalledLanguages, readSkillMarker, removeSkill, skillDirectory, writeSkill, type SkillFile } from "./skill";
+import {
+  aliasDirectory,
+  readInstalledLanguages,
+  readSkillMarker,
+  removeSkill,
+  skillDirectory,
+  writeAlias,
+  writeSkill,
+  type SkillFile,
+} from "./skill";
 
 export type SetupOptions = {
   targets?: string;
@@ -25,6 +34,7 @@ export type SetupOptions = {
 export type SetupContext = {
   env: NodeJS.ProcessEnv;
   files: SkillFile[];
+  aliasFiles: SkillFile[];
   version: string;
   interactive: boolean;
   prompter: Prompter;
@@ -75,6 +85,7 @@ export async function runSetup(options: SetupOptions, context: SetupContext): Pr
     await writeSkill(directory, context.files, languages, context.version);
     installed.add(directory);
     context.log(`Installed ${targetLabels[target]} skill: ${directory}`);
+    await installAlias(target, skillRoots[target], context);
   }
   for (const target of existing?.targets ?? []) {
     const root = existing?.skillRoots[target];
@@ -82,6 +93,8 @@ export async function runSetup(options: SetupOptions, context: SetupContext): Pr
     const directory = skillDirectory(root);
     if (installed.has(directory)) continue;
     if (await removeSkill(directory) === "removed") context.log(`Removed ${targetLabels[target]} skill: ${directory}`);
+    const alias = aliasDirectory(root);
+    if (await removeSkill(alias) === "removed") context.log(`Removed ${targetLabels[target]} rr alias: ${alias}`);
   }
 
   const config: InstallConfig = {
@@ -94,6 +107,16 @@ export async function runSetup(options: SetupOptions, context: SetupContext): Pr
   context.log(`GitHub comment language: ${languages.comments}`);
   context.log(`Private reviewer note language: ${languages.reviewerNotes}`);
   return config;
+}
+
+async function installAlias(target: Target, root: string, context: SetupContext): Promise<void> {
+  const alias = aliasDirectory(root);
+  if ((await readSkillMarker(alias))?.managed === false) {
+    context.log(`Kept your own skill at ${alias}; the rr alias was not installed.`);
+    return;
+  }
+  await writeAlias(alias, context.aliasFiles, context.version);
+  context.log(`Installed ${targetLabels[target]} rr alias: ${alias}`);
 }
 
 async function promptLanguage(prompter: Prompter, label: string, fallback: string): Promise<string> {
