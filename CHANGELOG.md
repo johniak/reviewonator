@@ -2,6 +2,18 @@
 
 Each release's notes on GitHub come from its section below. Releases before 0.11.0 are listed on the [releases page](https://github.com/johniak/reviewonator/releases).
 
+## 0.12.0 - 2026-11-03
+
+### Added
+
+- In every message to the AI agent, **Enter** sends it and **Shift+Enter** starts a new line.
+- A reply in your own discussion has its own **Send to AI** button, so it no longer waits for the button in the review panel.
+- Comments, private explanations, discussion messages, the review summary, and **About this PR** render Markdown the way GitHub does, including code blocks. A GitHub `suggestion` block is labelled **Suggested change**.
+
+### Fixed
+
+- The Homebrew instructions trust the tap before installing, which recent Homebrew versions require.
+
 ## 0.11.0 - 2026-11-03
 
 ### Added
