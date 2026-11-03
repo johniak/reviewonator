@@ -39,6 +39,8 @@ const viewedFileRequestSchema = z.object({ path: z.string().min(1), viewed: z.bo
 
 export class StalePullRequestError extends Error {}
 export class ClosedSessionError extends Error {}
+/** A user comment change the session refuses; the message is meant for the user. */
+export class CommentChangeError extends Error {}
 
 export class ReviewSession {
   private state: "open" | "publishing" | "closed" = "open";
@@ -218,7 +220,7 @@ export class ReviewSession {
     this.assertOpen();
     const { path, line, side, body } = userCommentInputSchema.parse(input);
     if (!isLineInDiff(this.patch, { path, line, side })) {
-      throw new Error(`Comments can only be placed on lines inside the pull request diff: ${path}:${line}`);
+      throw new CommentChangeError(`Comments can only be placed on lines inside the pull request diff: ${path}:${line}`);
     }
     const ids = new Set(this.review.comments.map(({ id }) => id));
     let number = 1;
@@ -233,10 +235,10 @@ export class ReviewSession {
     const { body, severity } = commentEditSchema.parse(input);
     const current = this.findComment(id);
     if (current.discussion?.at(-1)?.author === "user") {
-      throw new Error("The AI agent is checking this comment. Edit it after the agent responds.");
+      throw new CommentChangeError("The AI agent is checking this comment. Edit it after the agent responds.");
     }
     const byUser = current.author === "user";
-    if (!byUser && severity !== undefined) throw new Error("Only comments you wrote can change severity.");
+    if (!byUser && severity !== undefined) throw new CommentChangeError("Only comments you wrote can change severity.");
     const { severity: currentSeverity, ...rest } = current;
     const nextSeverity = severity === undefined ? currentSeverity : severity ?? undefined;
     const updated: ReviewComment = {
@@ -251,7 +253,7 @@ export class ReviewSession {
 
   deleteUserComment(id: string): void {
     this.assertOpen();
-    if (this.findComment(id).author !== "user") throw new Error("Only comments you wrote can be deleted.");
+    if (this.findComment(id).author !== "user") throw new CommentChangeError("Only comments you wrote can be deleted.");
     this.deletedUserCommentIds.add(id);
     this.replaceComments(this.review.comments.filter((comment) => comment.id !== id));
   }
@@ -488,7 +490,7 @@ export class ReviewSession {
 
   private findComment(id: string): ReviewComment {
     const comment = this.review.comments.find((candidate) => candidate.id === id);
-    if (!comment) throw new Error(`Unknown review comment id: ${id}`);
+    if (!comment) throw new CommentChangeError(`Unknown review comment id: ${id}`);
     return comment;
   }
 

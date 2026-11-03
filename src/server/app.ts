@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { z, ZodError } from "zod";
 import type { UpdateNoticeSource } from "../domain/update";
-import { ClosedSessionError, ReviewSession, StalePullRequestError } from "./session";
+import { ClosedSessionError, CommentChangeError, ReviewSession, StalePullRequestError } from "./session";
 
 type AppDependencies = {
   html: string;
@@ -67,6 +67,21 @@ export function createApp({ html, favicon, token, session, updates }: AppDepende
     return context.json({ status: "revision_requested", session: session.snapshot() });
   });
 
+  app.post("/api/comments", async (context) => {
+    session.addUserComment(await context.req.json());
+    return context.json({ session: session.snapshot() });
+  });
+
+  app.patch("/api/comments/:id", async (context) => {
+    session.editComment(context.req.param("id"), await context.req.json());
+    return context.json({ session: session.snapshot() });
+  });
+
+  app.delete("/api/comments/:id", (context) => {
+    session.deleteUserComment(context.req.param("id"));
+    return context.json({ session: session.snapshot() });
+  });
+
   app.get("/api/agent/wait", async (context) => context.json(await session.waitForAgentRequest()));
 
   app.post("/api/agent/respond", async (context) => {
@@ -90,6 +105,9 @@ export function createApp({ html, favicon, token, session, updates }: AppDepende
     }
     if (error instanceof StalePullRequestError) {
       return context.json({ error: error.message }, 409);
+    }
+    if (error instanceof CommentChangeError) {
+      return context.json({ error: error.message }, 400);
     }
     if (error instanceof ClosedSessionError) {
       return context.json({ error: error.message }, 410);

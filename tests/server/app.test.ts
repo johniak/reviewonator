@@ -183,4 +183,47 @@ describe("Reviewonator HTTP API", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ oldContent: "old file", newContent: "new file" });
   });
+
+  describe("user comments", () => {
+    const send = (method: string, body?: unknown) => ({
+      method,
+      headers: { authorization: "Bearer secret", "content-type": "application/json" },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+    const onDeletedLine = { path: "src/example.ts", line: 2, side: "LEFT", body: "Keep the old constant for now." };
+
+    it("creates, edits, and deletes a user comment through the session", async () => {
+      const { app, session } = testApp(true);
+
+      const created = await app.request("/api/comments", send("POST", onDeletedLine));
+      expect(created.status).toBe(200);
+      expect((await created.json()).session.review.comments.at(-1)).toMatchObject({ id: "H1", author: "user" });
+
+      const edited = await app.request("/api/comments/H1", send("PATCH", { body: "Keep it.", severity: "nit" }));
+      expect((await edited.json()).session.review.comments.at(-1)).toMatchObject({ body: "Keep it.", severity: "nit" });
+
+      const deleted = await app.request("/api/comments/H1", send("DELETE"));
+      expect(deleted.status).toBe(200);
+      expect(session.review.comments.map(({ id }) => id)).not.toContain("H1");
+    });
+
+    it("requires the session token for comment changes", async () => {
+      const { app } = testApp(true);
+
+      expect((await app.request("/api/comments", { method: "POST", body: JSON.stringify(onDeletedLine) })).status).toBe(401);
+      expect((await app.request("/api/comments/S1", { method: "PATCH", body: "{}" })).status).toBe(401);
+      expect((await app.request("/api/comments/S1", { method: "DELETE" })).status).toBe(401);
+    });
+
+    it("explains why a comment outside the diff cannot be added", async () => {
+      const { app } = testApp(true);
+
+      const response = await app.request("/api/comments", send("POST", { ...onDeletedLine, line: 9, side: "RIGHT" }));
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: "Comments can only be placed on lines inside the pull request diff: src/example.ts:9",
+      });
+    });
+  });
 });

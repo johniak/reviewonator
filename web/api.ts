@@ -1,4 +1,4 @@
-import type { PublishRequest, RevisionRequest } from "../src/domain/review";
+import type { CommentEdit, PublishRequest, RevisionRequest, UserCommentInput } from "../src/domain/review";
 import type { FileContext } from "../src/github/client";
 import type { UpdateNotice } from "../src/domain/update";
 import type { SessionSnapshot } from "./types";
@@ -40,6 +40,18 @@ export const api = {
     method: "POST",
     body: JSON.stringify(input),
   }),
+  addComment: (input: UserCommentInput) => request<{ session: SessionSnapshot }>("/api/comments", {
+    method: "POST",
+    body: JSON.stringify(input),
+  }),
+  editComment: (id: string, edit: CommentEdit) => request<{ session: SessionSnapshot }>(
+    `/api/comments/${encodeURIComponent(id)}`,
+    { method: "PATCH", body: JSON.stringify(edit) },
+  ),
+  deleteComment: (id: string) => request<{ session: SessionSnapshot }>(
+    `/api/comments/${encodeURIComponent(id)}`,
+    { method: "DELETE" },
+  ),
   setFileViewed: (path: string, viewed: boolean) => request<{ viewedFiles: string[] }>("/api/viewed-files", {
     method: "POST",
     body: JSON.stringify({ path, viewed }),
