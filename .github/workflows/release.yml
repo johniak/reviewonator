@@ -32,20 +32,25 @@ jobs:
   package:
     name: Package ${{ matrix.platform }}
     needs: quality
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         include:
+          # macOS executables are built on macOS so that codesign can sign them after Bun appends the app.
           - platform: darwin-arm64
             target: bun-darwin-arm64
+            runner: macos-latest
           - platform: darwin-x64
             target: bun-darwin-x64
+            runner: macos-latest
           - platform: linux-arm64
             target: bun-linux-arm64
+            runner: ubuntu-latest
           - platform: linux-x64
             target: bun-linux-x64-baseline
+            runner: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -59,6 +64,15 @@ jobs:
         run: bun run build:web
       - name: Cross-compile executable
         run: bun build --compile --minify --target=${{ matrix.target }} src/cli.ts --outfile dist/reviewonator-${{ matrix.platform }}
+      - name: Sign macOS executable
+        if: startsWith(matrix.platform, 'darwin-')
+        run: |
+          # Bun's linker signature no longer matches once the app is appended; macOS may kill such an executable.
+          codesign --force --sign - "dist/reviewonator-${{ matrix.platform }}"
+          codesign --verify --strict --verbose=2 "dist/reviewonator-${{ matrix.platform }}"
+      - name: Run executable on its own platform
+        if: matrix.platform == 'darwin-arm64' || matrix.platform == 'linux-x64'
+        run: dist/reviewonator-${{ matrix.platform }} --version
       - name: Package release archive
         run: ./scripts/package-release.sh "${{ matrix.platform }}" "dist/reviewonator-${{ matrix.platform }}" release
       - name: Upload release archive
