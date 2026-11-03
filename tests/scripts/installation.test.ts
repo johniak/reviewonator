@@ -413,6 +413,24 @@ describe("release packaging", () => {
     expect(await readFile(`${archive}.sha256`, "utf8")).toContain("reviewonator-linux-x64.tar.gz");
   });
 
+  // macOS release archives are packaged on a macOS runner, whose tar would otherwise store file metadata.
+  it.skipIf(process.platform !== "darwin")("keeps macOS file metadata out of the archive", async () => {
+    const root = await mkdtemp(join(tmpdir(), "reviewonator-release-test-"));
+    const binary = join(root, "reviewonator");
+    const output = join(root, "release");
+    const extracted = join(root, "extracted");
+    await writeFile(binary, "#!/bin/sh\nprintf reviewonator\n");
+    await chmod(binary, 0o755);
+    await run("xattr", ["-w", "com.example.runner", "metadata", binary]);
+
+    await run("scripts/package-release.sh", ["darwin-arm64", binary, output]);
+
+    await mkdir(extracted);
+    await run("tar", ["-xzf", join(output, "reviewonator-darwin-arm64.tar.gz"), "-C", extracted]);
+    const { stdout } = await run("xattr", [join(extracted, "reviewonator")]);
+    expect(stdout).not.toContain("com.example.runner");
+  });
+
   it("rejects an unsupported release platform", async () => {
     const root = await mkdtemp(join(tmpdir(), "reviewonator-release-test-"));
     const binary = join(root, "reviewonator");

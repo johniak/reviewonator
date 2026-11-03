@@ -75,7 +75,8 @@ copy_dependency_license "remark-gfm" "license" "remark-gfm-MIT.txt"
 copy_dependency_license "tailwind-merge" "LICENSE.md" "tailwind-merge-MIT.txt"
 copy_dependency_license "zod" "LICENSE" "zod-MIT.txt"
 
-tar -czf "$OUTPUT_DIR/$ARCHIVE_NAME" -C "$PAYLOAD_DIR" .
+# macOS tar would otherwise store the packaging machine's file metadata in the archive.
+COPYFILE_DISABLE=1 tar -czf "$OUTPUT_DIR/$ARCHIVE_NAME" -C "$PAYLOAD_DIR" .
 
 if command -v shasum >/dev/null 2>&1; then
   (cd "$OUTPUT_DIR" && shasum -a 256 "$ARCHIVE_NAME" > "$ARCHIVE_NAME.sha256")
