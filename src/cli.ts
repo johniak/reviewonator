@@ -11,6 +11,7 @@ import { embeddedSkillFiles } from "./install/embedded-skill";
 import { createStdinPrompter } from "./install/prompt";
 import { runSetup } from "./install/setup";
 import { detectInstallMethod } from "./install/install-method";
+import { removeOtherExecutables } from "./install/other-executables";
 import { runUninstall } from "./install/uninstall";
 import { GhReleaseSource } from "./update/releases";
 import { runUpdate } from "./update/self-update";
@@ -75,6 +76,8 @@ async function main(): Promise<void> {
   if (positionals[0] === "setup") {
     if (positionals.length !== 1) throw new Error(help);
     const prompter = createStdinPrompter();
+    const interactive = Boolean(process.stdin.isTTY) || process.env.REVIEWONATOR_INTERACTIVE === "1";
+    const log = (line: string) => process.stdout.write(`${line}\n`);
     try {
       await runSetup({
         targets: values.targets,
@@ -87,10 +90,21 @@ async function main(): Promise<void> {
         env: process.env,
         files: embeddedSkillFiles,
         version: packageJson.version,
-        interactive: Boolean(process.stdin.isTTY) || process.env.REVIEWONATOR_INTERACTIVE === "1",
+        interactive,
         prompter,
-        log: (line) => process.stdout.write(`${line}\n`),
+        log,
       });
+      const installMethod = await detectInstallMethod(process.execPath);
+      if (installMethod.kind === "homebrew") {
+        await removeOtherExecutables({
+          executablePath: installMethod.executablePath,
+          env: process.env,
+          runner: new BunCommandRunner(),
+          interactive,
+          prompter,
+          log,
+        });
+      }
     } finally {
       prompter.close?.();
     }

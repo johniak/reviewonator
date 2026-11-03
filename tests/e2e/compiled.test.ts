@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { execFile, spawn } from "node:child_process";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { access, chmod, link, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -67,5 +67,38 @@ describe("compiled executable installed by the install script", () => {
       latest: "99.0.0",
       releaseUrl: "https://github.com/johniak/reviewonator/releases/tag/v99.0.0",
     });
+  }, 30_000);
+});
+
+describe("compiled executable installed with Homebrew", () => {
+  it("setup removes the executable the install script left on PATH", async () => {
+    const cellar = join(root, "homebrew", "Cellar", "reviewonator", "0.0.0", "bin");
+    const scriptBin = join(root, "script-bin");
+    await mkdir(cellar, { recursive: true });
+    await mkdir(scriptBin);
+    await link(executable, join(cellar, "reviewonator"));
+    await writeFile(join(scriptBin, "reviewonator"), "#!/bin/sh\nprintf 'Reviewonator 0.8.0\\n'\n");
+    await chmod(join(scriptBin, "reviewonator"), 0o755);
+    await writeFile(join(scriptBin, "reviewonator.reviewonator-managed"), "Installed by Reviewonator\n");
+
+    const { stdout } = await run(join(cellar, "reviewonator"), [
+      "setup", "--targets", "claude", "--comment-language", "English", "--reviewer-language", "English",
+    ], {
+      env: {
+        PATH: [scriptBin, "/usr/bin", "/bin"].join(delimiter),
+        HOME: root,
+        REVIEWONATOR_BIN_DIR: join(root, "no-default-bin"),
+        REVIEWONATOR_CONFIG_DIR: join(root, "homebrew-config"),
+        REVIEWONATOR_CLAUDE_SKILL_DIR: join(root, "homebrew-claude"),
+        REVIEWONATOR_CODEX_SKILL_DIR: join(root, "homebrew-codex"),
+        REVIEWONATOR_STATE_DIR: join(root, "homebrew-state"),
+      },
+    });
+
+    expect(stdout).toContain(
+      `Removed the Reviewonator executable installed by the install script: ${join(scriptBin, "reviewonator")}`,
+    );
+    await expect(access(join(scriptBin, "reviewonator"))).rejects.toThrow();
+    await expect(access(join(scriptBin, "reviewonator.reviewonator-managed"))).rejects.toThrow();
   }, 30_000);
 });
