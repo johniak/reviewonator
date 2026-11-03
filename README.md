@@ -59,11 +59,12 @@ Your GitHub credentials remain in the CLI process. They are never embedded in th
 ### Homebrew
 
 ```sh
+brew trust johniak/tap
 brew install johniak/tap/reviewonator
 "$(brew --prefix)/bin/reviewonator" setup
 ```
 
-Homebrew installs the executable and the GitHub CLI. Setup then installs the agent skill. The full path runs the Homebrew executable even when an older `reviewonator` comes first on your `PATH`. Setup removes the executable that the install script installed and asks before removing any other `reviewonator`.
+Recent Homebrew versions load formulas only from taps you trust, so the first line trusts the Reviewonator tap. Homebrew installs the executable and the GitHub CLI. Setup then installs the agent skill. The full path runs the Homebrew executable even when an older `reviewonator` comes first on your `PATH`. Setup removes the executable that the install script installed and asks before removing any other `reviewonator`.
 
 ### Install script
 

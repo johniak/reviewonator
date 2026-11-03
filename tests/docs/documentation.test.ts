@@ -48,6 +48,12 @@ describe("project documentation", () => {
     expect(readme).toContain("Mark files **Viewed**, in sync with GitHub");
   });
 
+  it("trusts the tap before installing with Homebrew", () => {
+    const readme = readFileSync("README.md", "utf8");
+
+    expect(readme).toContain("brew trust johniak/tap\nbrew install johniak/tap/reviewonator");
+  });
+
   it("asks for a changelog section in every release", () => {
     const readme = readFileSync("README.md", "utf8");
     const workflow = readFileSync(".github/workflows/release.yml", "utf8");
