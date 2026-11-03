@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -40,6 +41,15 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   window.location.hash = "";
+});
+
+describe("navigation panel layout", () => {
+  it("sizes every navigation list to the panel instead of its longest entry", () => {
+    const styles = readFileSync("web/styles.css", "utf8");
+    const rule = styles.match(/\n\.file-list, \.my-comment-list, \.finding-list, \.commit-list \{([^}]*)\}/)?.[1];
+
+    expect(rule).toContain("grid-template-columns: minmax(0, 1fr)");
+  });
 });
 
 describe("GitHub review body", () => {

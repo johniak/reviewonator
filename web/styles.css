@@ -415,7 +415,7 @@ textarea:focus { border-color: var(--pc-accent); }
 }
 .my-comments-heading, .findings-heading, .commits-heading { margin-top: 8px; }
 
-.file-list, .my-comment-list, .finding-list, .commit-list { display: grid; gap: 2px; padding: 0 8px; }
+.file-list, .my-comment-list, .finding-list, .commit-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 0 8px; }
 .file-list button,
 .my-comment-list button,
 .finding-list button,
