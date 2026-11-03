@@ -20,6 +20,7 @@ See the [feature guide](docs/features.md) for a visual walkthrough of the review
 
 ## Why Reviewonator?
 
+- Start from **About this PR**: a short private note on what the change really does, written from the ticket and the code rather than the author's description.
 - Review findings appear next to the exact changed lines, with clearly visible severity levels.
 - Read existing conversation comments, submitted reviews, and inline review comments without leaving the diff workspace.
 - Browse one file at a time or scroll through all changed files.
@@ -28,6 +29,8 @@ See the [feature guide](docs/features.md) for a visual walkthrough of the review
 - Review against your project's own rules: add a `review` skill to the repository and every review follows it.
 - Keep private reviewer explanations separate from comments sent to the pull request.
 - Discuss any proposed finding with the AI agent live and send a reply directly from its card.
+- Write your own comments on any diff line next to the agent's findings.
+- Mark files **Viewed**, in sync with GitHub, so the ones you understood collapse out of the way.
 - Edit, include, or exclude each inline and general comment. Nothing is included by default.
 - Preview the complete GitHub review before choosing **Comment**, **Approve**, or **Request changes**.
 - Cancel safely: Reviewonator never publishes automatically.
@@ -137,12 +140,13 @@ The shorter `rr` alias runs the same skill: `/rr https://github.com/owner/reposi
 
 The agent completes the review first, then launches one live Reviewonator workspace. In the application:
 
-1. Read the private reviewer explanation for each finding.
-2. Edit the public comment with the pencil on its card if needed.
-3. Select only the findings you want to publish.
-4. Add an optional general comment.
-5. Open the publish preview and choose the GitHub review event.
-6. Confirm the exact payload.
+1. Read **About this PR** above the diff to see what the change is for.
+2. Read the private reviewer explanation for each finding.
+3. Edit the public comment with the pencil on its card if needed.
+4. Select only the findings you want to publish.
+5. Add an optional general comment.
+6. Open the publish preview and choose the GitHub review event.
+7. Confirm the exact payload.
 
 Click **+** beside a diff line, write your comment, and choose **Add comment** to put it straight into the review, or **Send to AI** to have the agent check it first. Your own comments are marked **You**, start pending like every finding, and the agent never changes them or your edits unless you discuss that comment with it.
 
@@ -231,10 +235,11 @@ Tests exercise domain validation, GitHub integration boundaries, the HTTP server
 ## Release process
 
 1. Update the version in `package.json`.
-2. Ensure `bun run check` passes.
-3. Create and push a tag such as `v0.1.0`.
+2. Add a `## <version> - <date>` section to [CHANGELOG.md](CHANGELOG.md).
+3. Ensure `bun run check` passes.
+4. Create and push a tag such as `v0.1.0`.
 
-The release workflow builds binaries for macOS and Linux on x64 and ARM64, packages the skill and license notices, creates SHA-256 checksums, and publishes a GitHub Release with `install.sh`. It then updates the formula in [johniak/homebrew-tap](https://github.com/johniak/homebrew-tap), which requires the `HOMEBREW_TAP_TOKEN` repository secret: a fine-grained token with contents write access to the tap.
+The GitHub release notes come from that CHANGELOG.md section, and the release fails when it is missing. The release workflow builds binaries for macOS and Linux on x64 and ARM64, packages the skill and license notices, creates SHA-256 checksums, and publishes a GitHub Release with `install.sh`. It then updates the formula in [johniak/homebrew-tap](https://github.com/johniak/homebrew-tap), which requires the `HOMEBREW_TAP_TOKEN` repository secret: a fine-grained token with contents write access to the tap.
 
 ## Project status
 

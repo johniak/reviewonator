@@ -41,6 +41,22 @@ describe("project documentation", () => {
     expect(readme).toContain("stays open for follow-up rounds");
   });
 
+  it("introduces the private briefing and viewed files in the README", () => {
+    const readme = readFileSync("README.md", "utf8");
+
+    expect(readme).toContain("Start from **About this PR**: a short private note on what the change really does");
+    expect(readme).toContain("Mark files **Viewed**, in sync with GitHub");
+  });
+
+  it("asks for a changelog section in every release", () => {
+    const readme = readFileSync("README.md", "utf8");
+    const workflow = readFileSync(".github/workflows/release.yml", "utf8");
+
+    expect(readme).toContain("The GitHub release notes come from that CHANGELOG.md section, and the release fails when it is missing.");
+    expect(workflow).toContain('bun scripts/release-notes.ts "$GITHUB_REF_NAME" > release-notes.md');
+    expect(workflow).toContain("--notes-file release-notes.md");
+  });
+
   it("documents hand-written and edited comments", () => {
     const readme = readFileSync("README.md", "utf8");
     const guide = readFileSync("docs/features.md", "utf8");
