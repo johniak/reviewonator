@@ -7,6 +7,14 @@
   },
   "summary": "The implementation is close, but the new retry path can execute the same payment twice after a network timeout.",
   "recommendation": "REQUEST_CHANGES",
+  "briefing": {
+    "ticket": {
+      "key": "ACME-142",
+      "title": "Retry card payments after provider timeouts",
+      "url": "https://github.com/acme/widgets/issues/142"
+    },
+    "text": "Ticket prosi, żeby płatność po timeoucie u dostawcy była ponawiana, zamiast od razu kończyć się błędem. PR dodaje ponawianie w retry.ts i nową opcję w konfiguracji z liczbą prób. Rozjazd: ticket wymaga limitu prób, a pętla w retry.ts może ponawiać bez końca."
+  },
   "userThreads": [
     {
       "id": "U1",

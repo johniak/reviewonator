@@ -12,6 +12,14 @@ Write UTF-8 JSON matching this shape:
   },
   "summary": "The retry change can duplicate successful payments after a timeout.",
   "recommendation": "REQUEST_CHANGES",
+  "briefing": {
+    "ticket": {
+      "key": "ACME-142",
+      "title": "Retry card payments after provider timeouts",
+      "url": "https://github.com/acme/widgets/issues/142"
+    },
+    "text": "The ticket asks to retry a card payment when the provider times out. The PR adds the retry and a setting for the number of attempts. Mismatch: the ticket asks for a hard limit, but the retry loop can run forever."
+  },
   "userThreads": [
     {
       "id": "U1",
@@ -74,6 +82,7 @@ Write UTF-8 JSON matching this shape:
 - `prUrl` must exactly identify the reviewed GitHub PR.
 - `languages.comments` and `languages.reviewerNotes` must match the installed language configuration.
 - `summary` becomes the editable review body shown on the final confirmation screen. It is always optional and may be an empty string for every recommendation.
+- `briefing` is a private note for the reviewer and is never published to GitHub. `briefing.text` is required when `briefing` is present and has at most 100 words. Omit `briefing.ticket` when no ticket could be read.
 - `recommendation` must be `COMMENT`, `APPROVE`, or `REQUEST_CHANGES`.
 - `userThreads` contains private conversations started by the user on diff lines. It is never published to GitHub.
 - User thread IDs and message IDs must be unique and stable across review rounds. Preserve every earlier message verbatim and append new messages in order.

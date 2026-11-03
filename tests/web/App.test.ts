@@ -146,6 +146,31 @@ describe("GitHub review body", () => {
     await waitFor(() => expect(dismissed).toEqual(["0.8.0"]));
   });
 
+  it("opens the review panel with the private briefing above the review summary", async () => {
+    const briefed = {
+      ...review,
+      briefing: { ticket: { key: "ACME-142" }, text: "Ticket prosi o ponawianie płatności. PR je dodaje." },
+    };
+    serveSession(new ReviewSession(pullRequest, patch, briefed, new AppGateway(), discussion));
+
+    render(createElement(App));
+
+    const briefing = await screen.findByRole("region", { name: "What this PR is about" });
+    expect(briefing).toHaveTextContent("Ticket prosi o ponawianie płatności. PR je dodaje.");
+    expect(briefing).toHaveTextContent("Private · Polish");
+    expect(briefing.compareDocumentPosition(screen.getByRole("heading", { name: "Review summary" })))
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it("leaves the briefing out for reviews written before it existed", async () => {
+    serveSession(new ReviewSession(pullRequest, patch, review, new AppGateway(), discussion));
+
+    render(createElement(App));
+
+    await screen.findByRole("heading", { name: "Review summary" });
+    expect(screen.queryByRole("region", { name: "What this PR is about" })).not.toBeInTheDocument();
+  });
+
   it("collapses files viewed on GitHub and keeps the Viewed checkbox in sync", async () => {
     const gateway = new AppGateway();
     const session = new ReviewSession(pullRequest, patch, review, gateway, discussion, false, ["src/example.ts"]);

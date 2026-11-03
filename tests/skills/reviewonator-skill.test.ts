@@ -188,6 +188,22 @@ describe("Reviewonator skill", () => {
     expect(skill).toContain("New findings start pending");
   });
 
+  it("briefs the reviewer from the ticket and the code, never from the author's description", async () => {
+    const skill = await readFile("skills/reviewonator/SKILL.md", "utf8");
+    const schema = await readFile("skills/reviewonator/references/review-schema.md", "utf8");
+
+    expect(skill).toContain("gh pr view <PR_URL> --json closingIssuesReferences");
+    expect(skill).toContain("ticket keys such as `ABC-123`");
+    expect(skill).toContain("If you cannot read the ticket itself, treat the PR as having no ticket");
+    expect(skill).toContain("`briefing.text` is a private note for the human reviewer");
+    expect(skill).toContain("at most 100 words");
+    expect(skill).toContain("never on the PR title, description, or the author's summary");
+    expect(skill).toContain("With no ticket, only explain what the PR actually changes and do not mention mismatches");
+    expect(skill).toContain("`briefing.text`, and agent-authored private message");
+    expect(schema).toContain('"briefing": {');
+    expect(schema).toContain("`briefing` is a private note for the reviewer and is never published to GitHub");
+  });
+
   it("never requires or invents a review summary", async () => {
     const skill = await readFile("skills/reviewonator/SKILL.md", "utf8");
 

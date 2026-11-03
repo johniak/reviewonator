@@ -12,6 +12,30 @@ describe("review document", () => {
     expect(reviewDocumentSchema.parse(review)).toEqual(review);
   });
 
+  it("accepts a private briefing with or without the ticket it was based on", () => {
+    const withTicket = {
+      ...review,
+      briefing: {
+        ticket: { key: "ACME-142", title: "Retry payments after timeouts", url: "https://acme.atlassian.net/browse/ACME-142" },
+        text: "The ticket asks for retries. The PR adds them, but without a limit.",
+      },
+    };
+    expect(reviewDocumentSchema.parse(withTicket).briefing).toEqual(withTicket.briefing);
+    expect(reviewDocumentSchema.parse({ ...review, briefing: { text: "The PR adds payment retries." } }).briefing)
+      .toEqual({ text: "The PR adds payment retries." });
+    expect(reviewDocumentSchema.parse(review).briefing).toBeUndefined();
+  });
+
+  it("keeps the briefing to at most 100 words", () => {
+    const words = (count: number) => Array.from({ length: count }, (_, index) => `word${index}`).join(" ");
+
+    expect(reviewDocumentSchema.parse({ ...review, briefing: { text: words(100) } }).briefing?.text).toBe(words(100));
+    expect(() => reviewDocumentSchema.parse({ ...review, briefing: { text: words(101) } }))
+      .toThrow(/at most 100 words/);
+    expect(() => reviewDocumentSchema.parse({ ...review, briefing: { text: " " } })).toThrow();
+    expect(() => reviewDocumentSchema.parse({ ...review, briefing: { ticket: { key: "" }, text: "Short." } })).toThrow();
+  });
+
   it("accepts a carried inclusion decision without changing older comments", () => {
     const parsed = reviewDocumentSchema.parse({
       ...review,

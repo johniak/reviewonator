@@ -24,6 +24,7 @@ import { DiffPanel, fileSectionId } from "./components/DiffPanel";
 import { PublishDialog } from "./components/PublishDialog";
 import { PullRequestDiscussion } from "./components/PullRequestDiscussion";
 import { MyCommentNavigation } from "./components/MyCommentNavigation";
+import { PrBriefing } from "./components/PrBriefing";
 import { commentCardId, ReviewCommentCard } from "./components/ReviewCommentCard";
 import { ReviewFindingNavigation } from "./components/ReviewFindingNavigation";
 import { UpdateNoticeToast } from "./components/UpdateNotice";
@@ -663,6 +664,10 @@ export function App() {
           <div className="review-panel-content">
             {panelTab === "review" ? (
               <>
+                {review.briefing && (
+                  <PrBriefing briefing={review.briefing} reviewerLanguage={review.languages.reviewerNotes} />
+                )}
+
                 <section className="review-summary">
                   <h2>Review summary</h2>
                   <p>{review.summary}</p>

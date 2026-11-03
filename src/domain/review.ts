@@ -17,6 +17,21 @@ const defaultLanguages = { comments: "English", reviewerNotes: "English" } as co
 
 const commentBodySchema = z.string().trim().min(1).max(65_535);
 
+const maximumBriefingWords = 100;
+
+/** A private, plain-language note for the reviewer built from the ticket and the diff; never published. */
+export const briefingSchema = z.object({
+  ticket: z.object({
+    key: z.string().trim().min(1).max(120),
+    title: z.string().trim().min(1).max(300).optional(),
+    url: z.url().optional(),
+  }).optional(),
+  text: z.string().trim().min(1).max(2_000).refine(
+    (value) => value.split(/\s+/).length <= maximumBriefingWords,
+    { message: `The briefing must have at most ${maximumBriefingWords} words.` },
+  ),
+});
+
 export const reviewCommentSchema = z.object({
   id: z.string().trim().min(1).max(80),
   type: z.enum(["line", "general"]),
@@ -123,6 +138,7 @@ export const reviewDocumentSchema = z.object({
     reviewerNotes: languageSchema,
   }).default(defaultLanguages),
   summary: z.string().trim().max(65_535),
+  briefing: briefingSchema.optional(),
   recommendation: z.enum(reviewEvents),
   comments: z.array(reviewCommentSchema).max(500),
   userThreads: z.array(userCommentThreadSchema).max(500).default([]),
@@ -239,6 +255,7 @@ export type DiffLocation = { path: string; line: number; side: "LEFT" | "RIGHT" 
 export type UserThreadMessage = z.infer<typeof userThreadMessageSchema>;
 export type UserCommentThread = z.infer<typeof userCommentThreadSchema>;
 export type ReviewDocument = z.infer<typeof reviewDocumentSchema>;
+export type Briefing = z.infer<typeof briefingSchema>;
 export type RevisionRequest = z.infer<typeof revisionRequestSchema>;
 export type PublishRequest = z.infer<typeof publishRequestSchema>;
 export type ReviewEvent = (typeof reviewEvents)[number];

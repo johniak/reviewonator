@@ -2,6 +2,10 @@
 
 Reviewonator is a local, human-in-the-loop workspace for pull request reviews created by an AI agent. The agent investigates the change and proposes findings; you decide what, if anything, reaches GitHub.
 
+## Know what the pull request is for
+
+The review panel opens with **What this PR is about**: a private note of at most 100 words, written in plain language in your reviewer-note language. The agent builds it from the ticket and the code that actually changed, not from the author's description. It finds the ticket through issues linked to the pull request, ticket keys such as `ABC-123` in the title, branch, description, or commits, and any issue tracker it can read (GitHub Issues, or Jira and Linear through a connected tool). With a ticket, the note says what the ticket asks for, what the pull request really does, and where the two differ. Without one, it only explains what the pull request changes. The note is never published to GitHub.
+
 ## Review the change in context
 
 The workspace keeps the pull request, changed files, findings, and commits in one place. Each inline finding opens the relevant file and line. Severity borders and labels make bugs, warnings, suggestions, security issues, and nits easy to distinguish.

@@ -250,6 +250,8 @@ describe("Reviewonator CLI end-to-end", () => {
     expect(payload.comments).toHaveLength(1);
     expect(payload.comments[0]).toMatchObject({ path: "src/payments/retry.ts", line: 8, side: "RIGHT" });
     expect(JSON.stringify(payload)).not.toContain("Wszystkie próby muszą używać");
+    expect(JSON.stringify(payload)).not.toContain("Ticket prosi");
+    expect(JSON.stringify(payload)).not.toContain("ACME-142");
     expect(JSON.parse(process.output()).status).toBe("published");
   }, 15_000);
 
