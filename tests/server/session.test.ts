@@ -520,4 +520,54 @@ describe("user comments and edits", () => {
 
     expect(github.published?.comments[0].body).toBe("Take the value from the caller.");
   });
+
+  describe("while the agent is working", () => {
+    const answerS1 = (seen: typeof review) => ({
+      ...seen,
+      comments: seen.comments.map((comment) => comment.id === "S1" ? {
+        ...comment,
+        discussion: [...(comment.discussion ?? []), { id: "S1-D2", author: "agent" as const, body: "Checked." }],
+      } : comment),
+    });
+
+    async function workingSession() {
+      const session = new ReviewSession(pullRequest, patch, review, new FakeGitHub(), [], true);
+      return session;
+    }
+
+    it("restores a user comment added while the agent was working", async () => {
+      const session = await workingSession();
+      session.requestRevision({ requests: [{ commentId: "S1", message: "Is this right?" }] });
+      const { review: seen } = await session.waitForAgentRequest() as { review: typeof review };
+      session.addUserComment(onDeletedLine);
+
+      session.respond(answerS1(seen));
+
+      expect(session.review.comments.find(({ id }) => id === "H1")).toMatchObject({ body: "Keep the old constant for now." });
+    });
+
+    it("does not bring back a user comment deleted while the agent was working", async () => {
+      const session = await workingSession();
+      session.addUserComment(onDeletedLine);
+      session.requestRevision({ selectedCommentIds: ["H1"], requests: [{ commentId: "S1", message: "Is this right?" }] });
+      const { review: seen } = await session.waitForAgentRequest() as { review: typeof review };
+      session.deleteUserComment("H1");
+
+      session.respond(answerS1(seen));
+
+      expect(session.review.comments.map(({ id }) => id)).not.toContain("H1");
+    });
+
+    it("keeps the user's edit when the agent answers a different comment", async () => {
+      const session = await workingSession();
+      session.requestRevision({ requests: [{ commentId: "S1", message: "Is this right?" }] });
+      const { review: seen } = await session.waitForAgentRequest() as { review: typeof review };
+      session.editComment("G1", { body: "My wording of the general comment." });
+
+      session.respond(answerS1(seen));
+
+      expect(session.review.comments.find(({ id }) => id === "G1"))
+        .toMatchObject({ body: "My wording of the general comment.", edited: true });
+    });
+  });
 });

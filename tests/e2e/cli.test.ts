@@ -180,6 +180,9 @@ describe("Reviewonator CLI end-to-end", () => {
     expect(await waitForExit(process.child)).toBe(0);
     expect(JSON.parse(process.output())).toEqual({
       status: "revision_requested",
+      review: expect.objectContaining({
+        comments: expect.arrayContaining([expect.objectContaining({ id: "S1" }), expect.objectContaining({ id: "G1" })]),
+      }),
       selectedCommentIds: ["G1"],
       rejectedCommentIds: ["S2"],
       requests: [{ commentId: "S1", message: "Verify provider idempotency." }],

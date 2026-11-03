@@ -213,7 +213,8 @@ async function main(): Promise<void> {
   if (liveState && result.status !== "revision_requested") await writeLiveState({ ...liveState, result });
   await Bun.sleep(100);
   server.stop(true);
-  process.stdout.write(`${JSON.stringify(result)}\n`);
+  const printed = result.status === "revision_requested" ? { ...result, review: session.review } : result;
+  process.stdout.write(`${JSON.stringify(printed)}\n`);
 }
 
 /** Refreshes managed skills after an upgrade; development runs never touch installed skills. */
