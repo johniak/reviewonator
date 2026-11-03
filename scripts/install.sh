@@ -60,20 +60,6 @@ if ! command -v gh >/dev/null 2>&1; then
   printf '%s\n' "GitHub CLI is required to use Reviewonator. Install it from https://cli.github.com/" >&2
 fi
 
-if command -v brew >/dev/null 2>&1 && existing=$(command -v reviewonator 2>/dev/null) \
-  && [ ! -f "$existing.reviewonator-managed" ]; then
-  brew_prefix=$(brew --prefix 2>/dev/null || true)
-  if [ -n "$brew_prefix" ]; then
-    case "$existing" in
-      "$brew_prefix"/*) fail "Reviewonator is installed with Homebrew. Run brew upgrade reviewonator instead." ;;
-    esac
-  fi
-fi
-
-if [ -e "$BIN_PATH" ] && [ ! -f "$BIN_MARKER" ]; then
-  fail "Refusing to replace unmanaged executable: $BIN_PATH"
-fi
-
 platform_name() {
   case "$(uname -s)" in
     Darwin) os=darwin ;;
@@ -108,6 +94,19 @@ binary_version() {
   "$1" --version 2>/dev/null | sed -n 's/^Reviewonator \([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)$/\1/p' | head -n 1
 }
 
+# Asks only a person at a terminal (or a test that sets REVIEWONATOR_INTERACTIVE=1).
+confirm() {
+  if [ -t 0 ] || [ "${REVIEWONATOR_INTERACTIVE:-}" = "1" ]; then
+    printf '%s' "$1" >&2
+    answer=""
+    read -r answer || true
+    case "$answer" in
+      [yY]|[yY][eE][sS]) return 0 ;;
+    esac
+  fi
+  return 1
+}
+
 version_is_newer() {
   awk -v left="$1" -v right="$2" 'BEGIN {
     split(left, a, "."); split(right, b, ".");
@@ -118,6 +117,20 @@ version_is_newer() {
     exit 1;
   }'
 }
+
+# A reviewonator without the marker was put here some other way. Replace it only when it
+# is Reviewonator and the person agrees, or passes --force.
+if [ -e "$BIN_PATH" ] && [ ! -f "$BIN_MARKER" ]; then
+  UNMANAGED_VERSION=$(binary_version "$BIN_PATH")
+  if [ -z "$UNMANAGED_VERSION" ]; then
+    fail "Refusing to replace unmanaged executable: $BIN_PATH"
+  fi
+  if [ "$FORCE" = false ] \
+    && ! confirm "Replace Reviewonator $UNMANAGED_VERSION at $BIN_PATH, which this script did not install? [y/N] "; then
+    fail "Kept the Reviewonator executable at $BIN_PATH. Remove it, or run this script again with --force to replace it."
+  fi
+  FORCE=true
+fi
 
 if [ "$LOCAL_BUILD" = true ]; then
   SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -159,6 +172,13 @@ NEW_VERSION=$(binary_version "$STAGED")
 if [ -z "$NEW_VERSION" ]; then
   fail "Could not read the version of the downloaded Reviewonator executable."
 fi
+# The installer run last wins: remove a Homebrew installation only once the new executable is ready.
+if command -v brew >/dev/null 2>&1 && brew list --formula --versions reviewonator >/dev/null 2>&1; then
+  printf '%s\n' "Removing the Homebrew installation of Reviewonator: brew uninstall --formula --force reviewonator"
+  brew uninstall --formula --force reviewonator \
+    || fail "Could not remove the Homebrew installation of Reviewonator. Run brew uninstall reviewonator, then run this script again."
+fi
+
 INSTALLED_VERSION=""
 if [ -x "$BIN_PATH" ]; then
   INSTALLED_VERSION=$(binary_version "$BIN_PATH")

@@ -1,7 +1,7 @@
 // @vitest-environment node
 
-import { execFile } from "node:child_process";
-import { access, chmod, constants, cp, mkdir, mkdtemp, readdir, readFile, symlink, writeFile } from "node:fs/promises";
+import { execFile, spawn } from "node:child_process";
+import { access, chmod, constants, cp, lstat, mkdir, mkdtemp, readdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { promisify } from "node:util";
@@ -67,13 +67,27 @@ async function releaseFixture(releaseVersion = "0.8.0") {
   const script = await readFile("scripts/install.sh", "utf8");
   const install = (args: string[], overrides: NodeJS.ProcessEnv = {}) =>
     run("sh", ["-c", script, "", "--bin-dir", binDir, ...args], { env: { ...env, ...overrides } });
+  /** Runs the installer with `input` on stdin, as a person answering its question would. */
+  const answer = (args: string[], input: string, overrides: NodeJS.ProcessEnv = {}) =>
+    new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
+      const child = spawn("sh", ["-c", script, "", "--bin-dir", binDir, ...args], { env: { ...env, ...overrides } });
+      let stdout = "";
+      let stderr = "";
+      child.stdout.on("data", (chunk) => { stdout += chunk; });
+      child.stderr.on("data", (chunk) => { stderr += chunk; });
+      // The installer may exit before it reads the answer.
+      child.stdin.on("error", () => {});
+      child.once("error", reject);
+      child.once("close", (code) => resolve({ code, stdout, stderr }));
+      child.stdin.end(input);
+    });
   const setupArguments = async () => (await readFile(setupLog, "utf8")).trimEnd().split("\n");
   const installed = async (version: string, managed = true) => {
     await mkdir(binDir, { recursive: true });
     await writeExecutable(join(binDir, "reviewonator"), stubExecutable(version));
     if (managed) await writeFile(join(binDir, "reviewonator.reviewonator-managed"), "Installed by Reviewonator\n");
   };
-  return { root, release, binDir, env, install, setupArguments, installed };
+  return { root, release, binDir, env, install, answer, setupArguments, installed };
 }
 
 async function minimalPath(root: string, extra: Record<string, string> = {}): Promise<string> {
@@ -85,6 +99,24 @@ async function minimalPath(root: string, extra: Record<string, string> = {}): Pr
   }
   for (const [name, content] of Object.entries(extra)) await writeExecutable(join(directory, name), content);
   return directory;
+}
+
+/** A brew that has Reviewonator installed until `brew uninstall` removes it. */
+async function homebrewFixture(root: string, options: { failUninstall?: boolean } = {}) {
+  const bin = join(root, "brew-command");
+  const log = join(root, "brew.log");
+  const installed = join(root, "brew-installed");
+  await mkdir(bin);
+  await writeFile(installed, "");
+  await writeExecutable(join(bin, "brew"), `#!/bin/sh
+printf '%s\\n' "$*" >> '${log}'
+case "$*" in
+  "list --formula --versions reviewonator") [ -f '${installed}' ] && printf 'reviewonator 0.7.0\\n' && exit 0; exit 1 ;;
+  "uninstall --formula --force reviewonator") ${options.failUninstall ? "exit 1" : `rm -f '${installed}'`} ;;
+  *) exit 1 ;;
+esac
+`);
+  return { bin, calls: async () => (await readFile(log, "utf8").catch(() => "")).trimEnd().split("\n") };
 }
 
 const fakeWget = `#!/bin/sh
@@ -226,22 +258,101 @@ describe("bootstrap installer", { timeout: 20_000 }, () => {
     expect(await readFile(join(fixture.binDir, "reviewonator"), "utf8")).toContain("Reviewonator 0.8.0");
   });
 
-  it("refuses when Reviewonator is installed with Homebrew", async () => {
+  it("uninstalls a Homebrew installation once the download is verified", async () => {
     const fixture = await releaseFixture();
-    const prefix = join(fixture.root, "homebrew");
-    const brewBin = join(fixture.root, "brew-command");
-    await mkdir(join(prefix, "bin"), { recursive: true });
-    await mkdir(brewBin);
-    await writeExecutable(join(prefix, "bin", "reviewonator"), stubExecutable("0.8.0"));
-    await writeExecutable(join(brewBin, "brew"), `#!/bin/sh\n[ "$1" = "--prefix" ] && printf '%s\\n' '${prefix}'\n`);
+    const brew = await homebrewFixture(fixture.root);
 
-    await expect(fixture.install(["--targets", "claude"], {
-      PATH: [join(prefix, "bin"), brewBin, systemPath].join(delimiter),
-    })).rejects.toMatchObject({
+    const { stdout } = await fixture.install(["--targets", "claude"], { PATH: [brew.bin, systemPath].join(delimiter) });
+
+    expect(stdout).toContain("Removing the Homebrew installation of Reviewonator: brew uninstall --formula --force reviewonator");
+    expect(await brew.calls()).toContain("uninstall --formula --force reviewonator");
+    expect(await readFile(join(fixture.binDir, "reviewonator"), "utf8")).toContain("Reviewonator 0.8.0");
+    expect(await readFile(join(fixture.binDir, "reviewonator.reviewonator-managed"), "utf8")).toBe("Installed by Reviewonator\n");
+    expect(await fixture.setupArguments()).toEqual(["setup", "--targets", "claude"]);
+  });
+
+  it("keeps the Homebrew installation when the download fails verification", async () => {
+    const fixture = await releaseFixture();
+    const brew = await homebrewFixture(fixture.root);
+    await writeFile(join(fixture.release, `reviewonator-${platform}.tar.gz.sha256`), `${"0".repeat(64)}  archive\n`);
+
+    await expect(fixture.install(["--targets", "claude"], { PATH: [brew.bin, systemPath].join(delimiter) }))
+      .rejects.toMatchObject({ code: 1 });
+
+    expect(await brew.calls()).not.toContain("uninstall --formula --force reviewonator");
+  });
+
+  it("stops without installing when brew uninstall fails", async () => {
+    const fixture = await releaseFixture();
+    const brew = await homebrewFixture(fixture.root, { failUninstall: true });
+
+    await expect(fixture.install(["--targets", "claude"], { PATH: [brew.bin, systemPath].join(delimiter) }))
+      .rejects.toMatchObject({
+        code: 1,
+        stderr: expect.stringContaining(
+          "Could not remove the Homebrew installation of Reviewonator. Run brew uninstall reviewonator, then run this script again.",
+        ),
+      });
+    expect(await readdir(fixture.binDir)).toEqual([]);
+  });
+
+  it("asks before replacing a Reviewonator executable it did not install", async () => {
+    const fixture = await releaseFixture("0.8.0");
+    await fixture.installed("0.8.0", false);
+
+    const result = await fixture.answer(["--targets", "claude"], "y\n", { REVIEWONATOR_INTERACTIVE: "1" });
+
+    expect(result.code).toBe(0);
+    expect(result.stderr).toContain(
+      `Replace Reviewonator 0.8.0 at ${join(fixture.binDir, "reviewonator")}, which this script did not install? [y/N] `,
+    );
+    expect(result.stdout).toContain("Updating Reviewonator 0.8.0 to 0.8.0");
+    expect(await readFile(join(fixture.binDir, "reviewonator.reviewonator-managed"), "utf8")).toBe("Installed by Reviewonator\n");
+  });
+
+  it("keeps a Reviewonator executable it did not install when the answer is no", async () => {
+    const fixture = await releaseFixture();
+    await fixture.installed("0.7.0", false);
+
+    const result = await fixture.answer(["--targets", "claude"], "\n", { REVIEWONATOR_INTERACTIVE: "1" });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(`Kept the Reviewonator executable at ${join(fixture.binDir, "reviewonator")}.`);
+    expect(await readFile(join(fixture.binDir, "reviewonator"), "utf8")).toContain("Reviewonator 0.7.0");
+    await expect(access(join(fixture.binDir, "reviewonator.reviewonator-managed"))).rejects.toThrow();
+  });
+
+  it("refuses without a terminal and replaces with --force", async () => {
+    const fixture = await releaseFixture();
+    await fixture.installed("0.9.0", false);
+    const path = join(fixture.binDir, "reviewonator");
+
+    await expect(fixture.install(["--targets", "claude"])).rejects.toMatchObject({
       code: 1,
-      stderr: expect.stringContaining("Reviewonator is installed with Homebrew. Run brew upgrade reviewonator instead."),
+      stderr: expect.stringContaining(
+        `Kept the Reviewonator executable at ${path}. Remove it, or run this script again with --force to replace it.`,
+      ),
     });
-    await expect(access(join(fixture.binDir, "reviewonator"))).rejects.toThrow();
+    expect(await readFile(path, "utf8")).toContain("Reviewonator 0.9.0");
+
+    await fixture.install(["--targets", "claude", "--force"]);
+    expect(await readFile(path, "utf8")).toContain("Reviewonator 0.8.0");
+  });
+
+  it("replaces a symlinked executable without touching its target", async () => {
+    const fixture = await releaseFixture();
+    const build = join(fixture.root, "checkout", "dist");
+    await mkdir(build, { recursive: true });
+    await writeExecutable(join(build, "reviewonator"), stubExecutable("0.9.0"));
+    await mkdir(fixture.binDir, { recursive: true });
+    await symlink(join(build, "reviewonator"), join(fixture.binDir, "reviewonator"));
+
+    const result = await fixture.answer(["--targets", "claude"], "yes\n", { REVIEWONATOR_INTERACTIVE: "1" });
+
+    expect(result.code).toBe(0);
+    expect((await lstat(join(fixture.binDir, "reviewonator"))).isSymbolicLink()).toBe(false);
+    expect(await readFile(join(fixture.binDir, "reviewonator"), "utf8")).toContain("Reviewonator 0.8.0");
+    expect(await readFile(join(build, "reviewonator"), "utf8")).toContain("Reviewonator 0.9.0");
   });
 
   it("updates a managed script install that lives under the Homebrew prefix", async () => {
