@@ -17,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import type { ReviewComment, ReviewEvent } from "../src/domain/review";
+import type { ReviewComment, ReviewEvent, RevisionRequest } from "../src/domain/review";
 import type { UpdateNotice } from "../src/domain/update";
 import { api } from "./api";
 import { DiffPanel, fileSectionId } from "./components/DiffPanel";
@@ -325,25 +325,51 @@ export function App() {
 
   async function sendSingleRevisionRequest(commentId: string) {
     const message = revisionMessages[commentId]?.trim();
-    if (!message || !session) return;
+    if (!message) return;
+    await sendOneAgentRequest(
+      { requests: [{ commentId, message }] },
+      () => clearRevision(commentId),
+      "Could not send this discussion message.",
+    );
+  }
+
+  async function sendLineCommentDraft(location: LineCommentLocation) {
+    const draft = lineCommentDrafts[lineCommentDraftKey(location)];
+    const message = draft?.message.trim();
+    if (!draft || !message) return;
+    await sendOneAgentRequest(
+      { newThreads: [{ ...draft, message }] },
+      () => removeLineCommentDraft(location),
+      "Could not send this comment.",
+    );
+  }
+
+  /** Sends a single message and leaves every other unsent message in place. */
+  async function sendOneAgentRequest(
+    item: Partial<Pick<RevisionRequest, "requests" | "newThreads">>,
+    onSent: () => void,
+    failure: string,
+  ) {
+    if (!session) return;
     setActionError(null);
     try {
       const response = await api.requestRevision({
         selectedCommentIds: [...selectedIds],
         rejectedCommentIds: [...rejectedIds],
-        requests: [{ commentId, message }],
+        requests: [],
         newThreads: [],
         threadReplies: [],
         dismissedThreads: [],
+        ...item,
       });
       if (!response.session.live) {
         setCompletion({ type: "revision" });
         return;
       }
       setSession(response.session);
-      clearRevision(commentId);
+      onSent();
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Could not send this discussion message.");
+      setActionError(error instanceof Error ? error.message : failure);
     }
   }
 
@@ -566,6 +592,7 @@ export function App() {
             onCreateDraft={createLineCommentDraft}
             onChangeDraft={changeLineCommentDraft}
             onRemoveDraft={removeLineCommentDraft}
+            onSendDraft={(location) => void sendLineCommentDraft(location)}
             {...threadActions}
             {...actions}
           />

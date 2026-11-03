@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PullRequest } from "../../src/domain/pull-request";
 import type { PublishRequest, ReviewComment } from "../../src/domain/review";
@@ -390,6 +390,43 @@ describe("GitHub review body", () => {
 
     expect(await screen.findByText("Yes. I checked it and the finding still applies.")).toBeVisible();
     expect(screen.getByRole("button", { name: "Continue discussion" })).toBeEnabled();
+    session.cancel();
+  });
+
+  it("sends one line comment from its own card and keeps other pending messages", async () => {
+    vi.stubGlobal("EventSource", class { addEventListener() {} close() {} });
+    const session = new ReviewSession(pullRequest, patch, review, new AppGateway(), discussion, true);
+    const serverApp = createApp({ html: "<html></html>", favicon: "<svg></svg>", token: "secret", session });
+    vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+      const value = input instanceof Request ? input.url : input.toString();
+      const url = new URL(value, "http://reviewonator.local");
+      return serverApp.request(`${url.pathname}${url.search}`, init);
+    });
+    window.location.hash = "secret";
+    render(createElement(App));
+    await screen.findByText("Live");
+    fireEvent.click(screen.getAllByRole("button", { name: "Discuss with AI" })[0]);
+    fireEvent.change(screen.getByLabelText("What do you want to discuss with the AI agent?"), {
+      target: { value: "Keep this for later" },
+    });
+
+    const addedLine = [...document.querySelector("diffs-container")!.shadowRoot!.querySelectorAll("[data-line='3']")][0];
+    addedLine.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, composed: true, pointerType: "mouse" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add a comment to this line" }));
+    const draft = await screen.findByRole("region", { name: "Your comment for src/example.ts line 3" });
+    fireEvent.change(within(draft).getByRole("textbox"), { target: { value: "This branch skips validation." } });
+    fireEvent.click(within(draft).getByRole("button", { name: "Send to AI" }));
+
+    await expect(session.waitForAgentRequest()).resolves.toMatchObject({
+      requests: [],
+      newThreads: [{ path: "src/example.ts", line: 3, side: "RIGHT", message: "This branch skips validation." }],
+      threadReplies: [],
+      dismissedThreads: [],
+    });
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Your comment for src/example.ts line 3" })).toBeNull());
+    expect((await screen.findByText("Your discussion")).closest("article"))
+      .toHaveTextContent("This branch skips validation.");
+    expect(screen.getByLabelText("What do you want to discuss with the AI agent?")).toHaveValue("Keep this for later");
     session.cancel();
   });
 

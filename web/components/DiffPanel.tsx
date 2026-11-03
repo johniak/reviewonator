@@ -15,7 +15,9 @@ import {
   LoaderCircle,
   MessageSquarePlus,
   Plus,
+  RotateCcw,
   Rows3,
+  Send,
   Square,
   Trash2,
 } from "lucide-react";
@@ -72,6 +74,7 @@ export function DiffPanel({
   onCreateDraft,
   onChangeDraft,
   onRemoveDraft,
+  onSendDraft,
   replyMessages,
   dismissalReasons,
   onReplyChange,
@@ -183,6 +186,7 @@ export function DiffPanel({
               onCreateDraft={onCreateDraft}
               onChangeDraft={onChangeDraft}
               onRemoveDraft={onRemoveDraft}
+              onSendDraft={onSendDraft}
             />
           );
         })}
@@ -257,6 +261,7 @@ function FileDiffCard({
   onCreateDraft,
   onChangeDraft,
   onRemoveDraft,
+  onSendDraft,
 }: {
   file: FileDiffMetadata;
   fileUrl: string | undefined;
@@ -271,7 +276,7 @@ function FileDiffCard({
   diffStyle: "unified" | "split";
   theme: "light" | "dark";
   loadFileContext: (path: string) => Promise<FileContext>;
-} & Pick<LineCommentDraftActions, "onCreateDraft" | "onChangeDraft" | "onRemoveDraft">) {
+} & Pick<LineCommentDraftActions, "onCreateDraft" | "onChangeDraft" | "onRemoveDraft" | "onSendDraft">) {
   const containerRef = useRef<HTMLElement>(null);
   const [shouldLoad, setShouldLoad] = useState(false);
   const [context, setContext] = useState<FileContext | null>(null);
@@ -372,6 +377,7 @@ function FileDiffCard({
           onCreateDraft={onCreateDraft}
           onChangeDraft={onChangeDraft}
           onRemoveDraft={onRemoveDraft}
+          onSendDraft={onSendDraft}
         />
       </div>}
     </section>
@@ -416,6 +422,7 @@ function RenderedFileDiff({
   onCreateDraft,
   onChangeDraft,
   onRemoveDraft,
+  onSendDraft,
 }: {
   file: FileDiffMetadata;
   annotations: DiffLineAnnotation<LineAnnotationContent>[];
@@ -427,7 +434,7 @@ function RenderedFileDiff({
   diffStyle: "unified" | "split";
   theme: "light" | "dark";
   path: string;
-} & Pick<LineCommentDraftActions, "onCreateDraft" | "onChangeDraft" | "onRemoveDraft">) {
+} & Pick<LineCommentDraftActions, "onCreateDraft" | "onChangeDraft" | "onRemoveDraft" | "onSendDraft">) {
   return (
     <FileDiff<LineAnnotationContent>
       fileDiff={file}
@@ -485,8 +492,10 @@ function RenderedFileDiff({
           {annotation.metadata.draft && (
             <LineCommentDraftCard
               draft={annotation.metadata.draft}
+              agentPending={commentActions.agentPending}
               onChangeDraft={onChangeDraft}
               onRemoveDraft={onRemoveDraft}
+              onSendDraft={onSendDraft}
             />
           )}
         </div>
@@ -497,11 +506,14 @@ function RenderedFileDiff({
 
 export function LineCommentDraftCard({
   draft,
+  agentPending,
   onChangeDraft,
   onRemoveDraft,
+  onSendDraft,
 }: {
   draft: LineCommentDraft;
-} & Pick<LineCommentDraftActions, "onChangeDraft" | "onRemoveDraft">) {
+  agentPending: boolean;
+} & Pick<LineCommentDraftActions, "onChangeDraft" | "onRemoveDraft" | "onSendDraft">) {
   const location = { path: draft.path, line: draft.line, side: draft.side };
   return (
     <section
@@ -527,7 +539,18 @@ export function LineCommentDraftCard({
         placeholder="Write the point in your own words. The AI agent will verify it against the code and rewrite it as a clear review comment."
         onChange={(event) => onChangeDraft(location, event.target.value)}
       />
-      <small>This stays private until the AI agent checks it and you explicitly include the revised comment.</small>
+      <div className="line-comment-draft-footer">
+        <small>This stays private until the AI agent checks it and you explicitly include the revised comment.</small>
+        <button
+          className="finding-discussion-send"
+          type="button"
+          disabled={!draft.message.trim() || agentPending}
+          onClick={() => onSendDraft(location)}
+        >
+          {agentPending ? <RotateCcw aria-hidden="true" size={13} /> : <Send aria-hidden="true" size={13} />}
+          {agentPending ? "AI agent is responding" : "Send to AI"}
+        </button>
+      </div>
     </section>
   );
 }

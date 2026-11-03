@@ -27,6 +27,7 @@ describe("project documentation", () => {
     expect(guide).toContain("AI working");
     expect(guide).toContain("Each proposed finding also supports a private live discussion");
     expect(guide).toContain("Use **Send to AI** on the finding card");
+    expect(guide).toContain("Use **Send to AI** on your comment to send just that comment");
     expect(guide).toContain("assets/live-finding-discussion.png");
     expect(guide).toContain("assets/reviewonator-diff.png");
   });

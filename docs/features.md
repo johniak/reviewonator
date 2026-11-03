@@ -26,7 +26,7 @@ The workspace follows your system colour scheme and offers **System**, **Light**
 
 ## Discuss your own concerns with the AI agent
 
-Click **+** beside a diff line to add your own comment. Reviewonator keeps these conversations in a separate **My comments** section and never publishes them directly to GitHub.
+Click **+** beside a diff line to add your own comment. Use **Send to AI** on your comment to send just that comment; any other unsent messages stay where they are until you send them with the button in the review panel. Reviewonator keeps these conversations in a separate **My comments** section and never publishes them directly to GitHub.
 
 The agent checks the exact code before responding. It can:
 
