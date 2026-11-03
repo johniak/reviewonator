@@ -426,3 +426,98 @@ describe("ReviewSession", () => {
     expect(() => session.loadFileContext("src/secret.ts")).toThrow(/not part of this pull request/);
   });
 });
+
+describe("user comments and edits", () => {
+  const onDeletedLine = { path: "src/example.ts", line: 2, side: "LEFT" as const, body: "Keep the old constant for now." };
+
+  it("adds a pending user comment on a deleted line with the next free H id", () => {
+    const session = new ReviewSession(pullRequest, patch, review, new FakeGitHub(), [], true);
+    const before = session.version;
+
+    expect(session.addUserComment(onDeletedLine).id).toBe("H1");
+    expect(session.addUserComment({ ...onDeletedLine, line: 1, side: "RIGHT" }).id).toBe("H2");
+
+    const created = session.review.comments.find(({ id }) => id === "H1")!;
+    expect(created).toEqual({
+      id: "H1",
+      type: "line",
+      author: "user",
+      path: "src/example.ts",
+      line: 2,
+      side: "LEFT",
+      body: "Keep the old constant for now.",
+    });
+    expect(session.version).toBeGreaterThan(before);
+  });
+
+  it("rejects a user comment outside the diff hunks", () => {
+    const session = new ReviewSession(pullRequest, patch, review, new FakeGitHub(), [], true);
+
+    expect(() => session.addUserComment({ ...onDeletedLine, line: 9, side: "RIGHT" }))
+      .toThrow("Comments can only be placed on lines inside the pull request diff: src/example.ts:9");
+  });
+
+  it("marks an edited agent finding and keeps its decision state", () => {
+    const session = new ReviewSession(
+      pullRequest,
+      patch,
+      { ...review, comments: [{ ...review.comments[0], included: true }, review.comments[1]] },
+      new FakeGitHub(),
+      [],
+      true,
+    );
+
+    session.editComment("S1", { body: "Take the value from the caller." });
+
+    expect(session.review.comments[0]).toMatchObject({ body: "Take the value from the caller.", edited: true, included: true });
+    expect(() => session.editComment("S1", { body: "x", severity: "nit" })).toThrow("Only comments you wrote can change severity.");
+  });
+
+  it("changes and clears the severity of a user comment", () => {
+    const session = new ReviewSession(pullRequest, patch, review, new FakeGitHub(), [], true);
+    session.addUserComment(onDeletedLine);
+
+    session.editComment("H1", { body: "Keep it.", severity: "warning" });
+    expect(session.review.comments.find(({ id }) => id === "H1")).toMatchObject({ body: "Keep it.", severity: "warning" });
+    expect(session.review.comments.find(({ id }) => id === "H1")!.edited).toBeUndefined();
+
+    session.editComment("H1", { body: "Keep it.", severity: null });
+    expect(session.review.comments.find(({ id }) => id === "H1")).not.toHaveProperty("severity");
+  });
+
+  it("locks a comment while it waits for the AI agent", () => {
+    const session = new ReviewSession(pullRequest, patch, review, new FakeGitHub(), [], true);
+    session.requestRevision({ requests: [{ commentId: "S1", message: "Is this right?" }] });
+
+    expect(() => session.editComment("S1", { body: "x" }))
+      .toThrow("The AI agent is checking this comment. Edit it after the agent responds.");
+    expect(session.editComment("G1", { body: "Edited while the agent works." }).body).toBe("Edited while the agent works.");
+  });
+
+  it("deletes only user-written comments", () => {
+    const session = new ReviewSession(pullRequest, patch, review, new FakeGitHub(), [], true);
+    session.addUserComment(onDeletedLine);
+
+    expect(() => session.deleteUserComment("S1")).toThrow("Only comments you wrote can be deleted.");
+    session.deleteUserComment("H1");
+    expect(session.review.comments.map(({ id }) => id)).not.toContain("H1");
+  });
+
+  it("never reuses the id of a deleted user comment", () => {
+    const session = new ReviewSession(pullRequest, patch, review, new FakeGitHub(), [], true);
+    session.addUserComment(onDeletedLine);
+    session.deleteUserComment("H1");
+
+    expect(session.addUserComment(onDeletedLine).id).toBe("H2");
+  });
+
+  it("publishes the edited body", async () => {
+    const github = new FakeGitHub();
+    const session = new ReviewSession(pullRequest, patch, review, github);
+    session.editComment("S1", { body: "Take the value from the caller." });
+
+    await session.publish({ confirmed: true, event: "COMMENT", body: "", selectedCommentIds: ["S1"] });
+
+    expect(github.published?.comments[0].body).toBe("Take the value from the caller.");
+  });
+});

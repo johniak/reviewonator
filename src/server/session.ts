@@ -3,11 +3,15 @@ import { z } from "zod";
 import { buildFileUrl, type PullRequest } from "../domain/pull-request";
 import type { PullRequestDiscussionItem } from "../domain/discussion";
 import {
+  commentEditSchema,
+  isLineInDiff,
   publishRequestSchema,
   reviewDocumentSchema,
   revisionRequestSchema,
+  userCommentInputSchema,
   validateReviewLocations,
   type PublishRequest,
+  type ReviewComment,
   type ReviewDocument,
   type RevisionRequest,
 } from "../domain/review";
@@ -41,6 +45,8 @@ export class ReviewSession {
   private readonly resultPromise: Promise<SessionResult>;
   private resolveResult!: (result: SessionResult) => void;
   private readonly fileRevisions = new Map<string, FileRevision>();
+  /** User comments the user deleted, so an agent echoing an older review cannot bring them back. */
+  private readonly deletedUserCommentIds = new Set<string>();
   private readonly fileContextCache = new Map<string, Promise<FileContext>>();
   private pendingAgentRequests: Extract<SessionResult, { status: "revision_requested" }>[] = [];
   private activeAgentRequest?: Extract<SessionResult, { status: "revision_requested" }>;
@@ -197,6 +203,48 @@ export class ReviewSession {
     this.activeAgentRequest = undefined;
     this.notifyChanged();
     this.releaseAgentWaiter();
+  }
+
+  addUserComment(input: unknown): ReviewComment {
+    this.assertOpen();
+    const { path, line, side, body } = userCommentInputSchema.parse(input);
+    if (!isLineInDiff(this.patch, { path, line, side })) {
+      throw new Error(`Comments can only be placed on lines inside the pull request diff: ${path}:${line}`);
+    }
+    const ids = new Set(this.review.comments.map(({ id }) => id));
+    let number = 1;
+    while (ids.has(`H${number}`) || this.deletedUserCommentIds.has(`H${number}`)) number += 1;
+    const comment: ReviewComment = { id: `H${number}`, type: "line", author: "user", path, line, side, body };
+    this.replaceComments([...this.review.comments, comment]);
+    return comment;
+  }
+
+  editComment(id: string, input: unknown): ReviewComment {
+    this.assertOpen();
+    const { body, severity } = commentEditSchema.parse(input);
+    const current = this.findComment(id);
+    if (current.discussion?.at(-1)?.author === "user") {
+      throw new Error("The AI agent is checking this comment. Edit it after the agent responds.");
+    }
+    const byUser = current.author === "user";
+    if (!byUser && severity !== undefined) throw new Error("Only comments you wrote can change severity.");
+    const { severity: currentSeverity, ...rest } = current;
+    const nextSeverity = severity === undefined ? currentSeverity : severity ?? undefined;
+    const updated: ReviewComment = {
+      ...rest,
+      ...(nextSeverity ? { severity: nextSeverity } : {}),
+      body,
+      ...(byUser ? {} : { edited: true }),
+    };
+    this.replaceComments(this.review.comments.map((comment) => comment.id === id ? updated : comment));
+    return updated;
+  }
+
+  deleteUserComment(id: string): void {
+    this.assertOpen();
+    if (this.findComment(id).author !== "user") throw new Error("Only comments you wrote can be deleted.");
+    this.deletedUserCommentIds.add(id);
+    this.replaceComments(this.review.comments.filter((comment) => comment.id !== id));
   }
 
   waitForChange(afterVersion: number): Promise<number | null> {
@@ -427,6 +475,17 @@ export class ReviewSession {
     request: Extract<SessionResult, { status: "revision_requested" }>,
   ): Extract<AgentWaitResult, { status: "revision_requested" }> {
     return { ...request, review: this.review };
+  }
+
+  private findComment(id: string): ReviewComment {
+    const comment = this.review.comments.find((candidate) => candidate.id === id);
+    if (!comment) throw new Error(`Unknown review comment id: ${id}`);
+    return comment;
+  }
+
+  private replaceComments(comments: ReviewComment[]): void {
+    this.currentReview = { ...this.review, comments };
+    this.notifyChanged();
   }
 
   private notifyChanged(): void {
