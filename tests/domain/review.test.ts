@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isLineInDiff,
   revisionRequestSchema,
   reviewDocumentSchema,
   validateReviewLocations,
@@ -244,5 +245,44 @@ describe("review location validation", () => {
       ...review,
       userThreads: [{ ...userThread, path: "src/missing.ts" }],
     }, patch)).toThrow(/User comment threads must target files/);
+  });
+});
+
+describe("user-written comments", () => {
+  const userComment = {
+    id: "H1",
+    type: "line" as const,
+    author: "user" as const,
+    path: "src/example.ts",
+    line: 2,
+    side: "LEFT" as const,
+    body: "Keep the old constant until the caller migrates.",
+  };
+  const withComments = (...comments: unknown[]) => reviewDocumentSchema.parse({ ...review, comments });
+
+  it("requires severity and a What/Why explanation only from the agent", () => {
+    expect(withComments(userComment).comments[0]).toMatchObject({ author: "user", side: "LEFT" });
+    const { author: _author, ...agentShaped } = userComment;
+    expect(() => withComments(agentShaped)).toThrow();
+  });
+
+  it("accepts user comments on any diff line and agent findings only on added lines", () => {
+    expect(() => validateReviewLocations(withComments(userComment), patch)).not.toThrow();
+    expect(() => validateReviewLocations(withComments({ ...userComment, line: 1, side: "RIGHT" }), patch)).not.toThrow();
+    expect(() => validateReviewLocations(withComments({ ...userComment, line: 9, side: "RIGHT" }), patch))
+      .toThrow(/src\/example\.ts:9/);
+    expect(() => validateReviewLocations(withComments({ ...review.comments[0], line: 1 }), patch))
+      .toThrow(/added lines/);
+  });
+
+  it("rejects LEFT on agent findings", () => {
+    expect(() => withComments({ ...review.comments[0], side: "LEFT" })).toThrow();
+  });
+
+  it("knows which lines are inside the diff hunks", () => {
+    expect(isLineInDiff(patch, { path: "src/example.ts", line: 3, side: "LEFT" })).toBe(true);
+    expect(isLineInDiff(patch, { path: "src/example.ts", line: 4, side: "LEFT" })).toBe(false);
+    expect(isLineInDiff(patch, { path: "src/example.ts", line: 4, side: "RIGHT" })).toBe(true);
+    expect(isLineInDiff(patch, { path: "src/missing.ts", line: 1, side: "RIGHT" })).toBe(false);
   });
 });

@@ -42,7 +42,7 @@ describe("PublishDialog", () => {
     expect(includedComments).toHaveClass("publish-comment-list");
     expect(includedComments).toHaveAttribute("tabindex", "0");
     expect(includedComments).toContainElement(screen.getByText(review.comments[0].body));
-    expect(screen.queryByText(review.comments[0].reviewerExplanation)).not.toBeInTheDocument();
+    expect(screen.queryByText(review.comments[0].reviewerExplanation!)).not.toBeInTheDocument();
     expect(screen.getByText(/Private German explanations are excluded/)).toBeVisible();
 
     await userEvent.click(screen.getByRole("radio", { name: /Approve/ }));

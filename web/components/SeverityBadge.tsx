@@ -10,6 +10,7 @@ const severityDetails = {
 } as const;
 
 export function SeverityBadge({ severity }: Pick<ReviewComment, "severity">) {
+  if (!severity) return null;
   const details = severityDetails[severity];
   const Icon = details.icon;
   return (

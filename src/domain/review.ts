@@ -15,28 +15,39 @@ const languageSchema = z.string().trim().min(1).max(80).refine(
 
 const defaultLanguages = { comments: "English", reviewerNotes: "English" } as const;
 
+const commentBodySchema = z.string().trim().min(1).max(65_535);
+
 export const reviewCommentSchema = z.object({
   id: z.string().trim().min(1).max(80),
   type: z.enum(["line", "general"]),
-  severity: z.enum(severities),
-  body: z.string().trim().min(1).max(65_535),
-  reviewerExplanation: reviewerExplanationSchema,
+  author: z.enum(["agent", "user"]).optional(),
+  edited: z.boolean().optional(),
+  severity: z.enum(severities).optional(),
+  body: commentBodySchema,
+  reviewerExplanation: reviewerExplanationSchema.optional(),
   included: z.boolean().optional(),
   rejected: z.boolean().optional(),
   path: z.string().trim().min(1).optional(),
   line: z.int().positive().optional(),
-  side: z.literal("RIGHT").optional(),
+  side: z.enum(["LEFT", "RIGHT"]).optional(),
   discussion: z.array(z.object({
     id: z.string().trim().min(1).max(80),
     author: z.enum(["user", "agent"]),
     body: z.string().trim().min(1).max(4_000),
   })).max(100).optional(),
 }).superRefine((comment, context) => {
-  if (comment.type === "line" && (!comment.path || !comment.line || comment.side !== "RIGHT")) {
+  const byUser = comment.author === "user";
+  if (comment.type === "line" && (!comment.path || !comment.line || !comment.side || (!byUser && comment.side !== "RIGHT"))) {
     context.addIssue({
       code: "custom",
-      message: "Line comments require path, line, and side=RIGHT.",
+      message: byUser ? "Line comments require path, line, and side." : "Line comments require path, line, and side=RIGHT.",
     });
+  }
+  if (!byUser && !comment.severity) {
+    context.addIssue({ code: "custom", message: "Agent findings require a severity." });
+  }
+  if (!byUser && !comment.reviewerExplanation) {
+    context.addIssue({ code: "custom", message: "Agent findings require a private reviewer explanation." });
   }
   if (comment.type === "general" && (comment.path || comment.line || comment.side)) {
     context.addIssue({
@@ -208,7 +219,23 @@ export const publishRequestSchema = z.object({
   selectedCommentIds: z.array(z.string().min(1)).max(500),
 });
 
+export const userCommentInputSchema = z.object({
+  path: z.string().trim().min(1),
+  line: z.int().positive(),
+  side: z.enum(["LEFT", "RIGHT"]),
+  body: commentBodySchema,
+});
+
+export const commentEditSchema = z.object({
+  body: commentBodySchema,
+  severity: z.enum(severities).nullable().optional(),
+});
+
 export type ReviewComment = z.infer<typeof reviewCommentSchema>;
+export type Severity = (typeof severities)[number];
+export type UserCommentInput = z.infer<typeof userCommentInputSchema>;
+export type CommentEdit = z.infer<typeof commentEditSchema>;
+export type DiffLocation = { path: string; line: number; side: "LEFT" | "RIGHT" };
 export type UserThreadMessage = z.infer<typeof userThreadMessageSchema>;
 export type UserCommentThread = z.infer<typeof userCommentThreadSchema>;
 export type ReviewDocument = z.infer<typeof reviewDocumentSchema>;
@@ -221,13 +248,17 @@ function hasWhatAndWhySections(value: string): boolean {
   return [...value.matchAll(localizedHeading)].length >= 2;
 }
 
-export function validateReviewLocations(review: ReviewDocument, patch: string): void {
-  const changedLines = new Map<string, Set<number>>();
+type DiffLines = { LEFT: [number, number][]; RIGHT: [number, number][]; added: Set<number> };
 
+/** Per file: the inclusive line ranges each hunk covers on both sides, and the added lines. */
+export function diffLineRanges(patch: string): Map<string, DiffLines> {
+  const files = new Map<string, DiffLines>();
   for (const parsedPatch of parsePatchFiles(patch, "reviewonator", true)) {
     for (const file of parsedPatch.files) {
-      const lines = new Set<number>();
+      const lines: DiffLines = { LEFT: [], RIGHT: [], added: new Set() };
       for (const hunk of file.hunks) {
+        lines.LEFT.push([hunk.deletionStart, hunk.deletionStart + hunk.deletionCount - 1]);
+        lines.RIGHT.push([hunk.additionStart, hunk.additionStart + hunk.additionCount - 1]);
         let additionLine = hunk.additionStart;
         for (const content of hunk.hunkContent) {
           if (content.type === "context") {
@@ -235,26 +266,46 @@ export function validateReviewLocations(review: ReviewDocument, patch: string): 
             continue;
           }
           for (let index = 0; index < content.additions; index += 1) {
-            lines.add(additionLine + index);
+            lines.added.add(additionLine + index);
           }
           additionLine += content.additions;
         }
       }
-      changedLines.set(file.name, lines);
+      files.set(file.name, lines);
     }
   }
+  return files;
+}
 
-  const invalid = review.comments.filter((comment) => (
-    comment.type === "line"
-    && (!comment.path || !comment.line || !changedLines.get(comment.path)?.has(comment.line))
-  ));
+export function isLineInDiff(patch: string, location: DiffLocation): boolean {
+  return inRanges(diffLineRanges(patch).get(location.path), location);
+}
 
+function inRanges(lines: DiffLines | undefined, { line, side }: Pick<DiffLocation, "line" | "side">): boolean {
+  return Boolean(lines?.[side].some(([first, last]) => line >= first && line <= last));
+}
+
+export function validateReviewLocations(review: ReviewDocument, patch: string): void {
+  const files = diffLineRanges(patch);
+  const lineComments = review.comments.filter((comment) => comment.type === "line");
+  const located = (comment: ReviewComment) => `${comment.id} (${comment.path ?? "?"}:${comment.line ?? "?"})`;
+
+  const invalid = lineComments.filter((comment) => comment.author !== "user"
+    && (!comment.path || !comment.line || !files.get(comment.path)?.added.has(comment.line)));
   if (invalid.length > 0) {
-    const locations = invalid.map((comment) => `${comment.id} (${comment.path ?? "?"}:${comment.line ?? "?"})`);
-    throw new Error(`Review comments must target added lines in the pull request diff: ${locations.join(", ")}`);
+    throw new Error(`Review comments must target added lines in the pull request diff: ${invalid.map(located).join(", ")}`);
   }
 
-  const invalidThreads = review.userThreads.filter((thread) => !changedLines.has(thread.path));
+  const invalidUserComments = lineComments.filter((comment) => comment.author === "user"
+    && (!comment.path || !comment.line || !comment.side || !inRanges(files.get(comment.path), {
+      line: comment.line,
+      side: comment.side,
+    })));
+  if (invalidUserComments.length > 0) {
+    throw new Error(`Review comments must target lines inside the pull request diff: ${invalidUserComments.map(located).join(", ")}`);
+  }
+
+  const invalidThreads = review.userThreads.filter((thread) => !files.has(thread.path));
   if (invalidThreads.length > 0) {
     const locations = invalidThreads.map((thread) => `${thread.id} (${thread.path}:${thread.line})`);
     throw new Error(`User comment threads must target files in the pull request diff: ${locations.join(", ")}`);

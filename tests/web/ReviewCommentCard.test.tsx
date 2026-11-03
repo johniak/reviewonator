@@ -24,7 +24,7 @@ describe("ReviewCommentCard", () => {
       />,
     );
     expect(screen.getByText(comment.body)).toBeVisible();
-    expect(screen.getByText(comment.reviewerExplanation)).toBeVisible();
+    expect(screen.getByText(comment.reviewerExplanation!)).toBeVisible();
     expect(screen.getByText("For reviewer only")).toBeVisible();
     expect(screen.getByText("Private · German")).toBeVisible();
     expect(screen.getByRole("article")).toHaveClass("comment-severity-bug");

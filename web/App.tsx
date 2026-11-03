@@ -715,7 +715,7 @@ export function buildPublishBody(summary: string, selectedComments: SessionSnaps
   const general = selectedComments.filter((comment) => comment.type === "general");
   if (general.length === 0) return summary;
   const comments = `### General comments\n\n${general
-    .map((comment) => `- **${capitalize(comment.severity)}:** ${comment.body}`)
+    .map((comment) => `- ${comment.severity ? `**${capitalize(comment.severity)}:** ` : ""}${comment.body}`)
     .join("\n")}`;
   return [summary, comments].filter(Boolean).join("\n\n");
 }
