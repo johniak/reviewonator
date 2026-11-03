@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { execFile, spawn } from "node:child_process";
-import { access, chmod, link, mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { access, chmod, link, lstat, mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -71,21 +71,25 @@ describe("compiled executable installed by the install script", () => {
 });
 
 describe("compiled executable installed with Homebrew", () => {
-  it("setup removes the executable the install script left on PATH", async () => {
+  it("setup removes the executable the install script left on PATH and keeps Homebrew's own link", async () => {
     const cellar = join(root, "homebrew", "Cellar", "reviewonator", "0.0.0", "bin");
+    const homebrewBin = join(root, "homebrew", "bin");
     const scriptBin = join(root, "script-bin");
     await mkdir(cellar, { recursive: true });
+    await mkdir(homebrewBin);
     await mkdir(scriptBin);
     await link(executable, join(cellar, "reviewonator"));
+    // As Homebrew links it: <prefix>/bin/reviewonator -> ../Cellar/reviewonator/<version>/bin/reviewonator
+    await symlink(join("..", "Cellar", "reviewonator", "0.0.0", "bin", "reviewonator"), join(homebrewBin, "reviewonator"));
     await writeFile(join(scriptBin, "reviewonator"), "#!/bin/sh\nprintf 'Reviewonator 0.8.0\\n'\n");
     await chmod(join(scriptBin, "reviewonator"), 0o755);
     await writeFile(join(scriptBin, "reviewonator.reviewonator-managed"), "Installed by Reviewonator\n");
 
-    const { stdout } = await run(join(cellar, "reviewonator"), [
+    const { stdout } = await run(join(homebrewBin, "reviewonator"), [
       "setup", "--targets", "claude", "--comment-language", "English", "--reviewer-language", "English",
     ], {
       env: {
-        PATH: [scriptBin, "/usr/bin", "/bin"].join(delimiter),
+        PATH: [homebrewBin, scriptBin, "/usr/bin", "/bin"].join(delimiter),
         HOME: root,
         REVIEWONATOR_BIN_DIR: join(root, "no-default-bin"),
         REVIEWONATOR_CONFIG_DIR: join(root, "homebrew-config"),
@@ -100,5 +104,7 @@ describe("compiled executable installed with Homebrew", () => {
     );
     await expect(access(join(scriptBin, "reviewonator"))).rejects.toThrow();
     await expect(access(join(scriptBin, "reviewonator.reviewonator-managed"))).rejects.toThrow();
+    expect((await lstat(join(homebrewBin, "reviewonator"))).isSymbolicLink()).toBe(true);
+    expect(stdout).not.toContain(join(homebrewBin, "reviewonator"));
   }, 30_000);
 });
