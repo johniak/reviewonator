@@ -233,8 +233,12 @@ async function syncInstalledSkills(): Promise<SyncResult | null> {
 }
 
 async function readReviewFile(path: string, sync: SyncResult | null): Promise<ReviewDocument> {
+  return withSkillUpdateHint(sync, async () => reviewDocumentSchema.parse(await Bun.file(path).json()));
+}
+
+async function withSkillUpdateHint<T>(sync: SyncResult | null, action: () => Promise<T>): Promise<T> {
   try {
-    return reviewDocumentSchema.parse(await Bun.file(path).json());
+    return await action();
   } catch (error) {
     const hint = sync && skillUpdateHint(sync);
     if (!hint) throw error;
@@ -259,14 +263,16 @@ async function respondToLiveRequest(prUrl: string, reviewFile: string, sync: Syn
   const state = await readLiveState(prUrl);
   if (state.result) throw new Error("This live Reviewonator session has already finished.");
   await assertLiveServerReachable(state);
-  const review = await readReviewFile(reviewFile, sync);
-  if (new URL(review.prUrl).href !== new URL(prUrl).href) {
+  // The live session validates the response after restoring the user's version of their comments,
+  // so only the target pull request is checked here.
+  const review = await Bun.file(reviewFile).json() as { prUrl?: unknown };
+  if (typeof review.prUrl !== "string" || new URL(review.prUrl).href !== new URL(prUrl).href) {
     throw new Error("The review JSON belongs to a different pull request URL.");
   }
-  const result = await liveRequest(state, "/api/agent/respond", {
+  const result = await withSkillUpdateHint(sync, () => liveRequest(state, "/api/agent/respond", {
     method: "POST",
     body: JSON.stringify(review),
-  }, "respond");
+  }, "respond"));
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }
 

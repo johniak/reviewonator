@@ -6,6 +6,43 @@ export function isUserOwned(comment: ReviewComment): boolean {
 }
 
 /**
+ * Brings the agent's raw response in line with the user's state before it is validated, so the
+ * agent never gets an error for a user-owned field it could not have known about, and can never
+ * loosen its own findings by claiming they were written by the user.
+ */
+export function reconcileAgentInput(
+  input: unknown,
+  current: ReviewComment[],
+  discussedIds: Set<string>,
+  deletedUserIds: Set<string>,
+): unknown {
+  if (!isRecord(input) || !Array.isArray(input.comments)) return input;
+  const currentById = new Map(current.map((comment) => [comment.id, comment]));
+  const comments = input.comments
+    .filter((comment) => !(isRecord(comment) && typeof comment.id === "string" && deletedUserIds.has(comment.id)))
+    .map((comment) => {
+      if (!isRecord(comment) || typeof comment.id !== "string") return comment;
+      const existing = currentById.get(comment.id);
+      if (!existing) return comment;
+      if (isUserOwned(existing) && !discussedIds.has(existing.id)) return existing;
+      const { author: _author, edited: _edited, ...content } = comment;
+      return {
+        ...content,
+        ...(existing.author ? { author: existing.author } : {}),
+        ...(existing.edited ? { edited: true } : {}),
+        ...(existing.author === "user"
+          ? { type: existing.type, path: existing.path, line: existing.line, side: existing.side }
+          : {}),
+      };
+    });
+  return { ...input, comments };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
  * Applies the agent's comments to the session's current ones. The agent never sees changes the user
  * makes while it works, so the user's state is authoritative: user-owned comments the user did not
  * discuss stay as they are, the ones the agent left out come back, and deleted ones stay deleted.

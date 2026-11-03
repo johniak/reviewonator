@@ -226,6 +226,12 @@ describe("ReviewCommentCard", () => {
       expect(screen.getByRole("button", { name: "Edit comment" })).toBeDisabled();
     });
 
+    it("says the AI agent is checking a hand-written comment, not a finding", () => {
+      render(<ReviewCommentCard {...props({ ...mine, discussion: [{ id: "H1-D1", author: "user", body: "Clearer?" }] })} />);
+
+      expect(screen.getByText("The AI agent is checking this comment.")).toBeVisible();
+    });
+
     it("deletes only hand-written comments", async () => {
       const { unmount } = render(<ReviewCommentCard {...props(review.comments[0])} />);
       expect(screen.queryByRole("button", { name: "Delete comment" })).not.toBeInTheDocument();

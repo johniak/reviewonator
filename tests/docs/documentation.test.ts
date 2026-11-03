@@ -47,6 +47,7 @@ describe("project documentation", () => {
     expect(readme).toContain(
       "Click **+** beside a diff line, write your comment, and choose **Add comment** to put it straight into the review, or **Send to AI** to have the agent check it first.",
     );
+    expect(guide).toContain("**Send to AI** turns it into a private conversation with the agent");
     expect(guide).toContain(
       "Edit any comment with the pencil on its card. Reviewonator keeps your wording across agent rounds unless you discuss that comment with the agent.",
     );

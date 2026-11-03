@@ -385,6 +385,42 @@ describe("Reviewonator CLI end-to-end", () => {
     expect(await liveExit).toBe(0);
   }, 30_000);
 
+  it("accepts an agent response that drops the author of the user's own comment", async () => {
+    const temp = await mkdtemp(join(tmpdir(), "reviewonator-live-owned-"));
+    const env = { REVIEWONATOR_STATE_DIR: join(temp, "state") };
+    const liveProcess = await startReviewonator(env, true);
+    const liveExit = waitForExit(liveProcess.child);
+    const { baseUrl, token } = await liveProcess.ready;
+    const cliOptions = { cwd: process.cwd(), env: { ...process.env, ...env } };
+
+    const created = await authenticatedFetch(baseUrl, token, "/api/comments", {
+      method: "POST",
+      body: JSON.stringify({ path: "src/payments/retry.ts", line: 8, side: "RIGHT", body: "Name the retry limit." }),
+    });
+    expect(created.status).toBe(200);
+    await authenticatedFetch(baseUrl, token, "/api/revision", {
+      method: "POST",
+      body: JSON.stringify({ requests: [{ commentId: "S1", message: "Is this right?" }] }),
+    });
+    const waited = JSON.parse((await run("bun", ["src/cli.ts", "wait", prUrl], cliOptions)).stdout) as { review: ReviewDocument };
+    const responseFile = join(temp, "response.json");
+    await writeFile(responseFile, JSON.stringify({
+      ...waited.review,
+      comments: waited.review.comments.map(({ author: _author, ...comment }) => comment.id === "S1" ? {
+        ...comment,
+        discussion: [...(comment.discussion ?? []), { id: "S1-D2", author: "agent", body: "Checked." }],
+      } : comment),
+    }));
+
+    const responded = await run("bun", ["src/cli.ts", "respond", prUrl, "--review-file", responseFile], cliOptions);
+
+    expect(JSON.parse(responded.stdout)).toEqual({ status: "accepted" });
+    const snapshot = await (await authenticatedFetch(baseUrl, token, "/api/session")).json() as { review: ReviewDocument };
+    expect(snapshot.review.comments.find(({ id }) => id === "H1")).toMatchObject({ author: "user", body: "Name the retry limit." });
+    await authenticatedFetch(baseUrl, token, "/api/cancel", { method: "POST", body: "{}" });
+    await liveExit;
+  }, 30_000);
+
   it("distinguishes a stale saved session from a dropped wait connection", async () => {
     const stateDirectory = await mkdtemp(join(tmpdir(), "reviewonator-stale-test-"));
     const env = { REVIEWONATOR_STATE_DIR: stateDirectory };

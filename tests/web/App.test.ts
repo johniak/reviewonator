@@ -510,6 +510,13 @@ describe("GitHub review body", () => {
     return { session, draft };
   }
 
+  it("describes the line comment button without promising an AI review", async () => {
+    const session = await liveApp();
+
+    expect(screen.getByRole("button", { name: "Add a comment to this line" })).toHaveAttribute("title", "Comment on this line");
+    session.cancel();
+  });
+
   it("adds a hand-written comment from the line draft without the AI agent", async () => {
     const { session, draft } = await liveAppWithDraft(3);
     fireEvent.change(within(draft).getByRole("textbox"), { target: { value: "Rename this before release." } });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PullRequest } from "../../src/domain/pull-request";
-import type { PublishRequest, ReviewComment } from "../../src/domain/review";
+import { reviewDocumentSchema, type PublishRequest, type ReviewComment } from "../../src/domain/review";
 import type { GitHubGateway, LoadedPullRequest, PublishedReview } from "../../src/github/client";
 import { ClosedSessionError, ReviewSession, StalePullRequestError } from "../../src/server/session";
 import { patch, pullRequest, review, userThread } from "../fixtures";
@@ -556,6 +556,68 @@ describe("user comments and edits", () => {
       session.respond(answerS1(seen));
 
       expect(session.review.comments.map(({ id }) => id)).not.toContain("H1");
+    });
+
+    it("keeps the user's comment when the agent drops its author or moves it", async () => {
+      const session = await workingSession();
+      session.addUserComment(onDeletedLine);
+      session.requestRevision({ requests: [{ commentId: "S1", message: "Is this right?" }] });
+      const { review: seen } = await session.waitForAgentRequest() as { review: typeof review };
+      const answered = answerS1(seen);
+
+      session.respond({
+        ...answered,
+        comments: answered.comments.map(({ author: _author, ...comment }) => comment.id === "H1"
+          ? { ...comment, line: 99, body: "Agent rewrite." }
+          : comment),
+      });
+
+      expect(session.review.comments.find(({ id }) => id === "H1")).toEqual({
+        id: "H1",
+        type: "line",
+        author: "user",
+        path: "src/example.ts",
+        line: 2,
+        side: "LEFT",
+        body: "Keep the old constant for now.",
+      });
+    });
+
+    it("accepts the agent's rewrite of a discussed user comment that omits its author", async () => {
+      const session = await workingSession();
+      session.addUserComment(onDeletedLine);
+      session.requestRevision({ requests: [{ commentId: "H1", message: "Can you make this clearer?" }] });
+      const { review: seen } = await session.waitForAgentRequest() as { review: typeof review };
+
+      session.respond({
+        ...seen,
+        comments: seen.comments.map(({ author: _author, ...comment }) => comment.id === "H1" ? {
+          ...comment,
+          body: "Keep the old constant until every caller migrates.",
+          discussion: [...(comment.discussion ?? []), { id: "H1-D2", author: "agent" as const, body: "Clarified." }],
+        } : comment),
+      });
+
+      expect(session.review.comments.find(({ id }) => id === "H1")).toMatchObject({
+        author: "user",
+        side: "LEFT",
+        body: "Keep the old constant until every caller migrates.",
+      });
+    });
+
+    it("never stores an agent finding loosened by a forged author", async () => {
+      const session = await workingSession();
+      session.requestRevision({ requests: [{ commentId: "S1", message: "Is this right?" }] });
+      const { review: seen } = await session.waitForAgentRequest() as { review: typeof review };
+      const answered = answerS1(seen);
+
+      expect(() => session.respond({
+        ...answered,
+        comments: answered.comments.map(({ severity: _severity, reviewerExplanation: _explanation, ...comment }) =>
+          comment.id === "S1" ? { ...comment, author: "user", side: "LEFT" } : { ...comment, severity: _severity, reviewerExplanation: _explanation }),
+      })).toThrow();
+      expect(() => reviewDocumentSchema.parse(session.review)).not.toThrow();
+      expect(session.review.comments.find(({ id }) => id === "S1")).toMatchObject({ side: "RIGHT", severity: "bug" });
     });
 
     it("keeps the user's edit when the agent answers a different comment", async () => {

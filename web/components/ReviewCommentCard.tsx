@@ -165,7 +165,7 @@ export function ReviewCommentCard({
         </div>
       )}
       {waitingForAgent && (
-        <p className="finding-discussion-waiting"><RotateCcw aria-hidden="true" size={12} /> The AI agent is checking this finding.</p>
+        <p className="finding-discussion-waiting"><RotateCcw aria-hidden="true" size={12} /> The AI agent is checking this {byUser ? "comment" : "finding"}.</p>
       )}
     </article>
   );

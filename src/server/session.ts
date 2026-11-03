@@ -16,7 +16,7 @@ import {
   type RevisionRequest,
 } from "../domain/review";
 import type { FileContext, FileRevision, GitHubGateway, PublishedReview } from "../github/client";
-import { mergeAgentComments } from "./user-owned-comments";
+import { mergeAgentComments, reconcileAgentInput } from "./user-owned-comments";
 
 export type SessionResult =
   | {
@@ -199,14 +199,12 @@ export class ReviewSession {
     this.assertOpen();
     if (!this.live) throw new Error("Agent responses require a live review session.");
     if (!this.activeAgentRequest) throw new Error("There is no user request waiting for an agent response.");
-    const parsed = reviewDocumentSchema.parse(input);
-    const nextReview = {
-      ...parsed,
-      comments: parsed.comments.filter(({ id }) => !this.deletedUserCommentIds.has(id)),
-    };
+    const discussedIds = new Set(this.activeAgentRequest.requests.map(({ commentId }) => commentId));
+    const nextReview = reviewDocumentSchema.parse(
+      reconcileAgentInput(input, this.review.comments, discussedIds, this.deletedUserCommentIds),
+    );
     validateReviewLocations(nextReview, this.patch);
     this.validateAgentResponse(nextReview);
-    const discussedIds = new Set(this.activeAgentRequest.requests.map(({ commentId }) => commentId));
     this.currentReview = {
       ...nextReview,
       comments: mergeAgentComments(this.review.comments, nextReview.comments, discussedIds, this.deletedUserCommentIds),

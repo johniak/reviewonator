@@ -195,6 +195,24 @@ describe("DiffPanel view modes", () => {
     });
   });
 
+  it("places a hand-written comment on a deleted line beside that deleted line", () => {
+    const mine = {
+      id: "H1",
+      type: "line" as const,
+      author: "user" as const,
+      path: "src/example.ts",
+      line: 2,
+      side: "LEFT" as const,
+      body: "Keep the old constant for now.",
+    };
+
+    expect(buildLineAnnotations("src/example.ts", [mine], [], [])).toEqual([{
+      side: "deletions",
+      lineNumber: 2,
+      metadata: { comments: [mine], userThreads: [] },
+    }]);
+  });
+
   it("lets the user edit and discard a line comment before sending it to the AI agent", async () => {
     const onChangeDraft = vi.fn();
     const onRemoveDraft = vi.fn();
@@ -214,6 +232,23 @@ describe("DiffPanel view modes", () => {
     expect(onChangeDraft).toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "Discard this comment" }));
     expect(onRemoveDraft).toHaveBeenCalledWith({ path: "src/example.ts", line: 2, side: "RIGHT" });
+  });
+
+  it("explains both ways to use a line comment", () => {
+    render(
+      <LineCommentDraftCard
+        draft={{ id: "U-draft", path: "src/example.ts", line: 2, side: "RIGHT", message: "" }}
+        agentPending={false}
+        onChangeDraft={vi.fn()}
+        onRemoveDraft={vi.fn()}
+        onSendDraft={vi.fn()}
+        onAddComment={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByPlaceholderText(
+      "Write your comment. Add it as written, or send it to the AI agent to check it against the code first.",
+    )).toBeVisible();
   });
 
   it("adds the line comment to the review without the AI agent", async () => {

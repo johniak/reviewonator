@@ -225,7 +225,7 @@ export function buildLineAnnotations(
 
   for (const comment of comments) {
     if (comment.type === "line" && comment.path === path && comment.line) {
-      getAnnotation("additions", comment.line).metadata.comments.push(comment);
+      getAnnotation(comment.side === "LEFT" ? "deletions" : "additions", comment.line).metadata.comments.push(comment);
     }
   }
   for (const thread of userThreads) {
@@ -461,7 +461,7 @@ function RenderedFileDiff({
           className="diff-comment-trigger"
           type="button"
           aria-label="Add a comment to this line"
-          title="Ask the AI agent to review your comment"
+          title="Comment on this line"
           onClick={() => {
             const hovered = getHoveredLine();
             if (!hovered) return;
@@ -543,7 +543,7 @@ export function LineCommentDraftCard({
         autoFocus
         rows={3}
         value={draft.message}
-        placeholder="Write the point in your own words. The AI agent will verify it against the code and rewrite it as a clear review comment."
+        placeholder="Write your comment. Add it as written, or send it to the AI agent to check it against the code first."
         onChange={(event) => onChangeDraft(location, event.target.value)}
       />
       <div className="line-comment-draft-footer">
