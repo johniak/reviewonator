@@ -184,6 +184,35 @@ describe("GitHubClient", () => {
     expect(JSON.stringify(payload)).not.toContain("PRIVATE AGENT RESPONSE");
   });
 
+  it("publishes a user comment on a deleted line with side LEFT", async () => {
+    const runner = new RecordingRunner([
+      success(JSON.stringify({ id: 102, html_url: "https://github.com/acme/widgets/pull/42#pullrequestreview-102", state: "COMMENTED" })),
+    ]);
+
+    await new GitHubClient(runner).publishReview(
+      pullRequest,
+      { confirmed: true, event: "COMMENT", body: "", selectedCommentIds: ["H1"] },
+      [{
+        id: "H1",
+        type: "line",
+        author: "user",
+        edited: true,
+        severity: "warning",
+        path: "src/example.ts",
+        line: 2,
+        side: "LEFT",
+        body: "Keep the old constant for now.",
+      }],
+    );
+
+    expect(JSON.parse(runner.calls[0].input!).comments).toEqual([{
+      path: "src/example.ts",
+      line: 2,
+      side: "LEFT",
+      body: "Keep the old constant for now.",
+    }]);
+  });
+
   it("keeps the GitHub review body empty when the optional user summary is empty", async () => {
     const runner = new RecordingRunner([
       success(JSON.stringify({ id: 100, html_url: "https://github.com/acme/widgets/pull/42#pullrequestreview-100", state: "CHANGES_REQUESTED" })),
