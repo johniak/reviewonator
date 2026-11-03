@@ -344,6 +344,19 @@ export function App() {
     );
   }
 
+  async function addUserComment(location: LineCommentLocation) {
+    const body = lineCommentDrafts[lineCommentDraftKey(location)]?.message.trim();
+    if (!body) return;
+    setActionError(null);
+    try {
+      const response = await api.addComment({ ...location, body });
+      setSession(response.session);
+      removeLineCommentDraft(location);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Could not add this comment.");
+    }
+  }
+
   /** Sends a single message and leaves every other unsent message in place. */
   async function sendOneAgentRequest(
     item: Partial<Pick<RevisionRequest, "requests" | "newThreads">>,
@@ -593,6 +606,7 @@ export function App() {
             onChangeDraft={changeLineCommentDraft}
             onRemoveDraft={removeLineCommentDraft}
             onSendDraft={(location) => void sendLineCommentDraft(location)}
+            onAddComment={(location) => void addUserComment(location)}
             {...threadActions}
             {...actions}
           />

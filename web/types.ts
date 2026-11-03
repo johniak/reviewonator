@@ -46,6 +46,7 @@ export type LineCommentDraftActions = {
   onChangeDraft: (location: LineCommentLocation, message: string) => void;
   onRemoveDraft: (location: LineCommentLocation) => void;
   onSendDraft: (location: LineCommentLocation) => void;
+  onAddComment: (location: LineCommentLocation) => void;
 };
 
 export type UserThreadActions = {

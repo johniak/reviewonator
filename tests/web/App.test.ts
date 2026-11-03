@@ -430,6 +430,50 @@ describe("GitHub review body", () => {
     session.cancel();
   });
 
+  async function liveAppWithDraft(line: number) {
+    vi.stubGlobal("EventSource", class { addEventListener() {} close() {} });
+    const session = new ReviewSession(pullRequest, patch, review, new AppGateway(), discussion, true);
+    const serverApp = createApp({ html: "<html></html>", favicon: "<svg></svg>", token: "secret", session });
+    vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+      const value = input instanceof Request ? input.url : input.toString();
+      const url = new URL(value, "http://reviewonator.local");
+      return serverApp.request(`${url.pathname}${url.search}`, init);
+    });
+    window.location.hash = "secret";
+    render(createElement(App));
+    await screen.findByText("Live");
+    const target = [...document.querySelector("diffs-container")!.shadowRoot!.querySelectorAll(`[data-line='${line}']`)][0];
+    target.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, composed: true, pointerType: "mouse" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add a comment to this line" }));
+    const draft = await screen.findByRole("region", { name: `Your comment for src/example.ts line ${line}` });
+    return { session, draft };
+  }
+
+  it("adds a hand-written comment from the line draft without the AI agent", async () => {
+    const { session, draft } = await liveAppWithDraft(3);
+    fireEvent.change(within(draft).getByRole("textbox"), { target: { value: "Rename this before release." } });
+    fireEvent.click(within(draft).getByRole("button", { name: "Add comment" }));
+
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Your comment for src/example.ts line 3" })).toBeNull());
+    expect(session.review.comments.find(({ id }) => id === "H1"))
+      .toMatchObject({ author: "user", path: "src/example.ts", line: 3, side: "RIGHT", body: "Rename this before release." });
+    expect(session.snapshot().agentPending).toBe(false);
+    const card = (await screen.findByText("Rename this before release.")).closest("article")!;
+    expect(within(card).getByRole("button", { name: "Include" })).toHaveAttribute("aria-pressed", "false");
+    session.cancel();
+  });
+
+  it("keeps the draft when the server rejects the hand-written comment", async () => {
+    const { session, draft } = await liveAppWithDraft(3);
+    fireEvent.change(within(draft).getByRole("textbox"), { target: { value: "Rename this before release." } });
+    session.cancel();
+    fireEvent.click(within(draft).getByRole("button", { name: "Add comment" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("This review session is no longer open.");
+    expect(within(screen.getByRole("region", { name: "Your comment for src/example.ts line 3" })).getByRole("textbox"))
+      .toHaveValue("Rename this before release.");
+  });
+
   it("lets the user dismiss their discussion with a reason", async () => {
     const session = new ReviewSession(
       pullRequest,

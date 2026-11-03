@@ -37,6 +37,7 @@ const actions = {
   onChangeDraft: vi.fn(),
   onRemoveDraft: vi.fn(),
   onSendDraft: vi.fn(),
+  onAddComment: vi.fn(),
   viewedPaths: new Set<string>(),
   onViewedChange: vi.fn(),
 };
@@ -203,6 +204,7 @@ describe("DiffPanel view modes", () => {
         onChangeDraft={onChangeDraft}
         onRemoveDraft={onRemoveDraft}
         onSendDraft={vi.fn()}
+        onAddComment={vi.fn()}
       />,
     );
 
@@ -210,6 +212,27 @@ describe("DiffPanel view modes", () => {
     expect(onChangeDraft).toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "Discard this comment" }));
     expect(onRemoveDraft).toHaveBeenCalledWith({ path: "src/example.ts", line: 2, side: "RIGHT" });
+  });
+
+  it("adds the line comment to the review without the AI agent", async () => {
+    const onAddComment = vi.fn();
+    const draft = { id: "U-draft", path: "src/example.ts", line: 2, side: "LEFT" as const, message: "" };
+    const card = (message: string, agentPending = false) => (
+      <LineCommentDraftCard
+        draft={{ ...draft, message }}
+        agentPending={agentPending}
+        onChangeDraft={vi.fn()}
+        onRemoveDraft={vi.fn()}
+        onSendDraft={vi.fn()}
+        onAddComment={onAddComment}
+      />
+    );
+    const { rerender } = render(card("  "));
+
+    expect(screen.getByRole("button", { name: "Add comment" })).toBeDisabled();
+    rerender(card("Keep the old constant for now.", true));
+    await userEvent.click(screen.getByRole("button", { name: "Add comment" }));
+    expect(onAddComment).toHaveBeenCalledWith({ path: "src/example.ts", line: 2, side: "LEFT" });
   });
 
   it("sends only this line comment to the AI agent once it has text", async () => {
@@ -222,6 +245,7 @@ describe("DiffPanel view modes", () => {
         onChangeDraft={vi.fn()}
         onRemoveDraft={vi.fn()}
         onSendDraft={onSendDraft}
+        onAddComment={vi.fn()}
       />
     );
     const { rerender } = render(card("  "));

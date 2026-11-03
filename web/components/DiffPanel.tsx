@@ -75,6 +75,7 @@ export function DiffPanel({
   onChangeDraft,
   onRemoveDraft,
   onSendDraft,
+  onAddComment,
   replyMessages,
   dismissalReasons,
   onReplyChange,
@@ -187,6 +188,7 @@ export function DiffPanel({
               onChangeDraft={onChangeDraft}
               onRemoveDraft={onRemoveDraft}
               onSendDraft={onSendDraft}
+              onAddComment={onAddComment}
             />
           );
         })}
@@ -262,6 +264,7 @@ function FileDiffCard({
   onChangeDraft,
   onRemoveDraft,
   onSendDraft,
+  onAddComment,
 }: {
   file: FileDiffMetadata;
   fileUrl: string | undefined;
@@ -276,7 +279,7 @@ function FileDiffCard({
   diffStyle: "unified" | "split";
   theme: "light" | "dark";
   loadFileContext: (path: string) => Promise<FileContext>;
-} & Pick<LineCommentDraftActions, "onCreateDraft" | "onChangeDraft" | "onRemoveDraft" | "onSendDraft">) {
+} & Pick<LineCommentDraftActions, "onCreateDraft" | "onChangeDraft" | "onRemoveDraft" | "onSendDraft" | "onAddComment">) {
   const containerRef = useRef<HTMLElement>(null);
   const [shouldLoad, setShouldLoad] = useState(false);
   const [context, setContext] = useState<FileContext | null>(null);
@@ -378,6 +381,7 @@ function FileDiffCard({
           onChangeDraft={onChangeDraft}
           onRemoveDraft={onRemoveDraft}
           onSendDraft={onSendDraft}
+          onAddComment={onAddComment}
         />
       </div>}
     </section>
@@ -423,6 +427,7 @@ function RenderedFileDiff({
   onChangeDraft,
   onRemoveDraft,
   onSendDraft,
+  onAddComment,
 }: {
   file: FileDiffMetadata;
   annotations: DiffLineAnnotation<LineAnnotationContent>[];
@@ -434,7 +439,7 @@ function RenderedFileDiff({
   diffStyle: "unified" | "split";
   theme: "light" | "dark";
   path: string;
-} & Pick<LineCommentDraftActions, "onCreateDraft" | "onChangeDraft" | "onRemoveDraft" | "onSendDraft">) {
+} & Pick<LineCommentDraftActions, "onCreateDraft" | "onChangeDraft" | "onRemoveDraft" | "onSendDraft" | "onAddComment">) {
   return (
     <FileDiff<LineAnnotationContent>
       fileDiff={file}
@@ -496,6 +501,7 @@ function RenderedFileDiff({
               onChangeDraft={onChangeDraft}
               onRemoveDraft={onRemoveDraft}
               onSendDraft={onSendDraft}
+              onAddComment={onAddComment}
             />
           )}
         </div>
@@ -510,10 +516,11 @@ export function LineCommentDraftCard({
   onChangeDraft,
   onRemoveDraft,
   onSendDraft,
+  onAddComment,
 }: {
   draft: LineCommentDraft;
   agentPending: boolean;
-} & Pick<LineCommentDraftActions, "onChangeDraft" | "onRemoveDraft" | "onSendDraft">) {
+} & Pick<LineCommentDraftActions, "onChangeDraft" | "onRemoveDraft" | "onSendDraft" | "onAddComment">) {
   const location = { path: draft.path, line: draft.line, side: draft.side };
   return (
     <section
@@ -522,7 +529,7 @@ export function LineCommentDraftCard({
       aria-label={`Your comment for ${draft.path} line ${draft.line}`}
     >
       <div className="line-comment-draft-heading">
-        <span><MessageSquarePlus aria-hidden="true" size={14} /> Your comment for the AI agent</span>
+        <span><MessageSquarePlus aria-hidden="true" size={14} /> Your comment</span>
         <button
           type="button"
           aria-label="Discard this comment"
@@ -540,16 +547,27 @@ export function LineCommentDraftCard({
         onChange={(event) => onChangeDraft(location, event.target.value)}
       />
       <div className="line-comment-draft-footer">
-        <small>This stays private until the AI agent checks it and you explicitly include the revised comment.</small>
-        <button
-          className="finding-discussion-send"
-          type="button"
-          disabled={!draft.message.trim() || agentPending}
-          onClick={() => onSendDraft(location)}
-        >
-          {agentPending ? <RotateCcw aria-hidden="true" size={13} /> : <Send aria-hidden="true" size={13} />}
-          {agentPending ? "AI agent is responding" : "Send to AI"}
-        </button>
+        <small>Add it to the review as you wrote it, or send it to the AI agent to check first. Either way it stays pending until you include it.</small>
+        <div className="line-comment-draft-actions">
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={!draft.message.trim()}
+            onClick={() => onAddComment(location)}
+          >
+            <Plus aria-hidden="true" size={13} />
+            Add comment
+          </button>
+          <button
+            className="finding-discussion-send"
+            type="button"
+            disabled={!draft.message.trim() || agentPending}
+            onClick={() => onSendDraft(location)}
+          >
+            {agentPending ? <RotateCcw aria-hidden="true" size={13} /> : <Send aria-hidden="true" size={13} />}
+            {agentPending ? "AI agent is responding" : "Send to AI"}
+          </button>
+        </div>
       </div>
     </section>
   );

@@ -765,8 +765,9 @@ textarea:focus { border-color: var(--pc-accent); }
 .user-thread-heading > span { display: inline-flex; align-items: center; gap: 6px; }
 .line-comment-draft-heading button { width: var(--pc-control-compact); padding: 0; color: var(--pc-fg-muted); }
 .line-comment-draft-heading button:hover { color: var(--pc-danger); }
-.line-comment-draft-footer { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
-.line-comment-draft-footer small { margin-top: 0; }
+.line-comment-draft-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 8px; }
+.line-comment-draft-footer small { flex: 1 1 260px; margin-top: 0; }
+.line-comment-draft-actions { display: flex; flex: 0 0 auto; gap: 8px; margin-left: auto; }
 .user-thread-status-converted { color: var(--pc-success); background: var(--pc-success-subtle); }
 .user-thread-status-needs-reply { color: var(--pc-info); background: var(--pc-info-subtle); }
 .user-thread-status-dismissed, .user-thread-status-dismissing { color: var(--pc-danger); background: var(--pc-danger-subtle); }
