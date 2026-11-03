@@ -29,6 +29,8 @@ describe("project documentation", () => {
     expect(guide).toContain("Each proposed finding also supports a private live discussion");
     expect(guide).toContain("Use **Send to AI** on the finding card");
     expect(guide).toContain("Use **Send to AI** on your comment to send just that comment");
+    expect(guide).toContain("In every message to the agent, **Enter** sends it and **Shift+Enter** starts a new line.");
+    expect(guide).toContain("Comments, private explanations, and replies render Markdown the way GitHub does, including code blocks");
     expect(guide).toContain("assets/live-finding-discussion.png");
     expect(guide).toContain("assets/reviewonator-diff.png");
   });

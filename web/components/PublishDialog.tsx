@@ -3,6 +3,7 @@ import { CheckCircle2, EyeOff, ExternalLink, Send, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ReviewEvent } from "../../src/domain/review";
 import type { ReviewComment } from "../types";
+import { MarkdownText } from "./MarkdownText";
 import { AuthorBadge, SeverityBadge } from "./SeverityBadge";
 
 type Props = {
@@ -107,7 +108,7 @@ export function PublishDialog({
                         {comment.type === "line" ? `${comment.path}:${comment.line}` : "General comment"}
                       </span>
                     </div>
-                    <p>{comment.body}</p>
+                    <MarkdownText>{comment.body}</MarkdownText>
                   </div>
                 ))}
               </div>

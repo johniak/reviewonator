@@ -94,6 +94,75 @@ describe("ReviewCommentCard", () => {
     expect(onSendRevision).toHaveBeenCalledWith("S1");
   });
 
+  it("sends the discussion message on Enter and starts a new line on Shift+Enter", async () => {
+    const onSendRevision = vi.fn(async () => {});
+    function Harness({ agentPending = false }: { agentPending?: boolean }) {
+      const [message, setMessage] = useState("");
+      return (
+        <ReviewCommentCard
+          comment={review.comments[0]}
+          agentPending={agentPending}
+          selectedIds={new Set()}
+          rejectedIds={new Set()}
+          revisionMessages={{ S1: message }}
+          onToggleSelected={vi.fn()}
+          onToggleRejected={vi.fn()}
+          onRevisionChange={(_id, value) => setMessage(value)}
+          onSendRevision={onSendRevision}
+          onEditComment={vi.fn(async () => true)}
+          onDeleteComment={vi.fn(async () => {})}
+        />
+      );
+    }
+    const { rerender } = render(<Harness />);
+    await userEvent.click(screen.getByRole("button", { name: "Discuss with AI" }));
+    const field = screen.getByRole("textbox", { name: "What do you want to discuss with the AI agent?" });
+
+    await userEvent.type(field, "{Enter}");
+    expect(onSendRevision).not.toHaveBeenCalled();
+
+    await userEvent.type(field, "Check the caller.{Shift>}{Enter}{/Shift}And the tests.");
+    expect(field).toHaveValue("Check the caller.\nAnd the tests.");
+    expect(onSendRevision).not.toHaveBeenCalled();
+    expect(screen.getByText("to send,", { exact: false })).toBeVisible();
+
+    rerender(<Harness agentPending />);
+    await userEvent.type(field, "{Enter}");
+    expect(onSendRevision).not.toHaveBeenCalled();
+
+    rerender(<Harness />);
+    await userEvent.type(field, "{Enter}");
+    expect(onSendRevision).toHaveBeenCalledWith("S1");
+    expect(field).toHaveValue("Check the caller.\nAnd the tests.");
+  });
+
+  it("renders code blocks in the public comment and the private explanation", () => {
+    const comment = {
+      ...review.comments[0],
+      body: "Return early:\n\n```suggestion\nif (!input) return;\n```",
+      reviewerExplanation: "Co: brak strażnika.\nDlaczego: `input` może być pusty.",
+    };
+    const { container } = render(
+      <ReviewCommentCard
+        comment={comment}
+        agentPending={false}
+        selectedIds={new Set()}
+        rejectedIds={new Set()}
+        revisionMessages={{}}
+        onToggleSelected={vi.fn()}
+        onToggleRejected={vi.fn()}
+        onRevisionChange={vi.fn()}
+        onSendRevision={vi.fn(async () => {})}
+        onEditComment={vi.fn(async () => true)}
+        onDeleteComment={vi.fn(async () => {})}
+      />,
+    );
+
+    expect(container.querySelector(".comment-body pre code")).toHaveTextContent("if (!input) return;");
+    expect(screen.getByText("Suggested change")).toBeVisible();
+    expect(container.querySelector(".reviewer-explanation code")).toHaveTextContent("input");
+  });
+
   it("shows the full finding discussion and allows another live reply", async () => {
     const onRevisionChange = vi.fn();
     const comment = {

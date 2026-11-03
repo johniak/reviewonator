@@ -57,6 +57,7 @@ export type UserThreadActions = {
   dismissalReasons: Record<string, string>;
   onReplyChange: (id: string, message: string) => void;
   onDismissalChange: (id: string, reason: string) => void;
+  onSendReply: (id: string) => void;
   onSelectFinding: (id: string) => void;
 };
 

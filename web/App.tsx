@@ -24,6 +24,7 @@ import { DiffPanel, fileSectionId } from "./components/DiffPanel";
 import { PublishDialog } from "./components/PublishDialog";
 import { PullRequestDiscussion } from "./components/PullRequestDiscussion";
 import { MyCommentNavigation } from "./components/MyCommentNavigation";
+import { MarkdownText } from "./components/MarkdownText";
 import { PrBriefing } from "./components/PrBriefing";
 import { commentCardId, ReviewCommentCard } from "./components/ReviewCommentCard";
 import { ReviewFindingNavigation } from "./components/ReviewFindingNavigation";
@@ -197,6 +198,7 @@ export function App() {
     dismissalReasons,
     onReplyChange: changeThreadReply,
     onDismissalChange: changeDismissalReason,
+    onSendReply: sendThreadReply,
     onSelectFinding: selectFindingById,
   };
 
@@ -355,6 +357,16 @@ export function App() {
     );
   }
 
+  async function sendThreadReply(threadId: string) {
+    const message = threadReplies[threadId]?.trim();
+    if (!message) return;
+    await sendOneAgentRequest(
+      { threadReplies: [{ threadId, message }] },
+      () => changeThreadReply(threadId, ""),
+      "Could not send this reply.",
+    );
+  }
+
   async function editComment(id: string, edit: CommentEdit): Promise<boolean> {
     setActionError(null);
     try {
@@ -393,7 +405,7 @@ export function App() {
 
   /** Sends a single message and leaves every other unsent message in place. */
   async function sendOneAgentRequest(
-    item: Partial<Pick<RevisionRequest, "requests" | "newThreads">>,
+    item: Partial<Pick<RevisionRequest, "requests" | "newThreads" | "threadReplies">>,
     onSent: () => void,
     failure: string,
   ) {
@@ -681,7 +693,7 @@ export function App() {
               <>
                 <section className="review-summary">
                   <h2>Review summary</h2>
-                  <p>{review.summary}</p>
+                  <MarkdownText>{review.summary}</MarkdownText>
                   <div className={`recommendation recommendation-${review.recommendation.toLowerCase()}`}>
                     <MessageSquareText size={16} />
                     Recommended decision

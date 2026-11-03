@@ -1,5 +1,6 @@
 import { ChevronRight, ExternalLink, EyeOff, Ticket } from "lucide-react";
 import type { Briefing } from "../../src/domain/review";
+import { MarkdownText } from "./MarkdownText";
 
 export function PrBriefing({ briefing, reviewerLanguage, collapsed, onCollapsedChange }: {
   briefing: Briefing;
@@ -41,7 +42,7 @@ export function PrBriefing({ briefing, reviewerLanguage, collapsed, onCollapsedC
         {ticket && !ticket.url && <span className="briefing-ticket">{ticketLabel}</span>}
         <small><EyeOff aria-hidden="true" size={13} /> Private · {reviewerLanguage}</small>
       </div>
-      {!collapsed && <p className="briefing-text">{text}</p>}
+      {!collapsed && <MarkdownText className="briefing-text">{text}</MarkdownText>}
     </section>
   );
 }

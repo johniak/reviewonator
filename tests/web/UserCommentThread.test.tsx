@@ -9,6 +9,7 @@ const actions = {
   dismissalReasons: {},
   onReplyChange: vi.fn(),
   onDismissalChange: vi.fn(),
+  onSendReply: vi.fn(),
   onSelectFinding: vi.fn(),
 };
 
@@ -22,6 +23,33 @@ describe("UserCommentThreadCard", () => {
     expect(screen.getByText("Needs your reply")).toBeVisible();
     await userEvent.type(screen.getByLabelText("Reply to the AI agent"), "The closure supplies the input.");
     expect(onReplyChange).toHaveBeenCalled();
+  });
+
+  it("sends a reply to the AI agent on Enter or with its own button", async () => {
+    const onSendReply = vi.fn();
+    const card = (reply: string, agentPending = false) => (
+      <UserCommentThreadCard
+        thread={userThread}
+        {...actions}
+        agentPending={agentPending}
+        replyMessages={{ U1: reply }}
+        onSendReply={onSendReply}
+      />
+    );
+    const { rerender } = render(card(""));
+
+    expect(screen.getByRole("button", { name: "Send to AI" })).toBeDisabled();
+    await userEvent.type(screen.getByLabelText("Reply to the AI agent"), "{Enter}");
+    expect(onSendReply).not.toHaveBeenCalled();
+
+    rerender(card("The closure supplies the input."));
+    await userEvent.type(screen.getByLabelText("Reply to the AI agent"), "{Enter}");
+    expect(onSendReply).toHaveBeenCalledWith("U1");
+    await userEvent.click(screen.getByRole("button", { name: "Send to AI" }));
+    expect(onSendReply).toHaveBeenCalledTimes(2);
+
+    rerender(card("The closure supplies the input.", true));
+    expect(screen.getByRole("button", { name: "AI agent is responding" })).toBeDisabled();
   });
 
   it("shows the finding created after the agent agrees", async () => {

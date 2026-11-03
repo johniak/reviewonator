@@ -31,6 +31,7 @@ const actions = {
   dismissalReasons: {},
   onReplyChange: vi.fn(),
   onDismissalChange: vi.fn(),
+  onSendReply: vi.fn(),
   onSelectFinding: vi.fn(),
   drafts: [],
   onCreateDraft: vi.fn(),
@@ -294,5 +295,28 @@ describe("DiffPanel view modes", () => {
 
     rerender(card("This ignores the input.", true));
     expect(screen.getByRole("button", { name: "AI agent is responding" })).toBeDisabled();
+  });
+
+  it("sends the line comment to the AI agent on Enter, not on Shift+Enter", async () => {
+    const onSendDraft = vi.fn();
+    const onChangeDraft = vi.fn();
+    const draft = { id: "U-draft", path: "src/example.ts", line: 2, side: "RIGHT" as const, message: "Check this." };
+    render(
+      <LineCommentDraftCard
+        draft={draft}
+        agentPending={false}
+        onChangeDraft={onChangeDraft}
+        onRemoveDraft={vi.fn()}
+        onSendDraft={onSendDraft}
+        onAddComment={vi.fn()}
+      />,
+    );
+
+    await userEvent.type(screen.getByRole("textbox"), "{Shift>}{Enter}{/Shift}");
+    expect(onSendDraft).not.toHaveBeenCalled();
+    expect(onChangeDraft).toHaveBeenLastCalledWith({ path: "src/example.ts", line: 2, side: "RIGHT" }, "Check this.\n");
+
+    await userEvent.type(screen.getByRole("textbox"), "{Enter}");
+    expect(onSendDraft).toHaveBeenCalledWith({ path: "src/example.ts", line: 2, side: "RIGHT" });
   });
 });

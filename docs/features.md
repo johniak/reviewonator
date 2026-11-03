@@ -22,6 +22,8 @@ You can:
 
 **Viewed** is the same per-user flag as on GitHub. Files you already marked there arrive ticked and collapsed, and ticking or unticking a file in Reviewonator updates GitHub immediately. When the author pushes a new change to a viewed file, GitHub clears the flag and the file comes back unviewed. The **Files changed** heading counts how many files you have viewed, and a viewed file can still be expanded with the arrow next to its name.
 
+Comments, private explanations, and replies render Markdown the way GitHub does, including code blocks, and a GitHub `suggestion` block is labelled **Suggested change**.
+
 Context expansion is handled by the local Reviewonator process through your authenticated GitHub CLI session. GitHub credentials are never sent to the browser.
 
 The workspace follows your system colour scheme and offers **System**, **Light**, and **Dark** switches in the header. Switching never resets the open file, scroll position, or drafts. Reviewonator remembers the colour theme, the single-file or all-files view, and the unified or side-by-side diff for the next review.
@@ -30,7 +32,7 @@ The workspace follows your system colour scheme and offers **System**, **Light**
 
 ## Discuss your own concerns with the AI agent
 
-Click **+** beside a diff line to start your own comment. **Send to AI** turns it into a private conversation with the agent. Use **Send to AI** on your comment to send just that comment; any other unsent messages stay where they are until you send them with the button in the review panel. Reviewonator keeps these conversations in a separate **My comments** section and never publishes them directly to GitHub. To put a comment straight into the review instead, use **Add comment** (see below).
+Click **+** beside a diff line to start your own comment. **Send to AI** turns it into a private conversation with the agent. Use **Send to AI** on your comment to send just that comment; any other unsent messages stay where they are until you send them with the button in the review panel. In every message to the agent, **Enter** sends it and **Shift+Enter** starts a new line. Reviewonator keeps these conversations in a separate **My comments** section and never publishes them directly to GitHub. To put a comment straight into the review instead, use **Add comment** (see below).
 
 The agent checks the exact code before responding. It can:
 

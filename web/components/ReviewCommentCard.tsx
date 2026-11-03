@@ -2,6 +2,8 @@ import { Bot, Check, EyeOff, MessageSquareReply, Pencil, RotateCcw, Send, Trash2
 import { useState } from "react";
 import type { CommentEdit, Severity } from "../../src/domain/review";
 import type { CommentActions, ReviewComment } from "../types";
+import { MarkdownText } from "./MarkdownText";
+import { SendHint, sendOnEnter } from "./SendOnEnter";
 import { AuthorBadge, SeverityBadge, severityLabel, severityOrder } from "./SeverityBadge";
 
 type Props = CommentActions & {
@@ -80,7 +82,7 @@ export function ReviewCommentCard({
           onSave={async (edit) => { if (await onEditComment(comment.id, edit)) setEditing(false); }}
         />
       ) : (
-        <p className="comment-body">{comment.body}</p>
+        <MarkdownText className="comment-body">{comment.body}</MarkdownText>
       )}
       {comment.reviewerExplanation && (
         <div className="reviewer-explanation">
@@ -88,7 +90,7 @@ export function ReviewCommentCard({
             <span><EyeOff aria-hidden="true" size={13} /> For reviewer only</span>
             <small>Private · {reviewerLanguage}</small>
           </div>
-          <p>{comment.reviewerExplanation}</p>
+          <MarkdownText>{comment.reviewerExplanation}</MarkdownText>
         </div>
       )}
       {discussion.length > 0 && (
@@ -103,7 +105,7 @@ export function ReviewCommentCard({
                 : <Bot aria-hidden="true" size={12} />}</span>
               <div>
                 <strong>{message.author === "user" ? "You" : "AI agent"}</strong>
-                <p>{message.body}</p>
+                <MarkdownText>{message.body}</MarkdownText>
               </div>
             </div>
           ))}
@@ -148,11 +150,15 @@ export function ReviewCommentCard({
               aria-label={fieldLabel}
               value={revision}
               onChange={(event) => onRevisionChange(comment.id, event.target.value)}
+              onKeyDown={sendOnEnter(() => {
+                if (revision.trim() && !agentPending) void onSendRevision(comment.id);
+              })}
               placeholder="Explain what seems wrong, unclear, or worth checking…"
               rows={3}
               autoFocus
             />
           </label>
+          <SendHint />
           <button
             className="finding-discussion-send"
             type="button"

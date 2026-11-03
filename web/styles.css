@@ -698,7 +698,7 @@ textarea:focus { border-color: var(--pc-accent); }
   font: inherit;
   font-size: 13px;
 }
-.comment-body { margin: 8px 0 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.comment-body { margin: 8px 0 12px; }
 
 .reviewer-explanation {
   margin: 0 0 12px;
@@ -719,7 +719,7 @@ textarea:focus { border-color: var(--pc-accent); }
 }
 .reviewer-explanation-heading span { display: inline-flex; align-items: center; gap: 6px; }
 .reviewer-explanation-heading small { font-size: var(--pc-text-small); font-weight: 500; white-space: nowrap; }
-.reviewer-explanation p { margin: 6px 0 0; font-size: 13px; line-height: 20px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.reviewer-explanation .markdown-text { margin: 6px 0 0; font-size: 13px; line-height: 20px; }
 
 .finding-discussion {
   display: grid;
@@ -746,8 +746,8 @@ textarea:focus { border-color: var(--pc-accent); }
 .user-thread-message-agent .user-thread-avatar { color: var(--pc-accent); background: var(--pc-accent-subtle); }
 .finding-discussion-message strong,
 .user-thread-message strong { display: block; font-size: var(--pc-text-small); line-height: 18px; color: var(--pc-fg-muted); }
-.finding-discussion-message p,
-.user-thread-message p { margin: 0; font-size: 13px; line-height: 20px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.finding-discussion-message .markdown-text,
+.user-thread-message .markdown-text { font-size: 13px; line-height: 20px; }
 .finding-discussion-waiting,
 .thread-waiting-note { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; color: var(--pc-fg-muted); font-size: var(--pc-text-small); }
 .finding-discussion-waiting svg { animation: spin 1.3s linear infinite; }
@@ -758,7 +758,18 @@ textarea:focus { border-color: var(--pc-accent); }
 .revision-button.active { color: var(--pc-accent); background: var(--pc-accent-subtle); border-color: var(--pc-accent-border); }
 .revision-button:disabled { color: var(--pc-fg-muted); cursor: wait; }
 
-.revision-composer { margin-top: 10px; display: grid; gap: 8px; }
+.revision-composer { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.revision-composer > .revision-field { flex: 1 0 100%; }
+.thread-reply-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 8px; }
+.send-hint { color: var(--pc-fg-muted); font-size: var(--pc-text-small); line-height: 18px; }
+.send-hint kbd, .line-comment-draft small kbd {
+  padding: 0 4px;
+  color: var(--pc-fg-default);
+  background: var(--pc-bg-subtle);
+  border: var(--pc-border-width) solid var(--pc-border-default);
+  border-radius: var(--pc-radius-xs);
+  font: var(--pc-text-small) / 16px var(--pc-font-code);
+}
 .revision-field, .thread-reply-field, .thread-dismissal-field label, .publish-body-field { display: block; }
 .revision-field > span,
 .thread-reply-field > span,
@@ -928,11 +939,11 @@ textarea:focus { border-color: var(--pc-accent); }
 .briefing-ticket strong { font-weight: 600; white-space: nowrap; }
 .briefing-ticket span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--pc-fg-muted); }
 a.briefing-ticket:hover { background: var(--pc-bg-hover); border-color: var(--pc-border-strong); }
-.briefing-text { max-width: 110ch; margin-top: 6px; padding-left: 20px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.briefing-text { max-width: 110ch; margin-top: 6px; padding-left: 20px; }
 
 .review-summary { padding: 16px 20px 16px 16px; border-bottom: var(--pc-border-width) solid var(--pc-border-default); }
 .review-summary h2 { font-size: 16px; line-height: 24px; margin-bottom: 8px; }
-.review-summary > p { white-space: pre-wrap; overflow-wrap: anywhere; }
+
 .recommendation { margin-top: 12px; display: flex; align-items: center; gap: 8px; color: var(--pc-fg-muted); font-size: 13px; }
 .recommendation strong { margin-left: auto; color: var(--pc-fg-default); font-weight: 600; }
 .recommendation.recommendation-approve strong { color: var(--pc-success); background: var(--pc-success-subtle); }
@@ -1006,20 +1017,43 @@ a.briefing-ticket:hover { background: var(--pc-bg-hover); border-color: var(--pc
 .discussion-location { max-width: 100%; margin: 10px 0 0; justify-content: flex-start; }
 .discussion-location span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .discussion-location small { flex: 0 0 auto; color: var(--pc-warning); font-size: var(--pc-text-small); font-weight: 500; }
-.discussion-body { margin-top: 10px; font-size: 13px; line-height: 20px; overflow-wrap: anywhere; }
-.discussion-body > :first-child { margin-top: 0; }
-.discussion-body > :last-child { margin-bottom: 0; }
-.discussion-body p, .discussion-body ul, .discussion-body ol, .discussion-body blockquote, .discussion-body pre { margin: 8px 0; }
-.discussion-body ul, .discussion-body ol { padding-left: 20px; }
-.discussion-body code {
+.discussion-body { margin-top: 10px; font-size: 13px; line-height: 20px; }
+
+/* ---------- Markdown in comments, as GitHub renders it ---------- */
+
+.markdown-text { min-width: 0; overflow-wrap: anywhere; }
+.markdown-text > :first-child { margin-top: 0; }
+.markdown-text > :last-child { margin-bottom: 0; }
+.markdown-text p, .markdown-text ul, .markdown-text ol, .markdown-text blockquote, .markdown-text pre, .markdown-text .markdown-suggestion { margin: 8px 0; }
+.markdown-text ul, .markdown-text ol { padding-left: 20px; }
+.markdown-text code {
   padding: 1px 4px;
   background: var(--pc-bg-subtle);
   border-radius: var(--pc-radius-xs);
   font: var(--pc-text-small) / 18px var(--pc-font-code);
 }
-.discussion-body pre { overflow: auto; padding: 10px 12px; background: var(--pc-bg-subtle); border-radius: var(--pc-radius-sm); }
-.discussion-body pre code { padding: 0; background: transparent; }
-.discussion-body blockquote { padding-left: 10px; color: var(--pc-fg-muted); border-left: 2px solid var(--pc-border-strong); }
+.markdown-text pre {
+  overflow: auto;
+  padding: 10px 12px;
+  background: var(--pc-bg-subtle);
+  border: var(--pc-border-width) solid var(--pc-border-muted);
+  border-radius: var(--pc-radius-sm);
+  white-space: pre;
+  overflow-wrap: normal;
+}
+.markdown-text pre code { padding: 0; background: transparent; border-radius: 0; }
+.markdown-text blockquote { padding-left: 10px; color: var(--pc-fg-muted); border-left: 2px solid var(--pc-border-strong); }
+.markdown-suggestion { border: var(--pc-border-width) solid var(--pc-border-default); border-radius: var(--pc-radius-sm); overflow: hidden; }
+.markdown-suggestion > span {
+  display: block;
+  padding: 4px 12px;
+  color: var(--pc-fg-muted);
+  background: var(--pc-bg-surface);
+  border-bottom: var(--pc-border-width) solid var(--pc-border-muted);
+  font-size: var(--pc-text-small);
+  font-weight: 500;
+}
+.markdown-text .markdown-suggestion pre { margin: 0; border: 0; border-radius: 0; background: var(--pc-diff-add-bg); }
 .discussion-no-body { margin-top: 10px; color: var(--pc-fg-muted); font-size: 13px; font-style: italic; }
 
 /* ---------- Publish dialog (the one floating surface) ---------- */
@@ -1097,7 +1131,7 @@ a.briefing-ticket:hover { background: var(--pc-bg-hover); border-color: var(--pc
 .publish-comment:last-child { border-bottom: 0; }
 .publish-comment > div { display: flex; justify-content: space-between; gap: 10px; }
 .comment-location { color: var(--pc-fg-muted); font-size: var(--pc-text-small); font-variant-numeric: tabular-nums; }
-.publish-comment p { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.publish-comment .markdown-text { margin: 6px 0 0; }
 
 .dialog-footer { display: grid; gap: 10px; padding: 16px 24px 20px; background: var(--pc-bg-subtle); border-top: var(--pc-border-width) solid var(--pc-border-default); }
 .publish-confirmation { display: flex; align-items: center; gap: 8px; cursor: pointer; }

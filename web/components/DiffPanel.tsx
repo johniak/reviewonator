@@ -32,6 +32,7 @@ import type {
   UserThreadActions,
 } from "../types";
 import { ReviewCommentCard } from "./ReviewCommentCard";
+import { sendOnEnter } from "./SendOnEnter";
 import { userThreadCardId, UserCommentThreadCard } from "./UserCommentThread";
 
 type Props = CommentActions & LineCommentDraftActions & UserThreadActions & {
@@ -80,6 +81,7 @@ export function DiffPanel({
   dismissalReasons,
   onReplyChange,
   onDismissalChange,
+  onSendReply,
   onSelectFinding,
   ...commentActions
 }: Props) {
@@ -177,6 +179,7 @@ export function DiffPanel({
                 dismissalReasons,
                 onReplyChange,
                 onDismissalChange,
+                onSendReply,
                 onSelectFinding,
               }}
               diffStyle={diffStyle}
@@ -482,6 +485,7 @@ function RenderedFileDiff({
               key={thread.id}
               thread={thread}
               focused={thread.id === focusedThreadId}
+              agentPending={commentActions.agentPending}
               {...threadActions}
             />
           ))}
@@ -545,9 +549,15 @@ export function LineCommentDraftCard({
         value={draft.message}
         placeholder="Write your comment. Add it as written, or send it to the AI agent to check it against the code first."
         onChange={(event) => onChangeDraft(location, event.target.value)}
+        onKeyDown={sendOnEnter(() => {
+          if (draft.message.trim() && !agentPending) onSendDraft(location);
+        })}
       />
       <div className="line-comment-draft-footer">
-        <small>Add it to the review as you wrote it, or send it to the AI agent to check first. Either way it stays pending until you include it.</small>
+        <small>
+          Add it to the review as you wrote it, or send it to the AI agent to check first. Either way it stays pending until you include it.
+          {" "}<kbd>Enter</kbd> sends it to the AI agent, <kbd>Shift</kbd>+<kbd>Enter</kbd> starts a new line.
+        </small>
         <div className="line-comment-draft-actions">
           <button
             className="secondary-button"

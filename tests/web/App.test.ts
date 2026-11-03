@@ -483,6 +483,38 @@ describe("GitHub review body", () => {
     session.cancel();
   });
 
+  it("sends one discussion reply on Enter and keeps other pending messages", async () => {
+    vi.stubGlobal("EventSource", class { addEventListener() {} close() {} });
+    const session = new ReviewSession(
+      pullRequest,
+      patch,
+      { ...review, userThreads: [userThread] },
+      new AppGateway(),
+      discussion,
+      true,
+    );
+    serveSession(session);
+    render(createElement(App));
+    await screen.findByText("Live");
+    fireEvent.click(screen.getAllByRole("button", { name: "Discuss with AI" })[0]);
+    fireEvent.change(screen.getByLabelText("What do you want to discuss with the AI agent?"), {
+      target: { value: "Keep this for later" },
+    });
+
+    const reply = screen.getByLabelText("Reply to the AI agent");
+    fireEvent.change(reply, { target: { value: "The closure supplies the value." } });
+    fireEvent.keyDown(reply, { key: "Enter" });
+
+    await expect(session.waitForAgentRequest()).resolves.toMatchObject({
+      requests: [],
+      newThreads: [],
+      threadReplies: [{ threadId: "U1", message: "The closure supplies the value." }],
+      dismissedThreads: [],
+    });
+    expect(screen.getByLabelText("What do you want to discuss with the AI agent?")).toHaveValue("Keep this for later");
+    session.cancel();
+  });
+
   async function liveApp(prepare?: (session: ReviewSession) => void) {
     vi.stubGlobal("EventSource", class { addEventListener() {} close() {} });
     const session = new ReviewSession(pullRequest, patch, review, new AppGateway(), discussion, true);

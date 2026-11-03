@@ -1,5 +1,6 @@
 import {
   Bot,
+  RotateCcw,
   CheckCircle2,
   CircleX,
   MessageSquareReply,
@@ -9,19 +10,24 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import type { UserCommentThread, UserThreadActions } from "../types";
+import { MarkdownText } from "./MarkdownText";
+import { SendHint, sendOnEnter } from "./SendOnEnter";
 
 type Props = UserThreadActions & {
   thread: UserCommentThread;
   focused?: boolean;
+  agentPending?: boolean;
 };
 
 export function UserCommentThreadCard({
   thread,
   focused = false,
+  agentPending = false,
   replyMessages,
   dismissalReasons,
   onReplyChange,
   onDismissalChange,
+  onSendReply,
   onSelectFinding,
 }: Props) {
   const reply = replyMessages[thread.id] ?? "";
@@ -51,7 +57,7 @@ export function UserCommentThreadCard({
             </span>
             <div>
               <strong>{message.author === "user" ? "You" : "AI agent"}</strong>
-              <p>{message.body}</p>
+              <MarkdownText>{message.body}</MarkdownText>
             </div>
           </div>
         ))}
@@ -88,9 +94,25 @@ export function UserCommentThreadCard({
               onDismissalChange(thread.id, "");
               onReplyChange(thread.id, event.target.value);
             }}
+            onKeyDown={sendOnEnter(() => {
+              if (reply.trim() && !agentPending) onSendReply(thread.id);
+            })}
           />
-          <small>Your reply will return to the agent in the next review round.</small>
         </label>
+      )}
+      {canReply && !showDismissal && (
+        <div className="thread-reply-actions">
+          <SendHint />
+          <button
+            className="finding-discussion-send"
+            type="button"
+            disabled={!reply.trim() || agentPending}
+            onClick={() => onSendReply(thread.id)}
+          >
+            {agentPending ? <RotateCcw aria-hidden="true" size={13} /> : <Send aria-hidden="true" size={13} />}
+            {agentPending ? "AI agent is responding" : "Send to AI"}
+          </button>
+        </div>
       )}
 
       {!thread.dismissed && !thread.findingId && (

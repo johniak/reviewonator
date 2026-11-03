@@ -6,9 +6,8 @@ import {
   MessagesSquare,
   OctagonAlert,
 } from "lucide-react";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import type { PullRequestDiscussionItem } from "../../src/domain/discussion";
+import { MarkdownText } from "./MarkdownText";
 
 export function PullRequestDiscussion({
   items,
@@ -57,13 +56,7 @@ export function PullRequestDiscussion({
             )}
 
             {item.body ? (
-              <div className="discussion-body">
-                <Markdown remarkPlugins={[remarkGfm]} components={{
-                  a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer">{children}</a>,
-                }}>
-                  {item.body}
-                </Markdown>
-              </div>
+              <MarkdownText className="discussion-body">{item.body}</MarkdownText>
             ) : (
               <p className="discussion-no-body">No review summary was provided.</p>
             )}
