@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { z, ZodError } from "zod";
+import { defaultPreferences, preferenceChangeSchema, type Preferences, type PreferenceStore } from "../domain/preferences";
 import type { UpdateNoticeSource } from "../domain/update";
 import { ClosedSessionError, CommentChangeError, ReviewSession, StalePullRequestError } from "./session";
 
@@ -10,14 +11,22 @@ type AppDependencies = {
   token: string;
   session: ReviewSession;
   updates?: UpdateNoticeSource;
+  preferences?: PreferenceStore;
 };
 
 const dismissalSchema = z.object({ version: z.string().min(1) });
+const preferencesElement = /(<script id="reviewonator-preferences" type="application\/json">)[^<]*(<\/script>)/;
 
-export function createApp({ html, favicon, token, session, updates }: AppDependencies): Hono {
+/** Fills the placeholder in index.html so the page can apply the saved theme before its first paint. */
+function withPreferences(html: string, preferences: Preferences): string {
+  const json = JSON.stringify(preferences).replace(/</g, "\\u003c");
+  return html.replace(preferencesElement, (_match, open: string, close: string) => `${open}${json}${close}`);
+}
+
+export function createApp({ html, favicon, token, session, updates, preferences }: AppDependencies): Hono {
   const app = new Hono();
 
-  app.get("/", (context) => context.html(html));
+  app.get("/", async (context) => context.html(withPreferences(html, (await preferences?.read()) ?? defaultPreferences)));
   app.get("/favicon.svg", (context) => context.body(favicon, 200, { "content-type": "image/svg+xml" }));
   app.get("/health", (context) => context.json({ status: "ok" }));
 
@@ -50,6 +59,12 @@ export function createApp({ html, favicon, token, session, updates }: AppDepende
     const { version } = dismissalSchema.parse(await context.req.json());
     await updates?.dismiss(version);
     return context.json({ status: "dismissed" });
+  });
+
+  app.post("/api/preferences", async (context) => {
+    const change = preferenceChangeSchema.parse(await context.req.json());
+    const saved = preferences ? await preferences.update(change) : { ...defaultPreferences, ...change };
+    return context.json({ preferences: saved });
   });
 
   app.get("/api/file-context", async (context) => {

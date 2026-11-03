@@ -51,6 +51,7 @@ export async function runUninstall(options: UninstallOptions, context: Uninstall
     if (remaining.length === 0) {
       await removeConfig(env);
       await rm(join(liveStateDirectory(env), "update-check.json"), { force: true });
+      await rm(join(liveStateDirectory(env), "preferences.json"), { force: true });
     } else {
       await writeConfig({
         ...config,

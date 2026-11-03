@@ -30,6 +30,7 @@ import { UpdateNoticeToast } from "./components/UpdateNotice";
 import { userThreadCardId } from "./components/UserCommentThread";
 import markDark from "./brand/mark-dark.png";
 import markLight from "./brand/mark-light.png";
+import { usePreference } from "./preferences";
 import { ThemeSwitcher, useTheme } from "./theme";
 import type {
   LineCommentDraft,
@@ -47,8 +48,8 @@ export function App() {
   const [session, setSession] = useState<SessionSnapshot | null>(null);
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [activePath, setActivePath] = useState("");
-  const [viewMode, setViewMode] = useState<"single" | "all">("single");
-  const [diffStyle, setDiffStyle] = useState<"unified" | "split">("unified");
+  const [viewMode, setViewMode] = usePreference("viewMode");
+  const [diffStyle, setDiffStyle] = usePreference("diffStyle");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [rejectedIds, setRejectedIds] = useState<Set<string>>(new Set());
   const [focusedCommentId, setFocusedCommentId] = useState<string | null>(null);

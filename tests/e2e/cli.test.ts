@@ -121,6 +121,29 @@ describe("Reviewonator CLI end-to-end", () => {
     expect(await response.json()).toEqual({ notice: null });
   });
 
+  it("opens the next run with the preferences saved in the previous one", async () => {
+    const stateDirectory = await mkdtemp(join(tmpdir(), "reviewonator-e2e-preferences-"));
+    const first = await startReviewonator({ REVIEWONATOR_STATE_DIR: stateDirectory });
+    const firstRun = await first.ready;
+
+    const saved = await authenticatedFetch(firstRun.baseUrl, firstRun.token, "/api/preferences", {
+      method: "POST",
+      body: JSON.stringify({ theme: "dark", viewMode: "all" }),
+    });
+    expect(saved.status).toBe(200);
+    await authenticatedFetch(firstRun.baseUrl, firstRun.token, "/api/cancel", { method: "POST", body: "{}" });
+    await waitForExit(first.child);
+
+    const second = await startReviewonator({ REVIEWONATOR_STATE_DIR: stateDirectory });
+    const secondRun = await second.ready;
+    const page = await (await fetch(secondRun.baseUrl)).text();
+
+    const embedded = page.match(/<script id="reviewonator-preferences" type="application\/json">([^<]*)<\/script>/)?.[1];
+
+    expect(secondRun.baseUrl).not.toBe(firstRun.baseUrl);
+    expect(JSON.parse(embedded ?? "null")).toEqual({ theme: "dark", viewMode: "all", diffStyle: "unified" });
+  }, 20_000);
+
   it("exits right after its result even when the release lookup hangs", async () => {
     const stateDirectory = await mkdtemp(join(tmpdir(), "reviewonator-slow-release-"));
     const process = await startReviewonator({

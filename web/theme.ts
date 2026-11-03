@@ -1,21 +1,12 @@
 import { createElement, useEffect, useState } from "react";
+import type { ThemePreference } from "../src/domain/preferences";
+import { readPreferences, usePreference } from "./preferences";
 
-export type ThemePreference = "system" | "light" | "dark";
+export type { ThemePreference };
 export type ResolvedTheme = "light" | "dark";
-
-export const THEME_STORAGE_KEY = "reviewonator-theme";
 
 const preferences: ThemePreference[] = ["system", "light", "dark"];
 const labels: Record<ThemePreference, string> = { system: "System", light: "Light", dark: "Dark" };
-
-export function readThemePreference(): ThemePreference {
-  try {
-    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-    return stored === "light" || stored === "dark" ? stored : "system";
-  } catch {
-    return "system";
-  }
-}
 
 export function resolveTheme(preference: ThemePreference): ResolvedTheme {
   if (preference !== "system") return preference;
@@ -32,11 +23,11 @@ export function applyTheme(preference: ThemePreference): ResolvedTheme {
 
 /** Mirrors the inline script in index.html so tests and late renders agree with the first paint. */
 export function applyStoredTheme(): ResolvedTheme {
-  return applyTheme(readThemePreference());
+  return applyTheme(readPreferences().theme);
 }
 
 export function useTheme(): [ThemePreference, ResolvedTheme, (next: ThemePreference) => void] {
-  const [preference, setPreferenceState] = useState<ThemePreference>(readThemePreference);
+  const [preference, setPreference] = usePreference("theme");
   const [resolved, setResolved] = useState<ResolvedTheme>(() => applyTheme(preference));
 
   useEffect(() => {
@@ -47,16 +38,6 @@ export function useTheme(): [ThemePreference, ResolvedTheme, (next: ThemePrefere
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
   }, [preference]);
-
-  function setPreference(next: ThemePreference) {
-    try {
-      if (next === "system") window.localStorage.removeItem(THEME_STORAGE_KEY);
-      else window.localStorage.setItem(THEME_STORAGE_KEY, next);
-    } catch {
-      // Storage can be unavailable; the choice still applies for this session.
-    }
-    setPreferenceState(next);
-  }
 
   return [preference, resolved, setPreference];
 }

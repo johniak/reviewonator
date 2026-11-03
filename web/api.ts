@@ -1,3 +1,4 @@
+import type { PreferenceChange, Preferences } from "../src/domain/preferences";
 import type { CommentEdit, PublishRequest, RevisionRequest, UserCommentInput } from "../src/domain/review";
 import type { FileContext } from "../src/github/client";
 import type { UpdateNotice } from "../src/domain/update";
@@ -61,6 +62,10 @@ export const api = {
     body: JSON.stringify(input),
   }),
   cancel: () => request<{ status: string }>("/api/cancel", { method: "POST", body: "{}" }),
+  savePreferences: (change: PreferenceChange) => request<{ preferences: Preferences }>("/api/preferences", {
+    method: "POST",
+    body: JSON.stringify(change),
+  }),
   loadUpdateNotice: () => request<{ notice: UpdateNotice | null }>("/api/update-notice"),
   dismissUpdateNotice: (version: string) => request<{ status: string }>("/api/update-notice/dismiss", {
     method: "POST",

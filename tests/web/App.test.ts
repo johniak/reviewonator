@@ -1,4 +1,7 @@
 import { readFileSync } from "node:fs";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createElement } from "react";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -6,9 +9,11 @@ import type { PullRequest } from "../../src/domain/pull-request";
 import type { PublishRequest, ReviewComment } from "../../src/domain/review";
 import type { GitHubGateway, LoadedPullRequest, PublishedReview } from "../../src/github/client";
 import { createApp } from "../../src/server/app";
+import { FilePreferenceStore } from "../../src/server/preferences";
 import { ReviewSession } from "../../src/server/session";
 import { App, buildPublishBody, CompletionScreen, describeFilePath } from "../../web/App";
 import { discussion, patch, pullRequest, review, userThread } from "../fixtures";
+import { closePage, indexHtml, openPage } from "./page";
 
 class AppGateway implements GitHubGateway {
   async verifyPrerequisites() {}
@@ -27,20 +32,22 @@ class AppGateway implements GitHubGateway {
   }
 }
 
-function serveSession(session: ReviewSession) {
-  const serverApp = createApp({ html: "<html></html>", favicon: "<svg></svg>", token: "secret", session });
+function serveSession(session: ReviewSession, preferences?: FilePreferenceStore) {
+  const serverApp = createApp({ html: indexHtml, favicon: "<svg></svg>", token: "secret", session, preferences });
   vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
     const value = input instanceof Request ? input.url : input.toString();
     const url = new URL(value, "http://reviewonator.local");
     return serverApp.request(`${url.pathname}${url.search}`, init);
   });
   window.location.hash = "secret";
+  return serverApp;
 }
 
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   window.location.hash = "";
+  closePage();
 });
 
 describe("navigation panel layout", () => {
@@ -603,5 +610,30 @@ describe("completion screen", () => {
     expect(screen.getByText("Automatic closing cancelled.")).toBeVisible();
     act(() => vi.advanceTimersByTime(60_000));
     expect(onAutoClose).not.toHaveBeenCalled();
+  });
+});
+
+describe("saved view preferences", () => {
+  it("opens in the file view and diff layout saved by an earlier run and saves a change for the next run", async () => {
+    const preferences = new FilePreferenceStore({
+      REVIEWONATOR_STATE_DIR: await mkdtemp(join(tmpdir(), "reviewonator-view-preferences-")),
+    });
+    await preferences.update({ viewMode: "all", diffStyle: "split" });
+    await openPage(serveSession(new ReviewSession(pullRequest, patch, review, new AppGateway(), discussion), preferences));
+
+    render(createElement(App));
+
+    expect(await screen.findByRole("button", { name: "All files" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Split" })).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Single file" }));
+    fireEvent.click(screen.getByRole("button", { name: "Unified" }));
+
+    expect(screen.getByRole("button", { name: "Single file" })).toHaveAttribute("aria-pressed", "true");
+    await waitFor(async () => expect(await preferences.read()).toEqual({
+      theme: "system",
+      viewMode: "single",
+      diffStyle: "unified",
+    }));
   });
 });

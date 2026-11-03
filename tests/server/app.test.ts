@@ -1,8 +1,12 @@
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { PullRequest } from "../../src/domain/pull-request";
 import type { PublishRequest, ReviewComment } from "../../src/domain/review";
 import type { GitHubGateway, LoadedPullRequest, PublishedReview } from "../../src/github/client";
 import { createApp } from "../../src/server/app";
+import { FilePreferenceStore } from "../../src/server/preferences";
 import { ReviewSession } from "../../src/server/session";
 import { discussion, patch, pullRequest, review } from "../fixtures";
 
@@ -225,5 +229,59 @@ describe("Reviewonator HTTP API", () => {
         error: "Comments can only be placed on lines inside the pull request diff: src/example.ts:9",
       });
     });
+  });
+});
+
+describe("saved preferences", () => {
+  const page = '<head><script id="reviewonator-preferences" type="application/json">{}</script><script>/* theme */</script></head>';
+
+  async function preferencesApp() {
+    const preferences = new FilePreferenceStore({
+      REVIEWONATOR_STATE_DIR: await mkdtemp(join(tmpdir(), "reviewonator-app-preferences-")),
+    });
+    const session = new ReviewSession(pullRequest, patch, review, new AppGitHub(), discussion);
+    return { preferences, app: createApp({ html: page, favicon: "<svg>R</svg>", token: "secret", session, preferences }) };
+  }
+
+  it("embeds the saved preferences in the page ahead of the theme script", async () => {
+    const { app, preferences } = await preferencesApp();
+    await preferences.update({ theme: "dark", viewMode: "all" });
+
+    const html = await (await app.request("/")).text();
+
+    expect(html).toBe(
+      '<head><script id="reviewonator-preferences" type="application/json">'
+        + '{"theme":"dark","viewMode":"all","diffStyle":"unified"}</script><script>/* theme */</script></head>',
+    );
+  });
+
+  it("requires the session token to save a preference", async () => {
+    const { app, preferences } = await preferencesApp();
+
+    const response = await app.request("/api/preferences", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ theme: "dark" }),
+    });
+
+    expect(response.status).toBe(401);
+    expect((await preferences.read()).theme).toBe("system");
+  });
+
+  it("saves a preference change for the next run", async () => {
+    const { app, preferences } = await preferencesApp();
+
+    const response = await app.request("/api/preferences", authenticated({ diffStyle: "split" }));
+
+    expect(await response.json()).toEqual({ preferences: { theme: "system", viewMode: "single", diffStyle: "split" } });
+    expect(await preferences.read()).toEqual({ theme: "system", viewMode: "single", diffStyle: "split" });
+  });
+
+  it("rejects an unknown preference or value", async () => {
+    const { app, preferences } = await preferencesApp();
+
+    expect((await app.request("/api/preferences", authenticated({ theme: "sepia" }))).status).toBe(400);
+    expect((await app.request("/api/preferences", authenticated({ fontSize: 20 }))).status).toBe(400);
+    expect((await preferences.read()).theme).toBe("system");
   });
 });

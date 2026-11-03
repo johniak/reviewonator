@@ -6,6 +6,7 @@ import { reviewDocumentSchema, validateReviewLocations } from "./domain/review";
 import { GitHubClient } from "./github/client";
 import { BunCommandRunner, openBrowser } from "./platform/command";
 import { createApp } from "./server/app";
+import { FilePreferenceStore } from "./server/preferences";
 import { ReviewSession } from "./server/session";
 import { embeddedAliasFiles, embeddedSkillFiles } from "./install/embedded-skill";
 import { createStdinPrompter } from "./install/prompt";
@@ -177,7 +178,7 @@ async function main(): Promise<void> {
 
   const session = new ReviewSession(loaded.pullRequest, loaded.patch, review, github, loaded.discussion, values.live, loaded.viewedFiles);
   const token = crypto.randomUUID();
-  const app = createApp({ html: appHtml, favicon, token, session, updates });
+  const app = createApp({ html: appHtml, favicon, token, session, updates, preferences: new FilePreferenceStore(process.env) });
   const requestedPort = values.port ? Number(values.port) : 0;
   if (!Number.isInteger(requestedPort) || requestedPort < 0 || requestedPort > 65_535) {
     throw new Error("--port must be an integer between 0 and 65535.");

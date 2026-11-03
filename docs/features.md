@@ -20,7 +20,7 @@ You can:
 
 Context expansion is handled by the local Reviewonator process through your authenticated GitHub CLI session. GitHub credentials are never sent to the browser.
 
-The workspace follows your system colour scheme and offers **System**, **Light**, and **Dark** switches in the header. A manual choice is remembered in the browser and switching never resets the open file, scroll position, or drafts.
+The workspace follows your system colour scheme and offers **System**, **Light**, and **Dark** switches in the header. Switching never resets the open file, scroll position, or drafts. Reviewonator remembers the colour theme, the single-file or all-files view, and the unified or side-by-side diff for the next review.
 
 ![Changed code with inline AI findings and private reviewer context](assets/reviewonator-diff.png)
 
