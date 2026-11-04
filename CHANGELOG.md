@@ -2,6 +2,16 @@
 
 Each release's notes on GitHub come from its section below. Releases before 0.11.0 are listed on the [releases page](https://github.com/johniak/reviewonator/releases).
 
+## 0.13.0 - 2026-11-04
+
+### Added
+
+- **Settings** (the gear button in the header) lets you pick the colour theme: **Paper Copper**, the default, or **Slate**, with cool grey surfaces, a blue accent, and classic green and red diffs. Each theme previews its light and dark colours, and Reviewonator remembers the choice for the next review.
+
+### Changed
+
+- The copper accent in the dark Paper Copper theme is softer, so primary buttons and links no longer glow.
+
 ## 0.12.1 - 2026-11-04
 
 ### Fixed
