@@ -188,7 +188,7 @@ Update to the latest release with:
 reviewonator update
 ```
 
-For a Homebrew installation this runs `brew upgrade reviewonator`; otherwise Reviewonator downloads the latest release, verifies its checksum, and replaces itself. Either way, the installed skills are refreshed with your saved languages. An update waits until an open live review has finished; `--force` overrides this and, for an install-script installation, also reinstalls or downgrades to the latest release. Running the install script again works too.
+For a Homebrew installation this runs `brew update` and then `brew upgrade reviewonator`, so a new release is found even when Homebrew has not refreshed the tap yet; otherwise Reviewonator downloads the latest release, verifies its checksum, and replaces itself. Either way, the installed skills are refreshed with your saved languages. An update waits until an open live review has finished; `--force` overrides this and, for an install-script installation, also reinstalls or downgrades to the latest release. Running the install script again works too.
 
 When a newer release exists, the review page shows a small notice with the update command. Set `REVIEWONATOR_NO_UPDATE_CHECK=1` to turn the check off.
 

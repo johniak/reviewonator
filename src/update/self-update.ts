@@ -35,6 +35,9 @@ export async function runUpdate(options: { force: boolean }, context: UpdateCont
 
 async function updateWithHomebrew(context: UpdateContext): Promise<string> {
   const { runner } = context;
+  // brew upgrade refreshes taps only when its own auto-update is due, so fetch the tap first.
+  const update = await runner.run("brew", ["update"], undefined, { inheritOutput: true });
+  if (update.exitCode !== 0) throw new Error("brew update failed.");
   const upgrade = await runner.run("brew", ["upgrade", "reviewonator"], undefined, { inheritOutput: true });
   if (upgrade.exitCode !== 0) throw new Error("brew upgrade reviewonator failed.");
   const prefix = await runner.run("brew", ["--prefix", "reviewonator"]);

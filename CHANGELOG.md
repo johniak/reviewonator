@@ -2,6 +2,12 @@
 
 Each release's notes on GitHub come from its section below. Releases before 0.11.0 are listed on the [releases page](https://github.com/johniak/reviewonator/releases).
 
+## 0.12.1 - 2026-11-04
+
+### Fixed
+
+- `reviewonator update` runs `brew update` before `brew upgrade`, so a Homebrew installation finds a new release even when Homebrew has not refreshed the tap yet.
+
 ## 0.12.0 - 2026-11-03
 
 ### Added

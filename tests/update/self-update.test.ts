@@ -214,7 +214,7 @@ describe("reviewonator update", () => {
     expect(await stagedFiles(fixture.binDir)).toEqual([]);
   });
 
-  it("delegates to brew upgrade and runs setup from the Homebrew prefix", async () => {
+  it("updates Homebrew, then delegates to brew upgrade and runs setup from the Homebrew prefix", async () => {
     const fixture = await updateFixture({ kind: "homebrew" });
     const prefix = join(fixture.root, "homebrew", "opt", "reviewonator");
     const brewDir = join(fixture.root, "brew-command");
@@ -222,7 +222,9 @@ describe("reviewonator update", () => {
     await mkdir(brewDir);
     await writeExecutable(join(prefix, "bin", "reviewonator"), stubExecutable("0.8.0"));
     await writeExecutable(join(brewDir, "brew"), `#!/bin/sh
+printf '%s\\n' "$*" >> '${join(fixture.root, "brew.log")}'
 case "$*" in
+  "update") printf 'Updated 1 tap (johniak/tap).\\n' ;;
   "upgrade reviewonator") printf 'Upgrading reviewonator 0.7.0 -> 0.8.0\\n' ;;
   "--prefix reviewonator") printf '%s\\n' '${prefix}' ;;
   *) exit 9 ;;
@@ -232,10 +234,27 @@ esac
 
     await fixture.update(false, { env });
 
+    expect(await readFile(join(fixture.root, "brew.log"), "utf8")).toBe("update\nupgrade reviewonator\n--prefix reviewonator\n");
+    expect(fixture.terminal.join("")).toContain("Updated 1 tap (johniak/tap).");
     expect(fixture.terminal.join("")).toContain("Upgrading reviewonator 0.7.0 -> 0.8.0");
     expect(fixture.terminal.join("")).toContain("setup done");
     expect(await readFile(fixture.setupLog, "utf8")).toBe(`${join(prefix, "bin", "reviewonator")} setup\n`);
     expect(fixture.lines.some((line) => line.startsWith("Another reviewonator"))).toBe(false);
+  });
+
+  it("stops when brew update fails", async () => {
+    const fixture = await updateFixture({ kind: "homebrew" });
+    const brewDir = join(fixture.root, "brew-command");
+    await mkdir(brewDir);
+    await writeExecutable(join(brewDir, "brew"), `#!/bin/sh
+printf '%s\\n' "$*" >> '${join(fixture.root, "brew.log")}'
+[ "$1" = update ] && exit 1
+exit 0
+`);
+    const env = { ...fixture.env, PATH: [brewDir, systemPath].join(delimiter) };
+
+    await expect(fixture.update(false, { env })).rejects.toThrow("brew update failed.");
+    expect(await readFile(join(fixture.root, "brew.log"), "utf8")).toBe("update\n");
   });
 
   it("refuses an unmanaged executable", async () => {

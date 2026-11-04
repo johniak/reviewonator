@@ -124,6 +124,7 @@ describe("project documentation", () => {
     expect(readme).toContain('install.sh)" "" --targets claude,codex');
     expect(readme).toContain("Updates never ask for your targets or languages again.");
     expect(readme).toContain("reviewonator update");
+    expect(readme).toContain("this runs `brew update` and then `brew upgrade reviewonator`");
     expect(readme).toContain("reviewonator setup --reconfigure");
     expect(readme).toContain(
       "`--targets` is the complete selection: setup removes the managed skill of any agent you leave out.",
