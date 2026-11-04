@@ -76,7 +76,7 @@
   --pc-border-muted: #3C3630;
   --pc-border-strong: #67574A;
 
-  --pc-accent: #F5A26D;
+  --pc-accent: #DC9C74;
   --pc-on-accent: #191714;
   --pc-accent-subtle: #483025;
   --pc-accent-border: #C57E53;
@@ -110,6 +110,119 @@
 
   --pc-overlay: rgba(0, 0, 0, 0.6);
   --pc-shadow-floating: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+/* Slate: cool neutral surfaces with a blue accent. Values come from the MIT-licensed
+   @primer/primitives 10.3.4 light and dark themes; translucent ones are composited onto the
+   surface they sit on (word highlights onto their line), so every token stays opaque.
+   Both attributes sit on one element, so a nested element carrying them re-scopes the tokens
+   for its subtree; the colour theme previews rely on that. */
+[data-palette="slate"][data-theme="light"] {
+  color-scheme: light;
+
+  --pc-bg-canvas: #FFFFFF;
+  --pc-bg-surface: #FFFFFF;
+  --pc-bg-elevated: #FFFFFF;
+  --pc-bg-subtle: #F6F8FA;
+  --pc-bg-hover: #F2F3F4;
+  --pc-bg-selected: #ECEEF0;
+  --pc-bg-pressed: #ECEEF0;
+
+  --pc-fg-default: #1F2328;
+  --pc-fg-muted: #59636E;
+  --pc-fg-subtle: #59636E;
+  --pc-border-default: #D1D9E0;
+  --pc-border-muted: #DFE4E9;
+  --pc-border-strong: #818B98;
+
+  --pc-accent: #0969DA;
+  --pc-on-accent: #FFFFFF;
+  --pc-accent-subtle: #DDF4FF;
+  --pc-accent-border: #BBDFFF;
+
+  --pc-success: #1A7F37;
+  --pc-danger: #D1242F;
+  --pc-warning: #9A6700;
+  --pc-info: #0969DA;
+  --pc-success-subtle: #DAFBE1;
+  --pc-danger-subtle: #FFEBE9;
+  --pc-warning-subtle: #FFF8C5;
+  --pc-info-subtle: #DDF4FF;
+
+  --pc-diff-add-bg: #DAFBE1;
+  --pc-diff-del-bg: #FFEBE9;
+  --pc-diff-add-word-bg: #ACEEBB;
+  --pc-diff-del-word-bg: #FFCECB;
+  --pc-diff-hunk-bg: #DDF4FF;
+  --pc-diff-add-gutter: #ACEEBB;
+  --pc-diff-del-gutter: #FFCECB;
+  --pc-diff-gutter: #FFFFFF;
+  --pc-diff-selection: #FFF8C5;
+  --pc-code-fg: #1F2328;
+
+  --pc-syntax-keyword: #CF222E;
+  --pc-syntax-string: #0A3069;
+  --pc-syntax-number: #0550AE;
+  --pc-syntax-function: #6639BA;
+  --pc-syntax-comment: #59636E;
+  --pc-syntax-identifier: #1F2328;
+
+  --pc-overlay: rgba(200, 209, 218, 0.4);
+  --pc-shadow-floating: 0 0 0 1px #D1D9E0, 0 40px 80px rgba(37, 41, 46, 0.24);
+}
+
+[data-palette="slate"][data-theme="dark"] {
+  color-scheme: dark;
+
+  --pc-bg-canvas: #010409;
+  --pc-bg-surface: #0D1117;
+  --pc-bg-elevated: #151B23;
+  --pc-bg-subtle: #151B23;
+  --pc-bg-hover: #1F232A;
+  --pc-bg-selected: #161A21;
+  --pc-bg-pressed: #23282F;
+
+  --pc-fg-default: #F0F6FC;
+  --pc-fg-muted: #9198A1;
+  --pc-fg-subtle: #9198A1;
+  --pc-border-default: #3D444D;
+  --pc-border-muted: #2F353D;
+  --pc-border-strong: #656C76;
+
+  --pc-accent: #4493F8;
+  --pc-on-accent: #0D1117;
+  --pc-accent-subtle: #111D2E;
+  --pc-accent-border: #1E4273;
+
+  --pc-success: #3FB950;
+  --pc-danger: #F85149;
+  --pc-warning: #D29922;
+  --pc-info: #4493F8;
+  --pc-success-subtle: #12261E;
+  --pc-danger-subtle: #25181C;
+  --pc-warning-subtle: #272215;
+  --pc-info-subtle: #111D2E;
+
+  --pc-diff-add-bg: #12261E;
+  --pc-diff-del-bg: #25181C;
+  --pc-diff-add-word-bg: #1D572D;
+  --pc-diff-del-word-bg: #792F2E;
+  --pc-diff-hunk-bg: #111D2E;
+  --pc-diff-add-gutter: #1C4428;
+  --pc-diff-del-gutter: #542426;
+  --pc-diff-gutter: #0D1117;
+  --pc-diff-selection: #272215;
+  --pc-code-fg: #F0F6FC;
+
+  --pc-syntax-keyword: #FF7B72;
+  --pc-syntax-string: #A5D6FF;
+  --pc-syntax-number: #79C0FF;
+  --pc-syntax-function: #D2A8FF;
+  --pc-syntax-comment: #9198A1;
+  --pc-syntax-identifier: #F0F6FC;
+
+  --pc-overlay: rgba(33, 40, 48, 0.4);
+  --pc-shadow-floating: 0 0 0 1px #3D444D, 0 24px 48px #010409;
 }
 
 :root {
@@ -380,6 +493,8 @@ textarea:focus { border-color: var(--pc-accent); }
 .view-mode-toggle button:hover { color: var(--pc-fg-default); }
 .theme-switcher button.active,
 .view-mode-toggle button.active { color: var(--pc-fg-default); background: var(--pc-bg-surface); }
+/* Slate outlines the selected segment, since its surface and track are both near white. */
+[data-palette="slate"] :is(.theme-switcher, .view-mode-toggle) button.active { box-shadow: inset 0 0 0 1px var(--pc-border-strong); }
 
 .workspace {
   min-height: 0;
@@ -624,6 +739,11 @@ textarea:focus { border-color: var(--pc-accent); }
   --diffs-addition-color-override: var(--pc-success);
   --diffs-deletion-color-override: var(--pc-danger);
   --diffs-annotation-bg: var(--pc-bg-surface);
+}
+/* Slate keeps changed-line numbers in the default text colour on their tinted gutter. */
+[data-palette="slate"] .diff-surface diffs-container {
+  --diffs-fg-number-addition-override: var(--pc-fg-default);
+  --diffs-fg-number-deletion-override: var(--pc-fg-default);
 }
 
 .diff-comment-trigger {
@@ -1059,7 +1179,8 @@ a.briefing-ticket:hover { background: var(--pc-bg-hover); border-color: var(--pc
 /* ---------- Publish dialog (the one floating surface) ---------- */
 
 .dialog-overlay { position: fixed; inset: 0; z-index: 20; background: var(--pc-overlay); animation: fade-in .16s ease-out; }
-.publish-dialog {
+.publish-dialog,
+.settings-dialog {
   position: fixed;
   z-index: 21;
   left: 50%;
@@ -1083,6 +1204,63 @@ a.briefing-ticket:hover { background: var(--pc-bg-hover); border-color: var(--pc
 .icon-button { width: var(--pc-control-default); min-height: var(--pc-control-default); padding: 0; color: var(--pc-fg-muted); }
 .icon-button:hover { color: var(--pc-fg-default); }
 .publish-content { min-height: 0; overflow-y: auto; padding: 20px 24px; display: grid; gap: 20px; }
+
+/* ---------- Settings ---------- */
+
+.settings-dialog { width: min(640px, calc(100vw - 32px)); grid-template-rows: auto minmax(0, 1fr); }
+.settings-content { min-height: 0; overflow-y: auto; padding: 20px 24px 24px; }
+.palette-options { border: 0; padding: 0; margin: 0; display: grid; gap: 10px; }
+.palette-options legend { padding: 0; font-size: 13px; line-height: 20px; font-weight: 600; }
+.palette-options-hint { margin-bottom: 4px; color: var(--pc-fg-muted); font-size: var(--pc-text-small); line-height: 18px; }
+.palette-option {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  background: var(--pc-bg-surface);
+  border: var(--pc-border-width) solid var(--pc-border-default);
+  border-radius: var(--pc-radius-md);
+  cursor: pointer;
+  transition: background-color .12s ease-out, border-color .12s ease-out;
+}
+.palette-option:hover { background: var(--pc-bg-hover); }
+.palette-option.palette-selected { background: var(--pc-accent-subtle); border-color: var(--pc-accent-border); }
+.palette-option-heading { display: flex; gap: 10px; }
+.palette-option-heading input { margin: 3px 0 0; accent-color: var(--pc-accent); }
+.palette-option-heading > span { display: flex; flex-direction: column; gap: 2px; }
+.palette-option-heading strong { font-size: 13px; line-height: 20px; }
+.palette-option-heading small { color: var(--pc-fg-muted); font-size: var(--pc-text-small); line-height: 18px; }
+.palette-previews { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+
+/* A preview carries its own data-palette and data-theme, so every var() below is the previewed theme's. */
+.palette-preview {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  color: var(--pc-fg-default);
+  background: var(--pc-bg-canvas);
+  border: var(--pc-border-width) solid var(--pc-border-default);
+  border-radius: var(--pc-radius-sm);
+}
+.palette-preview-label { color: var(--pc-fg-muted); font-size: var(--pc-text-small); line-height: 16px; font-weight: 500; }
+.palette-preview-diff {
+  display: grid;
+  overflow: hidden;
+  background: var(--pc-bg-surface);
+  border: var(--pc-border-width) solid var(--pc-border-muted);
+  border-radius: var(--pc-radius-xs);
+  font: var(--pc-text-small) / 20px var(--pc-font-code);
+  color: var(--pc-code-fg);
+}
+.palette-preview-line { padding: 0 8px; white-space: nowrap; }
+.palette-preview-addition { background: var(--pc-diff-add-bg); }
+.palette-preview-deletion { background: var(--pc-diff-del-bg); }
+.palette-swatches { display: flex; flex-wrap: wrap; gap: 4px; }
+.palette-swatch {
+  width: 16px;
+  height: 16px;
+  border: var(--pc-border-width) solid var(--pc-border-default);
+  border-radius: var(--pc-radius-pill);
+}
 
 .event-options { border: 0; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .event-options legend { margin-bottom: 8px; font-size: 13px; line-height: 20px; font-weight: 500; }

@@ -1,8 +1,8 @@
 import { createElement, useEffect, useState } from "react";
-import type { ThemePreference } from "../src/domain/preferences";
+import type { Palette, ThemePreference } from "../src/domain/preferences";
 import { readPreferences, usePreference } from "./preferences";
 
-export type { ThemePreference };
+export type { Palette, ThemePreference };
 export type ResolvedTheme = "light" | "dark";
 
 const preferences: ThemePreference[] = ["system", "light", "dark"];
@@ -21,9 +21,21 @@ export function applyTheme(preference: ThemePreference): ResolvedTheme {
   return resolved;
 }
 
+export function applyPalette(palette: Palette): void {
+  document.documentElement.dataset.palette = palette;
+}
+
 /** Mirrors the inline script in index.html so tests and late renders agree with the first paint. */
 export function applyStoredTheme(): ResolvedTheme {
-  return applyTheme(readPreferences().theme);
+  const saved = readPreferences();
+  applyPalette(saved.palette);
+  return applyTheme(saved.theme);
+}
+
+export function usePalette(): [Palette, (next: Palette) => void] {
+  const [palette, setPalette] = usePreference("palette");
+  useEffect(() => applyPalette(palette), [palette]);
+  return [palette, setPalette];
 }
 
 export function useTheme(): [ThemePreference, ResolvedTheme, (next: ThemePreference) => void] {
@@ -51,7 +63,7 @@ export function ThemeSwitcher({
 }) {
   return createElement(
     "div",
-    { className: "theme-switcher", role: "group", "aria-label": "Colour theme" },
+    { className: "theme-switcher", role: "group", "aria-label": "Colour scheme" },
     preferences.map((value) => createElement(
       "button",
       {

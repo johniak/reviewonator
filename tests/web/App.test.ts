@@ -717,6 +717,7 @@ describe("saved view preferences", () => {
     expect(screen.getByRole("button", { name: "Single file" })).toHaveAttribute("aria-pressed", "true");
     await waitFor(async () => expect(await preferences.read()).toEqual({
       theme: "system",
+      palette: "copper",
       viewMode: "single",
       diffStyle: "unified",
       collapsedBriefings: [],

@@ -251,7 +251,7 @@ describe("saved preferences", () => {
 
     expect(html).toBe(
       '<head><script id="reviewonator-preferences" type="application/json">'
-        + '{"theme":"dark","viewMode":"all","diffStyle":"unified","collapsedBriefings":[]}</script><script>/* theme */</script></head>',
+        + '{"theme":"dark","palette":"copper","viewMode":"all","diffStyle":"unified","collapsedBriefings":[]}</script><script>/* theme */</script></head>',
     );
   });
 
@@ -273,15 +273,17 @@ describe("saved preferences", () => {
 
     const response = await app.request("/api/preferences", authenticated({ diffStyle: "split" }));
 
-    expect(await response.json()).toEqual({ preferences: { theme: "system", viewMode: "single", diffStyle: "split", collapsedBriefings: [] } });
-    expect(await preferences.read()).toEqual({ theme: "system", viewMode: "single", diffStyle: "split", collapsedBriefings: [] });
+    expect(await response.json()).toEqual({ preferences: { theme: "system", palette: "copper", viewMode: "single", diffStyle: "split", collapsedBriefings: [] } });
+    expect(await preferences.read()).toEqual({ theme: "system", palette: "copper", viewMode: "single", diffStyle: "split", collapsedBriefings: [] });
   });
 
   it("rejects an unknown preference or value", async () => {
     const { app, preferences } = await preferencesApp();
 
     expect((await app.request("/api/preferences", authenticated({ theme: "sepia" }))).status).toBe(400);
+    expect((await app.request("/api/preferences", authenticated({ palette: "neon" }))).status).toBe(400);
     expect((await app.request("/api/preferences", authenticated({ fontSize: 20 }))).status).toBe(400);
     expect((await preferences.read()).theme).toBe("system");
+    expect((await preferences.read()).palette).toBe("copper");
   });
 });

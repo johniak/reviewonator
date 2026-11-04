@@ -1,6 +1,9 @@
 import { z } from "zod";
 
 const themeSchema = z.enum(["system", "light", "dark"]);
+/** The colour theme; each one has a light and a dark variant, picked by `theme`. */
+export const palettes = ["copper", "slate"] as const;
+const paletteSchema = z.enum(palettes);
 const viewModeSchema = z.enum(["single", "all"]);
 const diffStyleSchema = z.enum(["unified", "split"]);
 /** Pull request URLs whose briefing the reviewer collapsed; only the most recent ones are kept. */
@@ -10,6 +13,7 @@ const collapsedBriefingsSchema = z.array(z.string().min(1).max(500)).max(maximum
 /** Reads saved choices leniently: a missing or unknown value falls back to its default on its own. */
 export const savedPreferencesSchema = z.object({
   theme: themeSchema.catch("system"),
+  palette: paletteSchema.catch("copper"),
   viewMode: viewModeSchema.catch("single"),
   diffStyle: diffStyleSchema.catch("unified"),
   collapsedBriefings: collapsedBriefingsSchema.catch([]),
@@ -17,6 +21,7 @@ export const savedPreferencesSchema = z.object({
 
 export const preferenceChangeSchema = z.object({
   theme: themeSchema,
+  palette: paletteSchema,
   viewMode: viewModeSchema,
   diffStyle: diffStyleSchema,
   collapsedBriefings: collapsedBriefingsSchema,
@@ -25,6 +30,7 @@ export const preferenceChangeSchema = z.object({
 export type Preferences = z.infer<typeof savedPreferencesSchema>;
 export type PreferenceChange = z.infer<typeof preferenceChangeSchema>;
 export type ThemePreference = Preferences["theme"];
+export type Palette = Preferences["palette"];
 
 export const defaultPreferences: Preferences = savedPreferencesSchema.parse({});
 

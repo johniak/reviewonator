@@ -9,14 +9,15 @@
     <!-- The server replaces {} with the preferences saved by earlier runs. -->
     <script id="reviewonator-preferences" type="application/json">{}</script>
     <script>
-      // Apply the theme before the first paint. Kept in sync with web/theme.ts.
+      // Apply the theme and colour theme before the first paint. Kept in sync with web/theme.ts.
       (function () {
-        var stored = null;
-        try { stored = JSON.parse(document.getElementById("reviewonator-preferences").textContent).theme; } catch (error) {}
-        var theme = stored === "light" || stored === "dark"
-          ? stored
+        var stored = {};
+        try { stored = JSON.parse(document.getElementById("reviewonator-preferences").textContent) || {}; } catch (error) {}
+        var theme = stored.theme === "light" || stored.theme === "dark"
+          ? stored.theme
           : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
         document.documentElement.setAttribute("data-theme", theme);
+        document.documentElement.setAttribute("data-palette", stored.palette === "slate" ? "slate" : "copper");
       })();
     </script>
   </head>

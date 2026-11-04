@@ -25,7 +25,7 @@
 ### Visual effect
 
 - Light: porcelain-white content on a warm, light background; dark ink; muted copper.
-- Dark: a deep brown-graphite canvas; warmer, lighter panels; light parchment text; illuminated copper.
+- Dark: a deep brown-graphite canvas; warmer, lighter panels; light parchment text; softly lit, muted copper that never glows.
 - No gradients on base surfaces, no decorative shadows, no glassmorphism effects, and no excessive animation.
 
 ---
@@ -33,6 +33,8 @@
 ## 2. Color system
 
 All components use **semantic tokens**. Raw HEX values are allowed only in token definitions and in documentation.
+
+Paper Copper is the default colour theme. Reviewonator also ships **Slate**, a cool grey theme with a blue accent, which the reviewer can pick in **Settings**. Slate defines every colour token below for light and dark in its own `[data-palette="slate"][data-theme="…"]` blocks in `web/styles.css`, so components never branch on the theme; a new colour token needs a Slate value in both blocks, and a test enforces that.
 
 ### 2.1. Base colors
 
@@ -51,7 +53,7 @@ All components use **semantic tokens**. Raw HEX values are allowed only in token
 | Standard border | `#E1D7CA` | `#49423A` | `--pc-border-default` |
 | Soft border | `#EBE3D9` | `#3C3630` | `--pc-border-muted` |
 | Strong border | `#C9B9A8` | `#67574A` | `--pc-border-strong` |
-| Accent / link / active navigation | `#A64724` | `#F5A26D` | `--pc-accent` |
+| Accent / link / active navigation | `#A64724` | `#DC9C74` | `--pc-accent` |
 | Text on accent | `#FFFFFF` | `#191714` | `--pc-on-accent` |
 | Subtle accent background | `#F8E6DA` | `#483025` | `--pc-accent-subtle` |
 | Accent border | `#C97753` | `#C57E53` | `--pc-accent-border` |
@@ -117,7 +119,7 @@ If a token's contrast drops when placed on the background of an added or deleted
 - Large text and key graphical UI elements: **3:1** respectively, in line with the applicable WCAG requirements.
 - The `--pc-fg-default` on `--pc-bg-surface` pair: approximately **14.2:1** in Light and **13.4:1** in Dark.
 - The `--pc-fg-muted` on `--pc-bg-surface` pair: approximately **5.5:1** in Light and **7.5:1** in Dark.
-- Accent buttons: white text on copper in Light, very dark text on light copper in Dark.
+- Accent buttons: white text on copper in Light, very dark text on muted light copper in Dark (about **7.7:1**; the same copper as link text on `--pc-bg-surface` is about **6.9:1**).
 - Check contrast for the **actual composited color**, including disabled, hover, selection, highlighted diff, and translucent elements.
 - Distinguish states by icon, text, border, or shape, never by color alone.
 
@@ -627,7 +629,7 @@ The definition below is the **source of truth** for the base colors. Components 
   --pc-border-muted: #3C3630;
   --pc-border-strong: #67574A;
 
-  --pc-accent: #F5A26D;
+  --pc-accent: #DC9C74;
   --pc-on-accent: #191714;
   --pc-accent-subtle: #483025;
   --pc-accent-border: #C57E53;

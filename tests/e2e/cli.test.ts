@@ -128,7 +128,7 @@ describe("Reviewonator CLI end-to-end", () => {
 
     const saved = await authenticatedFetch(firstRun.baseUrl, firstRun.token, "/api/preferences", {
       method: "POST",
-      body: JSON.stringify({ theme: "dark", viewMode: "all" }),
+      body: JSON.stringify({ theme: "dark", palette: "slate", viewMode: "all" }),
     });
     expect(saved.status).toBe(200);
     await authenticatedFetch(firstRun.baseUrl, firstRun.token, "/api/cancel", { method: "POST", body: "{}" });
@@ -141,7 +141,7 @@ describe("Reviewonator CLI end-to-end", () => {
     const embedded = page.match(/<script id="reviewonator-preferences" type="application\/json">([^<]*)<\/script>/)?.[1];
 
     expect(secondRun.baseUrl).not.toBe(firstRun.baseUrl);
-    expect(JSON.parse(embedded ?? "null")).toEqual({ theme: "dark", viewMode: "all", diffStyle: "unified", collapsedBriefings: [] });
+    expect(JSON.parse(embedded ?? "null")).toEqual({ theme: "dark", palette: "slate", viewMode: "all", diffStyle: "unified", collapsedBriefings: [] });
   }, 20_000);
 
   it("exits right after its result even when the release lookup hangs", async () => {

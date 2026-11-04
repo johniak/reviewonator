@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { FilePreferenceStore } from "../../src/server/preferences";
 
-const defaults = { theme: "system", viewMode: "single", diffStyle: "unified", collapsedBriefings: [] };
+const defaults = { theme: "system", palette: "copper", viewMode: "single", diffStyle: "unified", collapsedBriefings: [] };
 
 async function stateDirectory(): Promise<string> {
   return mkdtemp(join(tmpdir(), "reviewonator-preferences-test-"));
@@ -82,5 +82,15 @@ describe("FilePreferenceStore", () => {
     await savedFile(directory, JSON.stringify({ viewMode: "all", collapsedBriefings: "all of them" }));
 
     expect(await storeIn(directory).read()).toEqual({ ...defaults, viewMode: "all" });
+  });
+
+  it("remembers the colour theme and falls back to Paper Copper for an unknown one", async () => {
+    const directory = await stateDirectory();
+
+    await storeIn(directory).update({ palette: "slate" });
+    expect(await storeIn(directory).read()).toEqual({ ...defaults, palette: "slate" });
+
+    await savedFile(directory, JSON.stringify({ palette: "neon", theme: "dark" }));
+    expect(await storeIn(directory).read()).toEqual({ ...defaults, theme: "dark" });
   });
 });

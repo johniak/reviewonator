@@ -13,6 +13,7 @@ import {
   OctagonAlert,
   RotateCcw,
   Radio,
+  Settings,
   TimerOff,
   X,
 } from "lucide-react";
@@ -28,13 +29,14 @@ import { MarkdownText } from "./components/MarkdownText";
 import { PrBriefing } from "./components/PrBriefing";
 import { commentCardId, ReviewCommentCard } from "./components/ReviewCommentCard";
 import { ReviewFindingNavigation } from "./components/ReviewFindingNavigation";
+import { SettingsDialog } from "./components/SettingsDialog";
 import { UpdateNoticeToast } from "./components/UpdateNotice";
 import { userThreadCardId } from "./components/UserCommentThread";
 import markDark from "./brand/mark-dark.png";
 import markLight from "./brand/mark-light.png";
 import { usePreference } from "./preferences";
 import { maximumCollapsedBriefings } from "../src/domain/preferences";
-import { ThemeSwitcher, useTheme } from "./theme";
+import { ThemeSwitcher, usePalette, useTheme } from "./theme";
 import type {
   LineCommentDraft,
   LineCommentLocation,
@@ -71,6 +73,8 @@ export function App() {
   const [viewedPaths, setViewedPaths] = useState<Set<string>>(new Set());
   const [panelTab, setPanelTab] = useState<"review" | "discussion">("review");
   const [themePreference, resolvedTheme, setThemePreference] = useTheme();
+  const [palette, setPalette] = usePalette();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [updateNotice, setUpdateNotice] = useState<UpdateNotice | null>(null);
 
   useEffect(() => {
@@ -558,6 +562,9 @@ export function App() {
             <span className="deletions">−{pullRequest.deletions}</span>
           </div>
           <ThemeSwitcher preference={themePreference} onChange={setThemePreference} />
+          <button type="button" className="icon-button" aria-label="Settings" onClick={() => setSettingsOpen(true)}>
+            <Settings size={16} />
+          </button>
         </div>
       </header>
 
@@ -763,6 +770,12 @@ export function App() {
         </aside>
       </div>
 
+      <SettingsDialog
+        open={settingsOpen}
+        palette={palette}
+        onOpenChange={setSettingsOpen}
+        onPaletteChange={setPalette}
+      />
       <PublishDialog
         open={publishOpen}
         comments={selectedComments}

@@ -28,6 +28,8 @@ Context expansion is handled by the local Reviewonator process through your auth
 
 The workspace follows your system colour scheme and offers **System**, **Light**, and **Dark** switches in the header. Switching never resets the open file, scroll position, or drafts. Reviewonator remembers the colour theme, the single-file or all-files view, and the unified or side-by-side diff for the next review.
 
+The gear button in the header opens **Settings**, where you choose the colour theme: **Paper Copper**, the default, or **Slate**, with cool grey surfaces, a blue accent, and classic green and red diffs. Each theme shows its light and dark colours before you pick it, and both follow the **System**, **Light**, and **Dark** switch.
+
 ![Changed code with inline AI findings and private reviewer context](assets/reviewonator-diff.png)
 
 ## Discuss your own concerns with the AI agent
