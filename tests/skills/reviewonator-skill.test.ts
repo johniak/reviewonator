@@ -208,6 +208,9 @@ describe("Reviewonator skill", () => {
     const skill = await readFile("skills/reviewonator/SKILL.md", "utf8");
 
     expect(skill).toContain("`summary` is always optional");
+    expect(skill).toContain("Never repeat, list, or summarize the findings in it");
+    expect(skill).toContain("A general comment is a last resort for a problem with the PR as a whole");
+    expect(skill).toContain("never repeat or summarize inline findings in one");
     expect(skill).toContain("Use an empty string whenever no separate overall message adds value");
     expect(skill).toContain("Never manufacture a summary merely to justify");
   });

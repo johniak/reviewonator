@@ -10,7 +10,7 @@ Write UTF-8 JSON matching this shape:
     "comments": "English",
     "reviewerNotes": "English"
   },
-  "summary": "The retry change can duplicate successful payments after a timeout.",
+  "summary": "",
   "recommendation": "REQUEST_CHANGES",
   "briefing": {
     "ticket": {
@@ -81,7 +81,7 @@ Write UTF-8 JSON matching this shape:
 - `version` must be `2`.
 - `prUrl` must exactly identify the reviewed GitHub PR.
 - `languages.comments` and `languages.reviewerNotes` must match the installed language configuration.
-- `summary` becomes the editable review body shown on the final confirmation screen. It is always optional and may be an empty string for every recommendation.
+- `summary` becomes the editable review body shown on the final confirmation screen. It is always optional, empty by default, and must not repeat or summarize the findings.
 - `briefing` is a private note for the reviewer and is never published to GitHub. `briefing.text` is required when `briefing` is present and has at most 100 words. Omit `briefing.ticket` when no ticket could be read.
 - `recommendation` must be `COMMENT`, `APPROVE`, or `REQUEST_CHANGES`.
 - `userThreads` contains private conversations started by the user on diff lines. It is never published to GitHub.
