@@ -26,7 +26,7 @@ import { PublishDialog } from "./components/PublishDialog";
 import { PullRequestDiscussion } from "./components/PullRequestDiscussion";
 import { MyCommentNavigation } from "./components/MyCommentNavigation";
 import { MarkdownText } from "./components/MarkdownText";
-import { PrBriefing } from "./components/PrBriefing";
+import { PrBriefing, pullRequestPeople } from "./components/PrBriefing";
 import { commentCardId, ReviewCommentCard } from "./components/ReviewCommentCard";
 import { ReviewFindingNavigation } from "./components/ReviewFindingNavigation";
 import { SettingsDialog } from "./components/SettingsDialog";
@@ -640,6 +640,7 @@ export function App() {
           {review.briefing && (
             <PrBriefing
               briefing={review.briefing}
+              people={pullRequestPeople(pullRequest)}
               reviewerLanguage={review.languages.reviewerNotes}
               collapsed={collapsedBriefings.includes(review.prUrl)}
               onCollapsedChange={setBriefingCollapsed}

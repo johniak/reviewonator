@@ -16,7 +16,12 @@ describe("review document", () => {
     const withTicket = {
       ...review,
       briefing: {
-        ticket: { key: "ACME-142", title: "Retry payments after timeouts", url: "https://acme.atlassian.net/browse/ACME-142" },
+        ticket: {
+          key: "ACME-142",
+          title: "Retry payments after timeouts",
+          url: "https://acme.atlassian.net/browse/ACME-142",
+          author: "Dana Reporter",
+        },
         text: "The ticket asks for retries. The PR adds them, but without a limit.",
       },
     };

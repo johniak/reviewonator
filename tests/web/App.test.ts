@@ -158,6 +158,7 @@ describe("GitHub review body", () => {
     const briefing = await screen.findByRole("region", { name: "About this PR" });
     expect(briefing).toHaveTextContent("Ticket prosi o ponawianie płatności. PR je dodaje.");
     expect(briefing).toHaveTextContent("Private · Polish");
+    expect(briefing).toHaveTextContent("PR by octocat");
     expect(briefing.closest(".review-canvas")).not.toBeNull();
     expect(briefing.compareDocumentPosition(screen.getByLabelText("Diff view mode")))
       .toBe(Node.DOCUMENT_POSITION_FOLLOWING);

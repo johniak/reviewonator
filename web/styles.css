@@ -1059,6 +1059,8 @@ textarea:focus { border-color: var(--pc-accent); }
 .briefing-ticket strong { font-weight: 600; white-space: nowrap; }
 .briefing-ticket span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--pc-fg-muted); }
 a.briefing-ticket:hover { background: var(--pc-bg-hover); border-color: var(--pc-border-strong); }
+.briefing-people { margin: 4px 0 0; padding-left: 20px; color: var(--pc-fg-muted); font-size: var(--pc-text-small); line-height: 18px; }
+.briefing-people strong { color: var(--pc-fg-default); font-weight: 600; }
 .briefing-text { max-width: 110ch; margin-top: 6px; padding-left: 20px; }
 
 .review-summary { padding: 16px 20px 16px 16px; border-bottom: var(--pc-border-width) solid var(--pc-border-default); }

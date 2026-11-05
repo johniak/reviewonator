@@ -2,13 +2,18 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
 import type { Briefing } from "../../src/domain/review";
-import { PrBriefing } from "../../web/components/PrBriefing";
+import { PrBriefing, pullRequestPeople, type PullRequestPeople } from "../../web/components/PrBriefing";
 
-function Briefed({ briefing, reviewerLanguage = "English" }: { briefing: Briefing; reviewerLanguage?: string }) {
+function Briefed({ briefing, reviewerLanguage = "English", people = { author: "octocat", contributors: [] } }: {
+  briefing: Briefing;
+  reviewerLanguage?: string;
+  people?: PullRequestPeople;
+}) {
   const [collapsed, setCollapsed] = useState(false);
   return (
     <PrBriefing
       briefing={briefing}
+      people={people}
       reviewerLanguage={reviewerLanguage}
       collapsed={collapsed}
       onCollapsedChange={setCollapsed}
@@ -33,6 +38,39 @@ describe("PrBriefing", () => {
     expect(screen.getByRole("link", { name: /ACME-142 Retry payments after timeouts/ }))
       .toHaveAttribute("href", "https://acme.atlassian.net/browse/ACME-142");
     expect(screen.getByText("Ticket prosi o ponawianie płatności. PR je dodaje, ale bez limitu prób.")).toBeVisible();
+  });
+
+  it("names the pull request author, the other commit authors, and the ticket author", () => {
+    render(
+      <Briefed
+        people={{ author: "octocat", contributors: ["hubot", "Mona Lisa"] }}
+        briefing={{ ticket: { key: "OPS-7", author: "Dana Reporter" }, text: "The PR renames a job." }}
+      />,
+    );
+
+    expect(screen.getByText(/^PR by/)).toHaveTextContent("PR by octocat · Commits also by hubot, Mona Lisa · Ticket by Dana Reporter");
+
+    fireEvent.click(screen.getByRole("button", { name: "About this PR" }));
+    expect(screen.queryByText(/^PR by/)).not.toBeInTheDocument();
+  });
+
+  it("names only the pull request author when nobody else committed and the ticket author is unknown", () => {
+    render(<Briefed briefing={{ ticket: { key: "OPS-7" }, text: "The PR renames a job." }} />);
+
+    expect(screen.getByText(/^PR by/)).toHaveTextContent(/^PR by octocat$/);
+  });
+
+  it("finds the other commit authors once each, by login or else by name", () => {
+    const people = pullRequestPeople({
+      author: { login: "octocat" },
+      commits: [
+        { oid: "a", messageHeadline: "One", committedDate: "2026-11-01T00:00:00Z", authors: [{ login: "octocat" }, { login: "hubot" }] },
+        { oid: "b", messageHeadline: "Two", committedDate: "2026-11-02T00:00:00Z", authors: [{ login: "hubot" }, { login: "", name: "Mona Lisa" }] },
+        { oid: "c", messageHeadline: "Three", committedDate: "2026-11-03T00:00:00Z", authors: [{ login: "", name: " " }] },
+      ],
+    });
+
+    expect(people).toEqual({ author: "octocat", contributors: ["hubot", "Mona Lisa"] });
   });
 
   it("names a ticket without a link as plain text", () => {

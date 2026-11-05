@@ -194,6 +194,7 @@ describe("Reviewonator skill", () => {
 
     expect(skill).toContain("gh pr view <PR_URL> --json closingIssuesReferences");
     expect(skill).toContain("ticket keys such as `ABC-123`");
+    expect(skill).toContain("plus its title, URL, and `author` (the person who created the ticket) when known");
     expect(skill).toContain("If you cannot read the ticket itself, treat the PR as having no ticket");
     expect(skill).toContain("`briefing.text` is a private note for the human reviewer");
     expect(skill).toContain("at most 100 words");

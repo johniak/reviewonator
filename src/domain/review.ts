@@ -25,6 +25,7 @@ export const briefingSchema = z.object({
     key: z.string().trim().min(1).max(120),
     title: z.string().trim().min(1).max(300).optional(),
     url: z.url().optional(),
+    author: z.string().trim().min(1).max(200).optional(),
   }).optional(),
   text: z.string().trim().min(1).max(2_000).refine(
     (value) => value.split(/\s+/).length <= maximumBriefingWords,

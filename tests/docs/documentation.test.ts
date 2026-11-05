@@ -20,6 +20,7 @@ describe("project documentation", () => {
     expect(guide).toContain("Nothing is included by default");
     expect(guide).toContain("PR discussion");
     expect(guide).toContain("**About this PR**");
+    expect(guide).toContain("Reviewonator names the author of the pull request, everyone else who authored its commits, and the author of the ticket.");
     expect(guide).toContain("**Viewed** is the same per-user flag as on GitHub");
     expect(guide).toContain("Comment**, **Approve**, or **Request changes");
     expect(guide).toContain("assets/pr-discussion.png");

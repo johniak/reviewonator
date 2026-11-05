@@ -16,7 +16,8 @@ Write UTF-8 JSON matching this shape:
     "ticket": {
       "key": "ACME-142",
       "title": "Retry card payments after provider timeouts",
-      "url": "https://github.com/acme/widgets/issues/142"
+      "url": "https://github.com/acme/widgets/issues/142",
+      "author": "dana"
     },
     "text": "The ticket asks to retry a card payment when the provider times out. The PR adds the retry and a setting for the number of attempts. Mismatch: the ticket asks for a hard limit, but the retry loop can run forever."
   },
@@ -82,7 +83,7 @@ Write UTF-8 JSON matching this shape:
 - `prUrl` must exactly identify the reviewed GitHub PR.
 - `languages.comments` and `languages.reviewerNotes` must match the installed language configuration.
 - `summary` becomes the editable review body shown on the final confirmation screen. It is always optional, empty by default, and must not repeat or summarize the findings.
-- `briefing` is a private note for the reviewer and is never published to GitHub. `briefing.text` is required when `briefing` is present and has at most 100 words. Omit `briefing.ticket` when no ticket could be read.
+- `briefing` is a private note for the reviewer and is never published to GitHub. `briefing.text` is required when `briefing` is present and has at most 100 words. Omit `briefing.ticket` when no ticket could be read. `briefing.ticket.author` is the person who created the ticket, such as a GitHub login or a Jira reporter name; omit it when unknown.
 - `recommendation` must be `COMMENT`, `APPROVE`, or `REQUEST_CHANGES`.
 - `userThreads` contains private conversations started by the user on diff lines. It is never published to GitHub.
 - User thread IDs and message IDs must be unique and stable across review rounds. Preserve every earlier message verbatim and append new messages in order.
