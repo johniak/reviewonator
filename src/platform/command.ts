@@ -4,7 +4,7 @@ export type CommandResult = {
   exitCode: number;
 };
 
-/** `signal` kills the command; `inheritOutput` streams it to the terminal and returns empty output. */
+/** `signal` kills the command; `inheritOutput` connects it to the terminal, input included, and returns empty output. */
 export type RunOptions = { signal?: AbortSignal; inheritOutput?: boolean };
 
 export interface CommandRunner {
@@ -15,7 +15,7 @@ export class BunCommandRunner implements CommandRunner {
   async run(command: string, args: string[], input?: string, options: RunOptions = {}): Promise<CommandResult> {
     const output = options.inheritOutput ? "inherit" : "pipe";
     const process = Bun.spawn([command, ...args], {
-      stdin: input === undefined ? "ignore" : new Blob([input]),
+      stdin: input !== undefined ? new Blob([input]) : options.inheritOutput ? "inherit" : "ignore",
       stdout: output,
       stderr: output,
       signal: options.signal,

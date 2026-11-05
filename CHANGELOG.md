@@ -2,6 +2,12 @@
 
 Each release's notes on GitHub come from its section below. Releases before 0.11.0 are listed on the [releases page](https://github.com/johniak/reviewonator/releases).
 
+## 0.13.1 - 2026-11-05
+
+### Fixed
+
+- `reviewonator update` gives the new version's setup your terminal, so setup can ask about settings that a new release adds.
+
 ## 0.13.0 - 2026-11-04
 
 ### Added
