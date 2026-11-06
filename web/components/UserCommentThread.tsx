@@ -11,18 +11,21 @@ import {
 import { useState } from "react";
 import type { UserCommentThread, UserThreadActions } from "../types";
 import { MarkdownText } from "./MarkdownText";
+import { QueuedNote, sendLabel } from "./ReviewCommentCard";
 import { SendHint, sendOnEnter } from "./SendOnEnter";
 
 type Props = UserThreadActions & {
   thread: UserCommentThread;
   focused?: boolean;
   agentPending?: boolean;
+  queueing?: boolean;
 };
 
 export function UserCommentThreadCard({
   thread,
   focused = false,
   agentPending = false,
+  queueing = false,
   replyMessages,
   dismissalReasons,
   onReplyChange,
@@ -34,7 +37,10 @@ export function UserCommentThreadCard({
   const dismissalReason = dismissalReasons[thread.id] ?? "";
   const [showDismissal, setShowDismissal] = useState(Boolean(dismissalReason));
   const status = userThreadStatus(thread, reply, dismissalReason);
-  const canReply = !thread.dismissed && !thread.findingId && thread.messages.at(-1)?.author === "agent";
+  const open = !thread.dismissed && !thread.findingId;
+  const canReply = open && thread.messages.at(-1)?.author === "agent";
+  // While the AI reviews, a discussion with a queued message takes nothing more until the agent replies.
+  const queued = open && !canReply && queueing;
   const replyFieldId = `${userThreadCardId(thread.id)}-reply`;
   const dismissalFieldId = `${userThreadCardId(thread.id)}-dismissal`;
 
@@ -77,7 +83,8 @@ export function UserCommentThreadCard({
         </button>
       )}
 
-      {!thread.dismissed && !thread.findingId && !canReply && (
+      {queued && <QueuedNote className="thread-waiting-note" />}
+      {open && !canReply && !queued && (
         <p className="thread-waiting-note"><Send aria-hidden="true" size={12} /> Waiting for the AI agent to respond.</p>
       )}
 
@@ -110,12 +117,12 @@ export function UserCommentThreadCard({
             onClick={() => onSendReply(thread.id)}
           >
             {agentPending ? <RotateCcw aria-hidden="true" size={13} /> : <Send aria-hidden="true" size={13} />}
-            {agentPending ? "AI agent is responding" : "Send to AI"}
+            {sendLabel(agentPending, queueing)}
           </button>
         </div>
       )}
 
-      {!thread.dismissed && !thread.findingId && (
+      {open && !queued && (
         <div className="thread-user-actions">
           {showDismissal ? (
             <div className="thread-dismissal-field">

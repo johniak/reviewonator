@@ -31,7 +31,7 @@ import type {
   UserCommentThread,
   UserThreadActions,
 } from "../types";
-import { ReviewCommentCard } from "./ReviewCommentCard";
+import { ReviewCommentCard, sendLabel } from "./ReviewCommentCard";
 import { sendOnEnter } from "./SendOnEnter";
 import { userThreadCardId, UserCommentThreadCard } from "./UserCommentThread";
 
@@ -486,6 +486,7 @@ function RenderedFileDiff({
               thread={thread}
               focused={thread.id === focusedThreadId}
               agentPending={commentActions.agentPending}
+              queueing={commentActions.queueing}
               {...threadActions}
             />
           ))}
@@ -502,6 +503,7 @@ function RenderedFileDiff({
             <LineCommentDraftCard
               draft={annotation.metadata.draft}
               agentPending={commentActions.agentPending}
+              queueing={commentActions.queueing}
               onChangeDraft={onChangeDraft}
               onRemoveDraft={onRemoveDraft}
               onSendDraft={onSendDraft}
@@ -517,6 +519,7 @@ function RenderedFileDiff({
 export function LineCommentDraftCard({
   draft,
   agentPending,
+  queueing = false,
   onChangeDraft,
   onRemoveDraft,
   onSendDraft,
@@ -524,6 +527,7 @@ export function LineCommentDraftCard({
 }: {
   draft: LineCommentDraft;
   agentPending: boolean;
+  queueing?: boolean;
 } & Pick<LineCommentDraftActions, "onChangeDraft" | "onRemoveDraft" | "onSendDraft" | "onAddComment">) {
   const location = { path: draft.path, line: draft.line, side: draft.side };
   return (
@@ -575,7 +579,7 @@ export function LineCommentDraftCard({
             onClick={() => onSendDraft(location)}
           >
             {agentPending ? <RotateCcw aria-hidden="true" size={13} /> : <Send aria-hidden="true" size={13} />}
-            {agentPending ? "AI agent is responding" : "Send to AI"}
+            {sendLabel(agentPending, queueing)}
           </button>
         </div>
       </div>

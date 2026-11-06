@@ -1,4 +1,4 @@
-import { Bot, Check, EyeOff, MessageSquareReply, Pencil, RotateCcw, Send, Trash2, UserRound, X } from "lucide-react";
+import { Bot, Check, Clock, EyeOff, MessageSquareReply, Pencil, RotateCcw, Send, Trash2, UserRound, X } from "lucide-react";
 import { useState } from "react";
 import type { CommentEdit, Severity } from "../../src/domain/review";
 import type { CommentActions, ReviewComment } from "../types";
@@ -19,6 +19,7 @@ export function ReviewCommentCard({
   compact = false,
   focused = false,
   agentPending,
+  queueing = false,
   selectedIds,
   rejectedIds,
   revisionMessages,
@@ -166,13 +167,15 @@ export function ReviewCommentCard({
             onClick={() => void onSendRevision(comment.id)}
           >
             {agentPending ? <RotateCcw aria-hidden="true" size={13} /> : <Send aria-hidden="true" size={13} />}
-            {agentPending ? "AI agent is responding" : "Send to AI"}
+            {sendLabel(agentPending, queueing)}
           </button>
         </div>
       )}
-      {waitingForAgent && (
+      {waitingForAgent && (queueing ? (
+        <QueuedNote className="finding-discussion-waiting" />
+      ) : (
         <p className="finding-discussion-waiting"><RotateCcw aria-hidden="true" size={12} /> The AI agent is checking this {byUser ? "comment" : "finding"}.</p>
-      )}
+      ))}
     </article>
   );
 }
@@ -218,6 +221,21 @@ function CommentEditor({
         <button className="finding-discussion-send" type="submit" disabled={!body.trim() || !changed}>Save</button>
       </div>
     </form>
+  );
+}
+
+/** The label of a button that sends one message to the AI agent. */
+export function sendLabel(agentPending: boolean, queueing: boolean): string {
+  if (queueing) return "Queue for AI";
+  return agentPending ? "AI agent is responding" : "Send to AI";
+}
+
+/** Marks a message that waits until the AI agent finishes its early review. */
+export function QueuedNote({ className }: { className: string }) {
+  return (
+    <p className={`${className} discussion-queued`}>
+      <Clock aria-hidden="true" size={12} /> Queued, sent when the AI finishes its review
+    </p>
   );
 }
 

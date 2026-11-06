@@ -871,6 +871,8 @@ textarea:focus { border-color: var(--pc-accent); }
 .finding-discussion-waiting,
 .thread-waiting-note { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; color: var(--pc-fg-muted); font-size: var(--pc-text-small); }
 .finding-discussion-waiting svg { animation: spin 1.3s linear infinite; }
+/* A message queued during an early review is waiting, not being worked on, so its icon stays still. */
+.discussion-queued svg { animation: none; }
 
 .comment-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .selection-button.active { color: var(--pc-success); background: var(--pc-success-subtle); border-color: var(--pc-success); }
@@ -1062,9 +1064,43 @@ a.briefing-ticket:hover { background: var(--pc-bg-hover); border-color: var(--pc
 .briefing-people { margin: 4px 0 0; padding-left: 20px; color: var(--pc-fg-muted); font-size: var(--pc-text-small); line-height: 18px; }
 .briefing-people strong { color: var(--pc-fg-default); font-weight: 600; }
 .briefing-text { max-width: 110ch; margin-top: 6px; padding-left: 20px; }
+.briefing-pending {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 0;
+  color: var(--pc-fg-muted);
+  font-size: 13px;
+  line-height: 20px;
+}
+.briefing-pending .spin, .reviewing-progress .spin { flex: none; color: var(--pc-accent); }
 
 .review-summary { padding: 16px 20px 16px 16px; border-bottom: var(--pc-border-width) solid var(--pc-border-default); }
 .review-summary h2 { font-size: 16px; line-height: 24px; margin-bottom: 8px; }
+.reviewing-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--pc-fg-default);
+  font-size: 13px;
+  line-height: 20px;
+}
+.reviewing-elapsed {
+  margin-left: auto;
+  color: var(--pc-fg-muted);
+  font: 500 var(--pc-text-small) / 18px var(--pc-font-code);
+  font-variant-numeric: tabular-nums;
+}
+.reviewing-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 10px 0 0;
+  color: var(--pc-fg-muted);
+  font-size: 13px;
+  line-height: 20px;
+}
+.reviewing-hint svg { flex: none; margin-top: 3px; }
 
 .recommendation { margin-top: 12px; display: flex; align-items: center; gap: 8px; color: var(--pc-fg-muted); font-size: 13px; }
 .recommendation strong { margin-left: auto; color: var(--pc-fg-default); font-weight: 600; }
@@ -1087,6 +1123,7 @@ a.briefing-ticket:hover { background: var(--pc-bg-hover); border-color: var(--pc
 .selection-summary svg { color: var(--pc-success); }
 .selection-summary strong { color: var(--pc-fg-default); font-variant-numeric: tabular-nums; }
 .primary-button, .revision-submit-button { width: 100%; }
+.publish-unavailable { margin: -2px 0 0; color: var(--pc-fg-muted); font-size: var(--pc-text-small); line-height: 18px; text-align: center; }
 .cancel-button {
   width: 100%;
   min-height: var(--pc-control-compact);

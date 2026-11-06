@@ -26,9 +26,10 @@ import { PublishDialog } from "./components/PublishDialog";
 import { PullRequestDiscussion } from "./components/PullRequestDiscussion";
 import { MyCommentNavigation } from "./components/MyCommentNavigation";
 import { MarkdownText } from "./components/MarkdownText";
-import { PrBriefing, pullRequestPeople } from "./components/PrBriefing";
+import { PrBriefing, PrBriefingPending, pullRequestPeople } from "./components/PrBriefing";
 import { commentCardId, ReviewCommentCard } from "./components/ReviewCommentCard";
 import { ReviewFindingNavigation } from "./components/ReviewFindingNavigation";
+import { ReviewingStatus } from "./components/ReviewingStatus";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { UpdateNoticeToast } from "./components/UpdateNotice";
 import { userThreadCardId } from "./components/UserCommentThread";
@@ -184,8 +185,10 @@ export function App() {
     + pendingThreadReplies.length
     + pendingDismissedThreads.length;
 
+  const reviewing = session?.reviewing ?? null;
   const actions = {
     agentPending: session?.agentPending ?? false,
+    queueing: Boolean(reviewing),
     selectedIds,
     rejectedIds,
     revisionMessages,
@@ -553,9 +556,9 @@ export function App() {
         <div className="header-tools">
           <div className="diff-stats">
             {session.live && (
-              <span className={`live-session-badge ${session.agentPending ? "working" : ""}`}>
+              <span className={`live-session-badge ${reviewing || session.agentPending ? "working" : ""}`}>
                 <Radio aria-hidden="true" size={12} />
-                {session.agentPending ? "AI working" : "Live"}
+                {reviewing ? "AI reviewing" : session.agentPending ? "AI working" : "Live"}
               </span>
             )}
             <span className="additions">+{pullRequest.additions}</span>
@@ -637,6 +640,7 @@ export function App() {
         </aside>
 
         <main className="review-canvas">
+          {!review.briefing && reviewing && <PrBriefingPending />}
           {review.briefing && (
             <PrBriefing
               briefing={review.briefing}
@@ -698,6 +702,7 @@ export function App() {
 
           <div className="review-panel-content">
             {panelTab === "review" ? (
+              reviewing ? <ReviewingStatus startedAt={reviewing.startedAt} /> : (
               <>
                 <section className="review-summary">
                   <h2>Review summary</h2>
@@ -728,6 +733,7 @@ export function App() {
                   ))}
                 </section>
               </>
+              )
             ) : (
               <PullRequestDiscussion items={session.discussion} onSelectFile={selectFile} />
             )}
@@ -749,13 +755,14 @@ export function App() {
                 <RotateCcw size={16} />
                 {session.agentPending
                   ? "AI agent is responding"
-                  : `Send ${pendingAgentRequests} request${pendingAgentRequests === 1 ? "" : "s"} to AI agent`}
+                  : `${reviewing ? "Queue" : "Send"} ${pendingAgentRequests} request${pendingAgentRequests === 1 ? "" : "s"} ${reviewing ? "for AI" : "to AI agent"}`}
               </button>
             )}
             <button
               className="primary-button"
               type="button"
-              disabled={pendingAgentRequests > 0}
+              disabled={pendingAgentRequests > 0 || Boolean(reviewing)}
+              aria-describedby={reviewing ? "publish-unavailable" : undefined}
               onClick={() => {
                 setActionError(null);
                 setPublishOpen(true);
@@ -764,6 +771,9 @@ export function App() {
               Review and publish
               <ArrowRight size={16} />
             </button>
+            {reviewing && (
+              <p id="publish-unavailable" className="publish-unavailable">Available when the AI finishes its review</p>
+            )}
             <button className="cancel-button" type="button" onClick={cancel}>
               <X size={14} /> Cancel review
             </button>

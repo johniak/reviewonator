@@ -1,4 +1,4 @@
-import { ChevronRight, ExternalLink, EyeOff, Ticket } from "lucide-react";
+import { ChevronRight, ExternalLink, EyeOff, LoaderCircle, Ticket } from "lucide-react";
 import type { PullRequest } from "../../src/domain/pull-request";
 import type { Briefing } from "../../src/domain/review";
 import { MarkdownText } from "./MarkdownText";
@@ -72,6 +72,21 @@ export function PrBriefing({ briefing, people, reviewerLanguage, collapsed, onCo
           <MarkdownText className="briefing-text">{text}</MarkdownText>
         </>
       )}
+    </section>
+  );
+}
+
+/** Stands in for About this PR while an early review waits for the agent's first delivery. */
+export function PrBriefingPending() {
+  return (
+    <section className="pr-briefing pr-briefing-pending" aria-labelledby="pr-briefing-title">
+      <div className="pr-briefing-heading">
+        <h2 id="pr-briefing-title">About this PR</h2>
+      </div>
+      <p className="briefing-pending">
+        <LoaderCircle className="spin" aria-hidden="true" size={14} />
+        The AI is reading the pull request
+      </p>
     </section>
   );
 }

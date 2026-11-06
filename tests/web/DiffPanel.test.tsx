@@ -297,6 +297,24 @@ describe("DiffPanel view modes", () => {
     expect(screen.getByRole("button", { name: "AI agent is responding" })).toBeDisabled();
   });
 
+  it("queues the line comment for the AI while it reviews", async () => {
+    const onSendDraft = vi.fn();
+    render(
+      <LineCommentDraftCard
+        draft={{ id: "U-draft", path: "src/example.ts", line: 2, side: "RIGHT", message: "Check this." }}
+        agentPending={false}
+        queueing
+        onChangeDraft={vi.fn()}
+        onRemoveDraft={vi.fn()}
+        onSendDraft={onSendDraft}
+        onAddComment={vi.fn()}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Queue for AI" }));
+    expect(onSendDraft).toHaveBeenCalledWith({ path: "src/example.ts", line: 2, side: "RIGHT" });
+  });
+
   it("sends the line comment to the AI agent on Enter, not on Shift+Enter", async () => {
     const onSendDraft = vi.fn();
     const onChangeDraft = vi.fn();

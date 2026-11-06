@@ -87,6 +87,29 @@ describe("UserCommentThreadCard", () => {
     expect(screen.queryByLabelText("Reply to the AI agent")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Dismiss discussion" })).not.toBeInTheDocument();
   });
+
+  it("shows a message sent while the AI reviews as queued, without a reply field or dismissal", () => {
+    render(<UserCommentThreadCard thread={{ ...userThread, messages: [userThread.messages[0]] }} {...actions} queueing />);
+
+    expect(screen.getByText("Queued, sent when the AI finishes its review")).toBeVisible();
+    expect(screen.queryByText("Waiting for the AI agent to respond.")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Reply to the AI agent")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Dismiss discussion" })).not.toBeInTheDocument();
+  });
+
+  it("queues a reply for the AI while it reviews", async () => {
+    const onSendReply = vi.fn();
+    render(<UserCommentThreadCard
+      thread={userThread}
+      {...actions}
+      queueing
+      replyMessages={{ U1: "More evidence." }}
+      onSendReply={onSendReply}
+    />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Queue for AI" }));
+    expect(onSendReply).toHaveBeenCalledWith("U1");
+  });
 });
 
 describe("userThreadStatus", () => {

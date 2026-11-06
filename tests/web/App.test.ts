@@ -725,3 +725,137 @@ describe("saved view preferences", () => {
     }));
   });
 });
+
+describe("an early review", () => {
+  const starting = { ...review, summary: "", recommendation: "COMMENT" as const, comments: [], userThreads: [] };
+
+  async function earlyApp() {
+    let emitSessionUpdate: (() => void) | undefined;
+    vi.stubGlobal("EventSource", class {
+      onerror: (() => void) | null = null;
+      addEventListener(type: string, listener: EventListener) {
+        if (type === "session") emitSessionUpdate = () => listener(new Event("session"));
+      }
+      close() {}
+    });
+    const session = new ReviewSession(pullRequest, patch, starting, new AppGateway(), discussion, true, [], { early: true });
+    serveSession(session);
+    render(createElement(App));
+    await screen.findByText("AI reviewing");
+    return { session, update: () => act(() => emitSessionUpdate?.()) };
+  }
+
+  async function openLineDraft(line: number) {
+    const target = [...document.querySelector("diffs-container")!.shadowRoot!.querySelectorAll(`[data-line='${line}']`)][0];
+    target.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, composed: true, pointerType: "mouse" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add a comment to this line" }));
+    return screen.findByRole("region", { name: `Your comment for src/example.ts line ${line}` });
+  }
+
+  it("shows that the AI is still reading and reviewing, with the time since it started", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+    const started = new Date("2026-11-06T10:00:00Z").getTime();
+    vi.setSystemTime(started);
+    vi.stubGlobal("EventSource", class { addEventListener() {} close() {} });
+    const session = new ReviewSession(pullRequest, patch, starting, new AppGateway(), discussion, true, [], { early: true });
+    serveSession(session);
+    vi.setSystemTime(started + (4 * 60 + 12) * 1_000);
+    render(createElement(App));
+
+    expect(await screen.findByText("AI reviewing")).toBeVisible();
+    expect(screen.getByRole("region", { name: "About this PR" })).toHaveTextContent("The AI is reading the pull request");
+    expect(screen.getByText("The AI is reviewing this pull request")).toBeVisible();
+    expect(screen.getByText("4:12")).toBeVisible();
+    expect(screen.queryByText("Recommended decision")).toBeNull();
+    expect(screen.queryByText(/If the agent has stopped/)).toBeNull();
+
+    act(() => vi.advanceTimersByTime(1_000));
+    expect(screen.getByText("4:13")).toBeVisible();
+    act(() => vi.advanceTimersByTime((10 * 60 + 47) * 1_000));
+    expect(screen.getByText("15:00")).toBeVisible();
+    expect(screen.getByText("If the agent has stopped, cancel this review and run the skill again.")).toBeVisible();
+    session.cancel();
+  });
+
+  it("keeps publishing closed until the AI finishes its review", async () => {
+    const { session } = await earlyApp();
+
+    expect(screen.getByRole("button", { name: /Review and publish/ })).toBeDisabled();
+    expect(screen.getByText("Available when the AI finishes its review")).toBeVisible();
+    session.cancel();
+  });
+
+  it("shows About this PR as soon as the AI delivers it", async () => {
+    const { session, update } = await earlyApp();
+
+    session.deliver({ ...starting, briefing: { text: "PR przenosi odpowiedź do stałej." } }, false);
+    update();
+
+    const briefing = await screen.findByText("PR przenosi odpowiedź do stałej.");
+    expect(briefing.closest("section")).toHaveTextContent("PR by octocat");
+    expect(screen.queryByText("The AI is reading the pull request")).toBeNull();
+    expect(screen.getByText("The AI is reviewing this pull request")).toBeVisible();
+    session.cancel();
+  });
+
+  it("queues messages for the AI while it reviews and sends them when the review arrives", async () => {
+    const { session, update } = await earlyApp();
+
+    const first = await openLineDraft(3);
+    fireEvent.change(within(first).getByRole("textbox"), { target: { value: "This branch skips validation." } });
+    fireEvent.click(within(first).getByRole("button", { name: "Queue for AI" }));
+
+    const thread = await waitFor(() => {
+      const article = screen.getAllByText("This branch skips validation.")
+        .map((element) => element.closest("article")).find(Boolean);
+      if (!article) throw new Error("The queued line comment has no discussion card yet.");
+      return article;
+    });
+    expect(thread).toHaveTextContent("Queued, sent when the AI finishes its review");
+    expect(within(thread).queryByRole("textbox")).toBeNull();
+    expect(within(thread).queryByRole("button", { name: "Dismiss discussion" })).toBeNull();
+    expect(screen.getByText("AI reviewing")).toBeVisible();
+
+    const second = await openLineDraft(2);
+    fireEvent.change(within(second).getByRole("textbox"), { target: { value: "Why is this a constant?" } });
+    fireEvent.click(within(second).getByRole("button", { name: "Queue for AI" }));
+    await screen.findAllByText("Why is this a constant?");
+    await waitFor(() => expect(session.review.userThreads).toHaveLength(2));
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    session.deliver({ ...starting, summary: "The change looks safe.", comments: review.comments }, true);
+    update();
+
+    expect(await screen.findByText(review.comments[0].body)).toBeVisible();
+    expect(screen.getByText("AI working")).toBeVisible();
+    expect(screen.queryByText("Queued, sent when the AI finishes its review")).toBeNull();
+    expect(screen.getAllByText("Waiting for the AI agent to respond.")).toHaveLength(2);
+    expect(screen.queryByText("The AI is reviewing this pull request")).toBeNull();
+    expect(screen.queryByText("Available when the AI finishes its review")).toBeNull();
+    expect(screen.getByRole("button", { name: /Review and publish/ })).toBeEnabled();
+    await expect(session.waitForAgentRequest()).resolves.toMatchObject({
+      newThreads: [{ line: 3, message: "This branch skips validation." }, { line: 2, message: "Why is this a constant?" }],
+    });
+    session.cancel();
+  });
+
+  it("queues a discussion about the user's own comment from its card", async () => {
+    const { session } = await earlyApp();
+    const draft = await openLineDraft(3);
+    fireEvent.change(within(draft).getByRole("textbox"), { target: { value: "Rename this before release." } });
+    fireEvent.click(within(draft).getByRole("button", { name: "Add comment" }));
+    const card = (await screen.findByText("Rename this before release.")).closest("article")!;
+
+    fireEvent.click(within(card).getByRole("button", { name: "Discuss with AI" }));
+    fireEvent.change(within(card).getByLabelText("What do you want to discuss with the AI agent?"), {
+      target: { value: "Is this name really wrong?" },
+    });
+    fireEvent.click(within(card).getByRole("button", { name: "Queue for AI" }));
+
+    await waitFor(() => expect(card).toHaveTextContent("Queued, sent when the AI finishes its review"));
+    expect(card).toHaveTextContent("Is this name really wrong?");
+    expect(within(card).queryByRole("textbox")).toBeNull();
+    expect(within(card).getByRole("button", { name: "Waiting for AI" })).toBeDisabled();
+    session.cancel();
+  });
+});

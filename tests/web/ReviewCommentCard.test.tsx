@@ -301,6 +301,24 @@ describe("ReviewCommentCard", () => {
       expect(screen.getByText("The AI agent is checking this comment.")).toBeVisible();
     });
 
+    it("queues a discussion message while the AI reviews and shows it as queued", async () => {
+      const cardProps = { ...props(mine), queueing: true, revisionMessages: { H1: "Is this name wrong?" } };
+      const { rerender } = render(<ReviewCommentCard {...cardProps} />);
+
+      await userEvent.click(screen.getByRole("button", { name: "Queue for AI" }));
+      expect(cardProps.onSendRevision).toHaveBeenCalledWith("H1");
+
+      rerender(<ReviewCommentCard
+        {...cardProps}
+        revisionMessages={{}}
+        comment={{ ...mine, discussion: [{ id: "H1-D1", author: "user", body: "Is this name wrong?" }] }}
+      />);
+      expect(screen.getByText("Queued, sent when the AI finishes its review")).toBeVisible();
+      expect(screen.queryByText("The AI agent is checking this comment.")).not.toBeInTheDocument();
+      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Waiting for AI" })).toBeDisabled();
+    });
+
     it("deletes only hand-written comments", async () => {
       const { unmount } = render(<ReviewCommentCard {...props(review.comments[0])} />);
       expect(screen.queryByRole("button", { name: "Delete comment" })).not.toBeInTheDocument();

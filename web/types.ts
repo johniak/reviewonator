@@ -24,6 +24,8 @@ export type SessionSnapshot = {
 
 export type CommentActions = {
   agentPending: boolean;
+  /** True while an early review runs: messages to the AI wait in a queue until it delivers. */
+  queueing?: boolean;
   selectedIds: Set<string>;
   rejectedIds: Set<string>;
   revisionMessages: Record<string, string>;

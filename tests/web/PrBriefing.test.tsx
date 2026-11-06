@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
 import type { Briefing } from "../../src/domain/review";
-import { PrBriefing, pullRequestPeople, type PullRequestPeople } from "../../web/components/PrBriefing";
+import { PrBriefing, PrBriefingPending, pullRequestPeople, type PullRequestPeople } from "../../web/components/PrBriefing";
 
 function Briefed({ briefing, reviewerLanguage = "English", people = { author: "octocat", contributors: [] } }: {
   briefing: Briefing;
@@ -100,5 +100,11 @@ describe("PrBriefing", () => {
 
     expect(screen.getByRole("button", { name: "About this PR" })).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("The PR renames a job.")).toBeVisible();
+  });
+
+  it("shows that the AI is still reading the pull request before About this PR arrives", () => {
+    render(<PrBriefingPending />);
+
+    expect(screen.getByRole("region", { name: "About this PR" })).toHaveTextContent("The AI is reading the pull request");
   });
 });
