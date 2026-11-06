@@ -29,9 +29,10 @@ import {
 const help = `Reviewonator — review a GitHub pull request visually
 
 Usage:
-  reviewonator <PR_URL> --review-file <PATH> [--live] [--no-open] [--port <PORT>]
+  reviewonator <PR_URL> --review-file <PATH> [--live] [--early] [--no-open] [--port <PORT>]
   reviewonator wait <PR_URL>
   reviewonator respond <PR_URL> --review-file <PATH>
+  reviewonator deliver <PR_URL> --review-file <PATH> [--final]
   reviewonator setup [--targets claude,codex] [--comment-language L] [--reviewer-language L] [--mode full|early] [--reconfigure]
                      [--claude-skill-dir DIR] [--codex-skill-dir DIR]
   reviewonator update [--force]
@@ -51,6 +52,8 @@ async function main(): Promise<void> {
       version: { type: "boolean", short: "v" },
       "review-file": { type: "string" },
       live: { type: "boolean", default: false },
+      early: { type: "boolean", default: false },
+      final: { type: "boolean", default: false },
       "no-open": { type: "boolean", default: false },
       port: { type: "string" },
       targets: { type: "string" },
@@ -153,13 +156,21 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (positionals[0] === "deliver") {
+    if (!positionals[1] || positionals.length !== 2 || !values["review-file"]) throw new Error(help);
+    await deliverToLiveSession(positionals[1], values["review-file"], values.final, sync);
+    return;
+  }
+
   const prUrl = positionals[0];
   const reviewFile = values["review-file"];
   if (!prUrl || !reviewFile || positionals.length !== 1) {
     throw new Error(help);
   }
 
-  if (values.live) await ensureNoActiveLiveSession(prUrl);
+  // An early review is always live: the agent delivers its work to the open session.
+  const live = values.live || values.early;
+  if (live) await ensureNoActiveLiveSession(prUrl);
 
   const runner = new BunCommandRunner();
   // Only installs that `reviewonator update` can upgrade are offered an update.
@@ -175,10 +186,15 @@ async function main(): Promise<void> {
     throw new Error("The review JSON belongs to a different pull request URL.");
   }
 
+  if (values.early && review.comments.length > 0) throw new Error("An early review must start without findings.");
+
   const loaded = await github.loadPullRequest(prUrl);
   validateReviewLocations(review, loaded.patch);
 
-  const session = new ReviewSession(loaded.pullRequest, loaded.patch, review, github, loaded.discussion, values.live, loaded.viewedFiles);
+  const session = new ReviewSession(
+    loaded.pullRequest, loaded.patch, review, github, loaded.discussion, live, loaded.viewedFiles,
+    { early: values.early },
+  );
   const token = crypto.randomUUID();
   const app = createApp({ html: appHtml, favicon, token, session, updates, preferences: new FilePreferenceStore(process.env) });
   const requestedPort = values.port ? Number(values.port) : 0;
@@ -195,7 +211,7 @@ async function main(): Promise<void> {
   process.stderr.write(`Reviewonator is ready at ${url}\n`);
 
   let liveState: LiveSessionState | undefined;
-  if (values.live) {
+  if (live) {
     liveState = {
       prUrl,
       baseUrl: `http://127.0.0.1:${server.port}`,
@@ -278,6 +294,31 @@ async function respondToLiveRequest(prUrl: string, reviewFile: string, sync: Syn
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }
 
+async function deliverToLiveSession(
+  prUrl: string,
+  reviewFile: string,
+  final: boolean,
+  sync: SyncResult | null,
+): Promise<void> {
+  const state = await readLiveState(prUrl);
+  if (state.result) {
+    // The human cancelled while the agent was reviewing; nothing was published and nothing is left to deliver.
+    process.stdout.write(`${JSON.stringify(state.result)}\n`);
+    await removeLiveState(prUrl);
+    return;
+  }
+  await assertLiveServerReachable(state);
+  const review = await Bun.file(reviewFile).json() as { prUrl?: unknown };
+  if (typeof review.prUrl !== "string" || new URL(review.prUrl).href !== new URL(prUrl).href) {
+    throw new Error("The review JSON belongs to a different pull request URL.");
+  }
+  const result = await withSkillUpdateHint(sync, () => liveRequest(state, "/api/agent/deliver", {
+    method: "POST",
+    body: JSON.stringify({ review, final }),
+  }, "deliver"));
+  process.stdout.write(`${JSON.stringify(result)}\n`);
+}
+
 async function liveRequest(
   state: LiveSessionState,
   path: string,
@@ -335,6 +376,11 @@ async function ensureNoActiveLiveSession(prUrl: string): Promise<void> {
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("No live Reviewonator session")) return;
     throw error;
+  }
+  if (state.result?.status === "cancelled") {
+    // Nothing was published, so nothing is lost by starting over.
+    await removeLiveState(prUrl);
+    return;
   }
   if (state.result) {
     throw new Error(`A completed live session is waiting for the agent. Run reviewonator wait ${prUrl} first.`);

@@ -8,7 +8,7 @@ import { delimiter, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ReviewDocument } from "../../src/domain/review";
-import { writeLiveState } from "../../src/server/live-state";
+import { liveStatePath, writeLiveState } from "../../src/server/live-state";
 
 const fixtureDir = resolve("tests/e2e/fixtures");
 const reviewFile = join(fixtureDir, "review.json");
@@ -21,15 +21,20 @@ afterEach(() => {
   activeChildren.clear();
 });
 
-async function startReviewonator(extraEnv: NodeJS.ProcessEnv = {}, live = false) {
+async function startReviewonator(
+  extraEnv: NodeJS.ProcessEnv = {},
+  live = false,
+  options: { early?: boolean; reviewFile?: string } = {},
+) {
   const args = [
     "src/cli.ts",
     prUrl,
-    "--review-file", reviewFile,
+    "--review-file", options.reviewFile ?? reviewFile,
     "--no-open",
     "--port", "0",
   ];
   if (live) args.push("--live");
+  if (options.early) args.push("--early");
   const child = spawn("bun", [
     ...args,
   ], {
@@ -83,6 +88,22 @@ async function authenticatedFetch(baseUrl: string, token: string, path: string, 
       ...init?.headers,
     },
   });
+}
+
+async function writeStartingFile(directory: string, overrides: Partial<ReviewDocument> = {}): Promise<string> {
+  const original = JSON.parse(await readFile(reviewFile, "utf8")) as ReviewDocument;
+  const path = join(directory, "starting.json");
+  await writeFile(path, JSON.stringify({
+    version: 2,
+    prUrl: original.prUrl,
+    languages: original.languages,
+    summary: "",
+    recommendation: "COMMENT",
+    comments: [],
+    userThreads: [],
+    ...overrides,
+  }));
+  return path;
 }
 
 function waitForExit(child: ReturnType<typeof spawn>): Promise<number | null> {
@@ -471,5 +492,127 @@ describe("Reviewonator CLI end-to-end", () => {
     } finally {
       await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
     }
+  });
+
+  describe("early review", () => {
+    async function startEarly(prefix: string) {
+      const temp = await mkdtemp(join(tmpdir(), prefix));
+      const env = { REVIEWONATOR_STATE_DIR: join(temp, "state") };
+      const startingFile = await writeStartingFile(temp);
+      const early = await startReviewonator(env, false, { early: true, reviewFile: startingFile });
+      const exit = waitForExit(early.child);
+      const { baseUrl, token } = await early.ready;
+      const cli = (...args: string[]) => run("bun", ["src/cli.ts", ...args], { cwd: process.cwd(), env: { ...process.env, ...env } });
+      const session = async () => await (await authenticatedFetch(baseUrl, token, "/api/session")).json() as {
+        live: boolean;
+        reviewing: { startedAt: string } | null;
+        review: ReviewDocument;
+      };
+      return { temp, env, early, exit, baseUrl, token, cli, session };
+    }
+
+    it("delivers About this PR, then the final review, and releases a request queued meanwhile", async () => {
+      const { temp, early, exit, baseUrl, token, cli, session } = await startEarly("reviewonator-early-");
+      const original = JSON.parse(await readFile(reviewFile, "utf8")) as ReviewDocument;
+      expect(early.output()).toBe("");
+      const started = await session();
+      expect(started.live).toBe(true);
+      expect(started.reviewing).toMatchObject({ startedAt: expect.any(String) });
+
+      const briefingFile = await writeStartingFile(temp, { briefing: original.briefing });
+      const first = await cli("deliver", prUrl, "--review-file", briefingFile);
+      expect(JSON.parse(first.stdout)).toEqual({ status: "accepted" });
+      const afterBriefing = await session();
+      expect(afterBriefing.reviewing).not.toBeNull();
+      expect(afterBriefing.review.briefing?.text).toBe(original.briefing?.text);
+
+      const queued = await authenticatedFetch(baseUrl, token, "/api/revision", {
+        method: "POST",
+        body: JSON.stringify({
+          newThreads: [{ id: "U-early", path: "src/payments/retry.ts", line: 8, side: "RIGHT", message: "Is this safe?" }],
+        }),
+      });
+      expect(queued.status).toBe(200);
+
+      const finalFile = join(temp, "final.json");
+      await writeFile(finalFile, JSON.stringify({ ...original, userThreads: [] }));
+      const final = await cli("deliver", prUrl, "--review-file", finalFile, "--final");
+      expect(JSON.parse(final.stdout)).toEqual({ status: "accepted" });
+      const afterFinal = await session();
+      expect(afterFinal.reviewing).toBeNull();
+      expect(afterFinal.review.comments.map(({ id }) => id)).toEqual(["S1", "S2", "G1"]);
+
+      const waited = JSON.parse((await cli("wait", prUrl)).stdout) as { status: string; newThreads: Array<{ id: string }>; review: ReviewDocument };
+      expect(waited.status).toBe("revision_requested");
+      expect(waited.newThreads.map(({ id }) => id)).toEqual(["U-early"]);
+      expect(waited.review.comments).toHaveLength(3);
+
+      await authenticatedFetch(baseUrl, token, "/api/cancel", { method: "POST", body: "{}" });
+      await exit;
+    }, 30_000);
+
+    it("tells the agent that the review was cancelled and removes the saved session", async () => {
+      const { temp, env, exit, baseUrl, token, cli } = await startEarly("reviewonator-early-cancel-");
+      expect((await authenticatedFetch(baseUrl, token, "/api/cancel", { method: "POST", body: "{}" })).status).toBe(200);
+      expect(await exit).toBe(0);
+      const statePath = liveStatePath(prUrl, env);
+      expect(JSON.parse(await readFile(statePath, "utf8")).result).toEqual({ status: "cancelled" });
+
+      const delivered = await cli("deliver", prUrl, "--review-file", await writeStartingFile(temp));
+      expect(JSON.parse(delivered.stdout)).toEqual({ status: "cancelled" });
+      await expect(readFile(statePath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+    }, 30_000);
+
+    it("prints the session's error when the delivery is refused", async () => {
+      const { temp, early, exit, baseUrl, token, cli } = await startEarly("reviewonator-early-refused-");
+      const original = JSON.parse(await readFile(reviewFile, "utf8")) as ReviewDocument;
+      const withFindings = join(temp, "findings.json");
+      await writeFile(withFindings, JSON.stringify({ ...original, userThreads: [] }));
+      await expect(cli("deliver", prUrl, "--review-file", withFindings)).rejects.toMatchObject({
+        stderr: expect.stringContaining("A delivery before the final one cannot contain findings."),
+      });
+      expect(early.output()).toBe("");
+      await authenticatedFetch(baseUrl, token, "/api/cancel", { method: "POST", body: "{}" });
+      await exit;
+    }, 30_000);
+
+    it("refuses to start with findings already in the file", async () => {
+      const temp = await mkdtemp(join(tmpdir(), "reviewonator-early-findings-"));
+      await expect(run("bun", ["src/cli.ts", prUrl, "--review-file", reviewFile, "--early", "--no-open"], {
+        cwd: process.cwd(),
+        env: { ...process.env, REVIEWONATOR_STATE_DIR: join(temp, "state"), PATH: `${fixtureDir}${delimiter}${process.env.PATH}` },
+      })).rejects.toMatchObject({ stderr: expect.stringContaining("An early review must start without findings.") });
+    });
+
+    it("lets a new start replace a cancelled leftover but not a published one", async () => {
+      const temp = await mkdtemp(join(tmpdir(), "reviewonator-early-leftover-"));
+      const env = { REVIEWONATOR_STATE_DIR: join(temp, "state") };
+      const leftover = {
+        prUrl,
+        baseUrl: "http://127.0.0.1:1",
+        token: "old",
+        pid: 999_999,
+        startedAt: new Date().toISOString(),
+      };
+      await writeLiveState({ ...leftover, result: { status: "published" } as never }, env);
+      await expect(run("bun", ["src/cli.ts", prUrl, "--review-file", reviewFile, "--live", "--no-open"], {
+        cwd: process.cwd(),
+        env: { ...process.env, ...env, PATH: `${fixtureDir}${delimiter}${process.env.PATH}` },
+      })).rejects.toMatchObject({ stderr: expect.stringContaining("A completed live session is waiting for the agent.") });
+
+      await writeLiveState({ ...leftover, result: { status: "cancelled" } }, env);
+      const restarted = await startReviewonator(env, true);
+      const exit = waitForExit(restarted.child);
+      const { baseUrl, token } = await restarted.ready;
+      expect((await authenticatedFetch(baseUrl, token, "/health")).status).toBe(200);
+      await authenticatedFetch(baseUrl, token, "/api/cancel", { method: "POST", body: "{}" });
+      await exit;
+    }, 30_000);
+
+    it("lists deliver and --early in the help text", async () => {
+      const { stdout } = await run("bun", ["src/cli.ts", "--help"], { cwd: process.cwd() });
+      expect(stdout).toContain("reviewonator deliver <PR_URL> --review-file <PATH> [--final]");
+      expect(stdout).toContain("[--early]");
+    });
   });
 });
