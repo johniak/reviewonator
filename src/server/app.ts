@@ -15,6 +15,7 @@ type AppDependencies = {
 };
 
 const dismissalSchema = z.object({ version: z.string().min(1) });
+const deliverySchema = z.object({ review: z.unknown(), final: z.boolean() });
 const preferencesElement = /(<script id="reviewonator-preferences" type="application\/json">)[^<]*(<\/script>)/;
 
 /** Fills the placeholder in index.html so the page can apply the saved theme before its first paint. */
@@ -101,6 +102,12 @@ export function createApp({ html, favicon, token, session, updates, preferences 
 
   app.post("/api/agent/respond", async (context) => {
     session.respond(await context.req.json());
+    return context.json({ status: "accepted" });
+  });
+
+  app.post("/api/agent/deliver", async (context) => {
+    const { review, final } = deliverySchema.parse(await context.req.json());
+    session.deliver(review, final);
     return context.json({ status: "accepted" });
   });
 

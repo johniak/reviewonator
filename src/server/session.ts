@@ -16,7 +16,7 @@ import {
   type RevisionRequest,
 } from "../domain/review";
 import type { FileContext, FileRevision, GitHubGateway, PublishedReview } from "../github/client";
-import { mergeAgentComments, reconcileAgentInput } from "./user-owned-comments";
+import { isUserOwned, mergeAgentComments, reconcileAgentInput } from "./user-owned-comments";
 
 export type SessionResult =
   | {
@@ -42,6 +42,13 @@ export class ClosedSessionError extends Error {}
 /** A user comment change the session refuses; the message is meant for the user. */
 export class CommentChangeError extends Error {}
 
+type AgentRequest = Extract<SessionResult, { status: "revision_requested" }>;
+
+export type ReviewSessionOptions = {
+  /** Opens the session before the agent has reviewed; the agent sends its work with `deliver`. */
+  early?: boolean;
+};
+
 export class ReviewSession {
   private state: "open" | "publishing" | "closed" = "open";
   private currentReview: ReviewDocument;
@@ -51,8 +58,12 @@ export class ReviewSession {
   /** User comments the user deleted, so an agent echoing an older review cannot bring them back. */
   private readonly deletedUserCommentIds = new Set<string>();
   private readonly fileContextCache = new Map<string, Promise<FileContext>>();
-  private pendingAgentRequests: Extract<SessionResult, { status: "revision_requested" }>[] = [];
-  private activeAgentRequest?: Extract<SessionResult, { status: "revision_requested" }>;
+  private pendingAgentRequests: AgentRequest[] = [];
+  private activeAgentRequest?: AgentRequest;
+  /** Set while an early session waits for the agent's final delivery. */
+  private reviewing: { startedAt: string } | null;
+  /** The user's requests sent while reviewing, merged into one and released after the final delivery. */
+  private queuedAgentRequest?: AgentRequest;
   private agentWaiters: ((result: AgentWaitResult) => void)[] = [];
   private changeVersion = 0;
   private changeWaiters: ((version: number | null) => void)[] = [];
@@ -66,7 +77,10 @@ export class ReviewSession {
     readonly discussion: PullRequestDiscussionItem[] = [],
     readonly live = false,
     viewedFiles: string[] = [],
+    options: ReviewSessionOptions = {},
   ) {
+    if (options.early && !live) throw new Error("Early review mode requires a live session.");
+    this.reviewing = options.early ? { startedAt: new Date().toISOString() } : null;
     this.currentReview = review;
     this.viewedFiles = new Set(viewedFiles);
     this.resultPromise = new Promise((resolve) => {
@@ -101,7 +115,8 @@ export class ReviewSession {
       review: this.review,
       live: this.live,
       version: this.version,
-      agentPending: Boolean(this.activeAgentRequest || this.pendingAgentRequests.length),
+      reviewing: this.reviewing,
+      agentPending: !this.reviewing && Boolean(this.activeAgentRequest || this.pendingAgentRequests.length),
       discussion: this.discussion,
       viewedFiles: [...this.viewedFiles],
       fileUrls: Object.fromEntries(
@@ -112,7 +127,7 @@ export class ReviewSession {
 
   requestRevision(input: unknown): void {
     this.assertOpen();
-    if (this.live && (this.activeAgentRequest || this.pendingAgentRequests.length > 0)) {
+    if (this.live && !this.reviewing && (this.activeAgentRequest || this.pendingAgentRequests.length > 0)) {
       throw new Error("The AI agent is already working on the previous request.");
     }
     const request = revisionRequestSchema.parse(input);
@@ -155,6 +170,14 @@ export class ReviewSession {
         throw new Error(`User comment thread is already dismissed: ${threadId}`);
       }
     }
+    if (this.reviewing) {
+      const commentsById = new Map(this.review.comments.map((comment) => [comment.id, comment]));
+      const awaitingReply = [
+        ...request.requests.map(({ commentId }) => commentsById.get(commentId)!.discussion?.at(-1)?.author),
+        ...request.dismissedThreads.map(({ threadId }) => threadsById.get(threadId)!.messages.at(-1)?.author),
+      ].includes("user");
+      if (awaitingReply) throw new CommentChangeError("The AI agent has not replied to this discussion yet.");
+    }
     const unknownPaths = request.newThreads
       .map(({ path }) => path)
       .filter((path) => !this.fileRevisions.has(path));
@@ -175,8 +198,66 @@ export class ReviewSession {
       return;
     }
     this.applyHumanRevision(result);
-    this.pendingAgentRequests.push(result);
-    this.releaseAgentWaiter();
+    if (this.reviewing) {
+      this.queuedAgentRequest = mergeQueuedRequests(this.queuedAgentRequest, result);
+    } else {
+      this.pendingAgentRequests.push(result);
+      this.releaseAgentWaiter();
+    }
+    this.notifyChanged();
+  }
+
+  /**
+   * Takes the agent's work in an early session: first About this PR, then the final review with every
+   * finding. The user's comments, threads, and decisions made meanwhile stay, and the final delivery
+   * releases the requests the user queued.
+   */
+  deliver(input: unknown, final: boolean): void {
+    this.assertOpen();
+    if (!this.reviewing) throw new Error("The AI agent has already delivered its review.");
+    const delivered = reviewDocumentSchema.parse(input);
+    validateReviewLocations(delivered, this.patch);
+    this.validateDocumentIdentity(delivered);
+    for (const comment of delivered.comments) {
+      if (comment.author === "user") {
+        throw new Error(`The agent cannot deliver comment ${comment.id} as written by the user.`);
+      }
+      if (comment.edited) throw new Error(`Only the user can mark comment ${comment.id} as edited.`);
+      if (comment.id.startsWith("H")) {
+        throw new Error(`Comment ids starting with H are reserved for the user's comments: ${comment.id}`);
+      }
+      if (comment.included || comment.rejected) throw new Error(`New finding ${comment.id} must start pending.`);
+      if ((comment.discussion?.length ?? 0) > 0) {
+        throw new Error(`The agent cannot start a discussion on new finding ${comment.id}.`);
+      }
+    }
+    if (delivered.userThreads.length > 0) throw new Error("The agent cannot create user discussion threads.");
+    if (!final && delivered.comments.length > 0) {
+      throw new Error("A delivery before the final one cannot contain findings.");
+    }
+    const briefing = delivered.briefing ?? this.review.briefing;
+    this.currentReview = final
+      ? {
+          ...this.review,
+          ...(briefing ? { briefing } : {}),
+          summary: delivered.summary,
+          recommendation: delivered.recommendation,
+          comments: [...this.review.comments.filter(isUserOwned), ...delivered.comments],
+        }
+      : {
+          ...this.review,
+          ...(briefing ? { briefing } : {}),
+          summary: delivered.summary || this.review.summary,
+        };
+    if (final) {
+      this.reviewing = null;
+      const queued = this.queuedAgentRequest && this.withoutDeletedItems(this.queuedAgentRequest);
+      this.queuedAgentRequest = undefined;
+      if (queued) {
+        this.pendingAgentRequests.push(queued);
+        this.releaseAgentWaiter();
+      }
+    }
     this.notifyChanged();
   }
 
@@ -198,6 +279,7 @@ export class ReviewSession {
   respond(input: unknown): void {
     this.assertOpen();
     if (!this.live) throw new Error("Agent responses require a live review session.");
+    if (this.reviewing) throw new Error("The AI agent has not delivered its review yet.");
     if (!this.activeAgentRequest) throw new Error("There is no user request waiting for an agent response.");
     const discussedIds = new Set(this.activeAgentRequest.requests.map(({ commentId }) => commentId));
     const nextReview = reviewDocumentSchema.parse(
@@ -289,6 +371,7 @@ export class ReviewSession {
 
   async publish(input: unknown): Promise<PublishedReview> {
     this.assertOpen();
+    if (this.reviewing) throw new CommentChangeError("Publishing is available when the AI finishes its review.");
     const request = publishRequestSchema.parse(input);
     const byId = new Map(this.review.comments.map((comment) => [comment.id, comment]));
     const selectedIds = [...new Set(request.selectedCommentIds)];
@@ -344,7 +427,7 @@ export class ReviewSession {
     for (const resolve of this.changeWaiters.splice(0)) resolve(null);
   }
 
-  private applyHumanRevision(request: Extract<SessionResult, { status: "revision_requested" }>): void {
+  private applyHumanRevision(request: AgentRequest): void {
     const selected = new Set(request.selectedCommentIds);
     const rejected = new Set(request.rejectedCommentIds);
     const findingReplies = new Map(request.requests.map(({ commentId, message }) => [commentId, message]));
@@ -386,13 +469,31 @@ export class ReviewSession {
     this.currentReview = { ...this.review, comments, userThreads };
   }
 
-  private validateAgentResponse(next: ReviewDocument): void {
+  private validateDocumentIdentity(next: ReviewDocument): void {
     if (new URL(next.prUrl).href !== new URL(this.review.prUrl).href) {
       throw new Error("The agent response belongs to a different pull request.");
     }
     if (JSON.stringify(next.languages) !== JSON.stringify(this.review.languages)) {
       throw new Error("The agent cannot change review language settings during a live session.");
     }
+  }
+
+  /** Drops queued items whose comment the user deleted; returns nothing when no item is left. */
+  private withoutDeletedItems(request: AgentRequest): AgentRequest | undefined {
+    const commentIds = new Set(this.review.comments.map(({ id }) => id));
+    const filtered = {
+      ...request,
+      selectedCommentIds: request.selectedCommentIds.filter((id) => commentIds.has(id)),
+      rejectedCommentIds: request.rejectedCommentIds.filter((id) => commentIds.has(id)),
+      requests: request.requests.filter(({ commentId }) => commentIds.has(commentId)),
+    };
+    const itemCount = filtered.requests.length + filtered.newThreads.length
+      + filtered.threadReplies.length + filtered.dismissedThreads.length;
+    return itemCount > 0 ? filtered : undefined;
+  }
+
+  private validateAgentResponse(next: ReviewDocument): void {
+    this.validateDocumentIdentity(next);
     const nextComments = new Map(next.comments.map((comment) => [comment.id, comment]));
     const currentCommentIds = new Set(this.review.comments.map(({ id }) => id));
     const requestedCommentIds = new Set(this.activeAgentRequest!.requests.map(({ commentId }) => commentId));
@@ -480,9 +581,7 @@ export class ReviewSession {
     if (resolve && this.activeAgentRequest) resolve(this.agentResult(this.activeAgentRequest));
   }
 
-  private agentResult(
-    request: Extract<SessionResult, { status: "revision_requested" }>,
-  ): Extract<AgentWaitResult, { status: "revision_requested" }> {
+  private agentResult(request: AgentRequest): Extract<AgentWaitResult, { status: "revision_requested" }> {
     return { ...request, review: this.review };
   }
 
@@ -501,4 +600,18 @@ export class ReviewSession {
     this.changeVersion += 1;
     for (const resolve of this.changeWaiters.splice(0)) resolve(this.changeVersion);
   }
+}
+
+/** Each send carries the user's whole selection, so the latest one wins; every message is kept. */
+function mergeQueuedRequests(queued: AgentRequest | undefined, next: AgentRequest): AgentRequest {
+  if (!queued) return next;
+  return {
+    status: "revision_requested",
+    selectedCommentIds: next.selectedCommentIds,
+    rejectedCommentIds: next.rejectedCommentIds,
+    requests: [...queued.requests, ...next.requests],
+    newThreads: [...queued.newThreads, ...next.newThreads],
+    threadReplies: [...queued.threadReplies, ...next.threadReplies],
+    dismissedThreads: [...queued.dismissedThreads, ...next.dismissedThreads],
+  };
 }

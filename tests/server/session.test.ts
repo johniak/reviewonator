@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { PullRequest } from "../../src/domain/pull-request";
 import { reviewDocumentSchema, type PublishRequest, type ReviewComment } from "../../src/domain/review";
 import type { GitHubGateway, LoadedPullRequest, PublishedReview } from "../../src/github/client";
-import { ClosedSessionError, ReviewSession, StalePullRequestError } from "../../src/server/session";
+import { ClosedSessionError, CommentChangeError, ReviewSession, StalePullRequestError } from "../../src/server/session";
 import { patch, pullRequest, review, userThread } from "../fixtures";
 
 class FakeGitHub implements GitHubGateway {
@@ -631,5 +631,271 @@ describe("user comments and edits", () => {
       expect(session.review.comments.find(({ id }) => id === "G1"))
         .toMatchObject({ body: "My wording of the general comment.", edited: true });
     });
+  });
+});
+
+describe("an early review", () => {
+  const starting = { ...review, summary: "", recommendation: "COMMENT" as const, comments: [], userThreads: [] };
+  const briefing = { text: "The pull request makes the answer reusable by storing it in a constant." };
+  const findings = review.comments;
+  const onDeletedLine = { path: "src/example.ts", line: 2, side: "LEFT" as const, body: "Keep the old constant for now." };
+  const newThread = (id: string, message = "Why is this a constant?") => ({
+    id,
+    path: "src/example.ts",
+    line: 2,
+    side: "RIGHT" as const,
+    message,
+  });
+
+  function earlySession(github = new FakeGitHub()) {
+    return new ReviewSession(pullRequest, patch, starting, github, [], true, [], { early: true });
+  }
+
+  function track<T>(promise: Promise<T>) {
+    const state: { settled: boolean; value?: T } = { settled: false };
+    void promise.then((value) => {
+      state.settled = true;
+      state.value = value;
+    });
+    return state;
+  }
+
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it("requires a live session", () => {
+    expect(() => new ReviewSession(pullRequest, patch, starting, new FakeGitHub(), [], false, [], { early: true }))
+      .toThrow("Early review mode requires a live session.");
+  });
+
+  it("starts in the reviewing state with no findings and keeps wait pending", async () => {
+    const session = earlySession();
+    const waiting = track(session.waitForAgentRequest());
+    await tick();
+
+    const snapshot = session.snapshot();
+    expect(snapshot.reviewing).toEqual({ startedAt: expect.any(String) });
+    expect(new Date(snapshot.reviewing!.startedAt).toISOString()).toBe(snapshot.reviewing!.startedAt);
+    expect(snapshot.review.comments).toEqual([]);
+    expect(snapshot.agentPending).toBe(false);
+    expect(waiting.settled).toBe(false);
+  });
+
+  it("reports no reviewing state for a session that is not early", () => {
+    expect(new ReviewSession(pullRequest, patch, review, new FakeGitHub(), [], true).snapshot().reviewing).toBeNull();
+  });
+
+  it("takes the briefing from a delivery before the final one and keeps reviewing", () => {
+    const session = earlySession();
+
+    session.deliver({ ...starting, briefing, summary: "Early summary." }, false);
+
+    expect(session.review.briefing).toEqual(briefing);
+    expect(session.review.summary).toBe("Early summary.");
+    expect(session.review.recommendation).toBe("COMMENT");
+    expect(session.snapshot().reviewing).not.toBeNull();
+  });
+
+  it("keeps the summary when a delivery before the final one has none", () => {
+    const session = earlySession();
+    session.deliver({ ...starting, summary: "Early summary." }, false);
+
+    session.deliver({ ...starting, briefing }, false);
+
+    expect(session.review.summary).toBe("Early summary.");
+  });
+
+  it("refuses findings in a delivery before the final one", () => {
+    const session = earlySession();
+
+    expect(() => session.deliver({ ...starting, briefing, comments: findings }, false))
+      .toThrow("A delivery before the final one cannot contain findings.");
+    expect(session.review.briefing).toBeUndefined();
+  });
+
+  it("takes the summary, recommendation, and findings from the final delivery and ends reviewing", () => {
+    const session = earlySession();
+    session.deliver({ ...starting, briefing }, false);
+
+    session.deliver({ ...review, briefing: undefined }, true);
+
+    expect(session.review).toMatchObject({
+      briefing,
+      summary: review.summary,
+      recommendation: "REQUEST_CHANGES",
+      comments: findings,
+    });
+    expect(session.snapshot().reviewing).toBeNull();
+  });
+
+  it.each([
+    ["a comment written by the user", { comments: [{ ...findings[0], author: "user" }] },
+      "The agent cannot deliver comment S1 as written by the user."],
+    ["an edited comment", { comments: [{ ...findings[0], edited: true }] }, "Only the user can mark comment S1 as edited."],
+    ["an id reserved for the user", { comments: [{ ...findings[0], id: "H7" }] },
+      "Comment ids starting with H are reserved for the user's comments: H7"],
+    ["an included finding", { comments: [{ ...findings[0], included: true }] }, "New finding S1 must start pending."],
+    ["a rejected finding", { comments: [{ ...findings[0], rejected: true }] }, "New finding S1 must start pending."],
+    ["a finding with discussion", {
+      comments: [{ ...findings[0], discussion: [{ id: "D1", author: "user", body: "Is this right?" }] }],
+    }, "The agent cannot start a discussion on new finding S1."],
+    ["user threads", { userThreads: [userThread] }, "The agent cannot create user discussion threads."],
+    ["a different pull request", { prUrl: "https://github.com/acme/widgets/pull/43" },
+      "The agent response belongs to a different pull request."],
+    ["different languages", { languages: { comments: "English", reviewerNotes: "English" } },
+      "The agent cannot change review language settings during a live session."],
+    ["a line finding outside the added lines", { comments: [{ ...findings[0], line: 1 }] },
+      "Review comments must target added lines in the pull request diff: S1 (src/example.ts:1)"],
+  ])("rejects a delivery with %s", (_name, change, message) => {
+    const session = earlySession();
+
+    expect(() => session.deliver({ ...review, ...change }, true)).toThrow(message);
+    expect(session.review.comments).toEqual([]);
+    expect(session.snapshot().reviewing).not.toBeNull();
+  });
+
+  it("keeps the user's comments, decisions, and threads through both deliveries", () => {
+    const session = earlySession();
+    session.addUserComment(onDeletedLine);
+    session.requestRevision({ selectedCommentIds: ["H1"], newThreads: [newThread("U-a")] });
+    session.deliver({ ...starting, briefing }, false);
+    session.addUserComment({ ...onDeletedLine, body: "Rename this constant." });
+    session.requestRevision({
+      selectedCommentIds: ["H1"],
+      rejectedCommentIds: ["H2"],
+      newThreads: [newThread("U-b", "Is this tested?")],
+    });
+
+    session.deliver(review, true);
+
+    expect(session.review.comments).toEqual([
+      { id: "H1", type: "line", author: "user", ...onDeletedLine, included: true },
+      { id: "H2", type: "line", author: "user", ...onDeletedLine, body: "Rename this constant.", rejected: true },
+      ...findings,
+    ]);
+    expect(session.review.userThreads.map(({ id, messages }) => [id, messages.map(({ body }) => body)])).toEqual([
+      ["U-a", ["Why is this a constant?"]],
+      ["U-b", ["Is this tested?"]],
+    ]);
+    expect(session.review.briefing).toEqual(briefing);
+  });
+
+  it("queues every request while reviewing and releases them together after the final delivery", async () => {
+    const session = earlySession();
+    session.addUserComment(onDeletedLine);
+    const waiting = track(session.waitForAgentRequest());
+
+    session.requestRevision({ newThreads: [newThread("U-a")] });
+    session.requestRevision({
+      selectedCommentIds: ["H1"],
+      requests: [{ commentId: "H1", message: "Can you make this clearer?" }],
+    });
+    await tick();
+
+    expect(session.review.userThreads.find(({ id }) => id === "U-a")?.messages)
+      .toMatchObject([{ author: "user", body: "Why is this a constant?" }]);
+    expect(session.review.comments.find(({ id }) => id === "H1")?.discussion)
+      .toMatchObject([{ author: "user", body: "Can you make this clearer?" }]);
+    expect(session.snapshot().agentPending).toBe(false);
+    expect(waiting.settled).toBe(false);
+
+    session.deliver(review, true);
+    await tick();
+
+    expect(waiting.value).toEqual({
+      status: "revision_requested",
+      selectedCommentIds: ["H1"],
+      rejectedCommentIds: [],
+      requests: [{ commentId: "H1", message: "Can you make this clearer?" }],
+      newThreads: [newThread("U-a")],
+      threadReplies: [],
+      dismissedThreads: [],
+      review: session.review,
+    });
+    expect((waiting.value as { review: typeof review }).review.comments.map(({ id }) => id)).toEqual(["H1", "S1", "G1"]);
+    expect(session.snapshot().agentPending).toBe(true);
+    expect(() => session.requestRevision({ newThreads: [newThread("U-c")] }))
+      .toThrow("The AI agent is already working on the previous request.");
+  });
+
+  it("refuses a second message to a discussion the agent has not answered", () => {
+    const session = earlySession();
+    session.addUserComment(onDeletedLine);
+    session.requestRevision({ requests: [{ commentId: "H1", message: "Can you make this clearer?" }] });
+
+    expect(() => session.requestRevision({ requests: [{ commentId: "H1", message: "And shorter?" }] }))
+      .toThrow("The AI agent has not replied to this discussion yet.");
+  });
+
+  it("refuses to dismiss a thread the agent has not answered", () => {
+    const session = earlySession();
+    session.requestRevision({ newThreads: [newThread("U-a")] });
+
+    expect(() => session.requestRevision({ dismissedThreads: [{ threadId: "U-a", reason: "Never mind." }] }))
+      .toThrow("The AI agent has not replied to this discussion yet.");
+    expect(session.review.userThreads[0].dismissed).toBeUndefined();
+  });
+
+  it("drops a queued discussion on a user comment deleted before the final delivery", async () => {
+    const session = earlySession();
+    session.addUserComment(onDeletedLine);
+    session.requestRevision({
+      selectedCommentIds: ["H1"],
+      requests: [{ commentId: "H1", message: "Can you make this clearer?" }],
+      newThreads: [newThread("U-a")],
+    });
+    session.deleteUserComment("H1");
+
+    session.deliver(review, true);
+
+    await expect(session.waitForAgentRequest()).resolves.toMatchObject({
+      selectedCommentIds: [],
+      requests: [],
+      newThreads: [{ id: "U-a" }],
+    });
+  });
+
+  it("releases nothing when every queued item was deleted", async () => {
+    const session = earlySession();
+    session.addUserComment(onDeletedLine);
+    session.requestRevision({ requests: [{ commentId: "H1", message: "Can you make this clearer?" }] });
+    session.deleteUserComment("H1");
+    const waiting = track(session.waitForAgentRequest());
+
+    session.deliver(review, true);
+    await tick();
+
+    expect(waiting.settled).toBe(false);
+    expect(session.snapshot().agentPending).toBe(false);
+  });
+
+  it("refuses an agent response and publishing while reviewing", async () => {
+    const github = new FakeGitHub();
+    const session = earlySession(github);
+
+    expect(() => session.respond(starting)).toThrow("The AI agent has not delivered its review yet.");
+    const publishing = session.publish({ confirmed: true, event: "COMMENT", body: "", selectedCommentIds: [] });
+    await expect(publishing).rejects.toBeInstanceOf(CommentChangeError);
+    await expect(publishing).rejects.toThrow("Publishing is available when the AI finishes its review.");
+    expect(github.published).toBeUndefined();
+    expect(session.isOpen).toBe(true);
+  });
+
+  it("cancels while reviewing and tells a waiting agent", async () => {
+    const session = earlySession();
+    const waiting = session.waitForAgentRequest();
+
+    session.cancel();
+
+    await expect(waiting).resolves.toEqual({ status: "cancelled" });
+    await expect(session.waitForResult()).resolves.toEqual({ status: "cancelled" });
+  });
+
+  it("refuses a delivery after the final one and outside an early review", () => {
+    const session = earlySession();
+    session.deliver(review, true);
+
+    expect(() => session.deliver(review, true)).toThrow("The AI agent has already delivered its review.");
+    expect(() => new ReviewSession(pullRequest, patch, review, new FakeGitHub(), [], true).deliver(review, true))
+      .toThrow("The AI agent has already delivered its review.");
   });
 });

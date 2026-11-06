@@ -179,6 +179,38 @@ describe("Reviewonator HTTP API", () => {
     expect(session.snapshot()).toMatchObject({ live: true, version: 2 });
   });
 
+  it("accepts an authenticated delivery from the agent in an early review", async () => {
+    const starting = { ...review, summary: "", recommendation: "COMMENT" as const, comments: [] };
+    const session = new ReviewSession(pullRequest, patch, starting, new AppGitHub(), discussion, true, [], { early: true });
+    const app = createApp({ html: "<html>Reviewonator</html>", favicon: "<svg>R</svg>", token: "secret", session });
+
+    expect((await app.request("/api/agent/deliver", { method: "POST", body: JSON.stringify({ review, final: true }) })).status)
+      .toBe(401);
+    expect((await app.request("/api/agent/deliver", authenticated({ review }))).status).toBe(400);
+    expect(session.snapshot().reviewing).not.toBeNull();
+
+    const response = await app.request("/api/agent/deliver", authenticated({ review, final: true }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: "accepted" });
+    expect(session.snapshot()).toMatchObject({ reviewing: null, review: { comments: review.comments } });
+  });
+
+  it("refuses publishing with a clear reason while the agent reviews", async () => {
+    const session = new ReviewSession(pullRequest, patch, review, new AppGitHub(), discussion, true, [], { early: true });
+    const app = createApp({ html: "<html>Reviewonator</html>", favicon: "<svg>R</svg>", token: "secret", session });
+
+    const response = await app.request("/api/publish", authenticated({
+      confirmed: true,
+      event: "COMMENT",
+      body: "",
+      selectedCommentIds: [],
+    }));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Publishing is available when the AI finishes its review." });
+  });
+
   it("serves authenticated surrounding file context", async () => {
     const { app } = testApp();
     const response = await app.request("/api/file-context?path=src%2Fexample.ts", {

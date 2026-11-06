@@ -18,6 +18,8 @@ export type SessionSnapshot = {
   live: boolean;
   version: number;
   agentPending: boolean;
+  /** Set while an early review waits for the agent's final delivery. */
+  reviewing: { startedAt: string } | null;
 };
 
 export type CommentActions = {
