@@ -27,6 +27,25 @@ async function temporaryDirectory() {
 }
 
 describe("install config", () => {
+  it("round-trips the default review mode and still parses a config without one", async () => {
+    const directory = await temporaryDirectory();
+    const env = { REVIEWONATOR_CONFIG_DIR: directory };
+
+    await writeConfig({ ...config, mode: "early" }, env);
+    expect(await readConfig(env)).toEqual({ ...config, mode: "early" });
+
+    await writeFile(configPath(env), JSON.stringify(config));
+    expect((await readConfig(env))?.mode).toBeUndefined();
+  });
+
+  it("rejects an unknown review mode", async () => {
+    const directory = await temporaryDirectory();
+    const env = { REVIEWONATOR_CONFIG_DIR: directory };
+    await writeFile(configPath(env), JSON.stringify({ ...config, mode: "fast" }));
+
+    await expect(readConfig(env)).rejects.toBeInstanceOf(InvalidConfigError);
+  });
+
   it("resolves the config path from REVIEWONATOR_CONFIG_DIR, then XDG_CONFIG_HOME, then ~/.config", () => {
     expect(configPath({ REVIEWONATOR_CONFIG_DIR: "/custom", XDG_CONFIG_HOME: "/xdg" })).toBe("/custom/config.json");
     expect(configPath({ XDG_CONFIG_HOME: "/xdg" })).toBe("/xdg/reviewonator/config.json");

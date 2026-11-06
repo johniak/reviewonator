@@ -11,7 +11,7 @@ import { skillUpdateHint, syncSkills } from "../../src/install/sync";
 const files: SkillFile[] = [
   {
     path: "SKILL.md",
-    content: "---\nname: reviewonator\n---\n\nReview language configuration: write public pull request comments and the review summary in English; write private reviewer explanations in English.\n\nVersion two instructions.\n",
+    content: "---\nname: reviewonator\n---\n\nReview language configuration: write public pull request comments and the review summary in English; write private reviewer explanations in English.\nReview mode configuration: the default review mode is full.\n\nVersion two instructions.\n",
   },
 ];
 const aliasFiles: SkillFile[] = [{ path: "SKILL.md", content: "---\nname: rr\n---\n\nVersion two alias.\n" }];
@@ -43,7 +43,7 @@ async function oldSkill(directory: string, marker: string) {
   await writeFile(join(directory, ".reviewonator-managed"), marker);
   await writeFile(
     join(directory, "SKILL.md"),
-    "Review language configuration: write public pull request comments and the review summary in German; write private reviewer explanations in French.\n\nVersion one instructions.\n",
+    "Review language configuration: write public pull request comments and the review summary in German; write private reviewer explanations in French.\nReview mode configuration: the default review mode is full.\n\nVersion one instructions.\n",
   );
 }
 
@@ -80,10 +80,27 @@ describe("syncSkills", () => {
     expect(await readFile(join(fixture.claudeSkill, "SKILL.md"), "utf8")).toContain("Version one instructions.");
   });
 
+  it("rewrites an outdated skill with the configured default review mode, or full without one", async () => {
+    const fixture = await syncFixture();
+    await writeConfig({ ...fixture.config, mode: "early" }, fixture.env);
+    await oldSkill(fixture.claudeSkill, "Installed by Reviewonator 0.7.0\n");
+
+    expect((await fixture.sync()).updated).toEqual(["claude"]);
+    expect(await readFile(join(fixture.claudeSkill, "SKILL.md"), "utf8"))
+      .toContain("Review mode configuration: the default review mode is early.");
+
+    await writeConfig(fixture.config, fixture.env);
+    await oldSkill(fixture.claudeSkill, "Installed by Reviewonator 0.7.0\n");
+
+    expect((await fixture.sync()).updated).toEqual(["claude"]);
+    expect(await readFile(join(fixture.claudeSkill, "SKILL.md"), "utf8"))
+      .toContain("Review mode configuration: the default review mode is full.");
+  });
+
   it("leaves a current skill untouched", async () => {
     const fixture = await syncFixture();
     await writeConfig(fixture.config, fixture.env);
-    await writeSkill(fixture.claudeSkill, files, germanFrench, "0.8.0");
+    await writeSkill(fixture.claudeSkill, files, { languages: germanFrench, mode: "full" }, "0.8.0");
     await writeFile(join(fixture.claudeSkill, "local-note.md"), "kept");
 
     expect((await fixture.sync()).updated).toEqual([]);
@@ -122,7 +139,7 @@ describe("syncSkills", () => {
   it("adds a missing rr alias next to a current skill without asking for a restart", async () => {
     const fixture = await syncFixture();
     await writeConfig(fixture.config, fixture.env);
-    await writeSkill(fixture.claudeSkill, files, germanFrench, "0.8.0");
+    await writeSkill(fixture.claudeSkill, files, { languages: germanFrench, mode: "full" }, "0.8.0");
 
     expect(await fixture.sync()).toEqual({ updated: [], migrated: false, warnings: [] });
     expect(await readSkillMarker(fixture.claudeAlias)).toEqual({ managed: true, version: "0.8.0" });

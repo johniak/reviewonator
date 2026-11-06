@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { z } from "zod";
 
 export type Target = "claude" | "codex";
+export type ReviewMode = "full" | "early";
 export type Languages = { comments: string; reviewerNotes: string };
 
 export const targetLabels: Record<Target, string> = { claude: "Claude Code", codex: "Codex" };
@@ -13,6 +14,7 @@ const configSchema = z.object({
   targets: z.array(z.enum(["claude", "codex"])).min(1),
   skillRoots: z.object({ claude: z.string().min(1).optional(), codex: z.string().min(1).optional() }),
   languages: z.object({ comments: z.string().min(1), reviewerNotes: z.string().min(1) }),
+  mode: z.enum(["full", "early"]).optional(),
 });
 
 export type InstallConfig = z.infer<typeof configSchema>;
@@ -44,6 +46,14 @@ export function parseTargets(input: string): Target[] {
   }
   if (selected.size === 0) throw new Error("Select at least one installation target.");
   return (["claude", "codex"] as const).filter((target) => selected.has(target));
+}
+
+export function parseMode(input: string): ReviewMode {
+  switch (input.trim().toLowerCase()) {
+    case "1": case "full": return "full";
+    case "2": case "early": return "early";
+    default: throw new Error(`Unknown review mode: ${input.trim()}. Use full or early.`);
+  }
 }
 
 export async function readConfig(env: NodeJS.ProcessEnv = process.env): Promise<InstallConfig | null> {

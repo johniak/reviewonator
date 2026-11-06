@@ -41,7 +41,7 @@ export async function syncSkills(context: SyncContext): Promise<SyncResult> {
         continue;
       }
       if (!isCurrent(marker, context.version)) {
-        await writeSkill(directory, context.files, config.languages, context.version);
+        await writeSkill(directory, context.files, { languages: config.languages, mode: config.mode ?? "full" }, context.version);
         result.updated.push(target);
       }
     } catch (error) {

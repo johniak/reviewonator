@@ -15,7 +15,7 @@ STAGED=""
 
 usage() {
   printf '%s\n' "Usage: install.sh [--bin-dir DIR] [--force] [--local] [reviewonator setup options]"
-  printf '%s\n' "Setup options: --targets claude,codex --comment-language LANGUAGE --reviewer-language LANGUAGE"
+  printf '%s\n' "Setup options: --targets claude,codex --comment-language LANGUAGE --reviewer-language LANGUAGE --mode full|early"
   printf '%s\n' "               --claude-skill-dir DIR --codex-skill-dir DIR --reconfigure"
 }
 

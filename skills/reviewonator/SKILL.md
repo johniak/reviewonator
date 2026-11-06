@@ -7,6 +7,7 @@ description: Review a GitHub pull request with Claude Code or Codex, generate ve
 
 Accept one GitHub pull request URL as the argument. Require `gh` and the `reviewonator` executable.
 Review language configuration: write public pull request comments and the review summary in English; write private reviewer explanations in English.
+Review mode configuration: the default review mode is full.
 
 ## Run the workflow
 

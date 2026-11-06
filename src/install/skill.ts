@@ -1,6 +1,6 @@
 import { lstat, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { Languages } from "./config";
+import type { Languages, ReviewMode } from "./config";
 import { compareVersions } from "./version";
 
 export type SkillFile = { path: string; content: string };
@@ -12,6 +12,7 @@ const MARKER = ".reviewonator-managed";
 /** Hidden, so an interrupted write never looks like a second skill to Claude Code or Codex. */
 const STAGING_PREFIX = ".reviewonator-staging-";
 const LANGUAGE_LINE = /^Review language configuration: write public pull request comments and the review summary in (.+); write private reviewer explanations in (.+)\.$/m;
+const MODE_LINE = /^Review mode configuration: the default review mode is (full|early)\.$/m;
 const LEGACY_COMMENTS = /^- Write public pull request comments and the review summary in (.+)\.$/m;
 const LEGACY_REVIEWER = /^- Write private reviewer explanations in (.+)\.$/m;
 
@@ -28,6 +29,10 @@ export function languageLine(languages: Languages): string {
   return `Review language configuration: write public pull request comments and the review summary in ${languages.comments}; write private reviewer explanations in ${languages.reviewerNotes}.`;
 }
 
+export function modeLine(mode: ReviewMode): string {
+  return `Review mode configuration: the default review mode is ${mode}.`;
+}
+
 export async function readSkillMarker(skillDir: string): Promise<SkillMarker | null> {
   const marker = await readOptional(join(skillDir, MARKER));
   if (marker !== null) {
@@ -40,15 +45,25 @@ export async function readSkillMarker(skillDir: string): Promise<SkillMarker | n
 export async function writeSkill(
   skillDir: string,
   files: SkillFile[],
-  languages: Languages,
+  settings: { languages: Languages; mode: ReviewMode },
   version: string,
 ): Promise<void> {
   const skill = files.find((file) => file.path === "SKILL.md");
   if (!skill || !LANGUAGE_LINE.test(skill.content)) {
     throw new Error("The Reviewonator skill is missing its language configuration marker.");
   }
+  if (!MODE_LINE.test(skill.content)) {
+    throw new Error("The Reviewonator skill is missing its review mode marker.");
+  }
   const configured = files.map((file) =>
-    file === skill ? { ...file, content: file.content.replace(LANGUAGE_LINE, () => languageLine(languages)) } : file
+    file === skill
+      ? {
+        ...file,
+        content: file.content
+          .replace(LANGUAGE_LINE, () => languageLine(settings.languages))
+          .replace(MODE_LINE, () => modeLine(settings.mode)),
+      }
+      : file
   );
   await writeManagedDirectory(skillDir, configured, version);
 }

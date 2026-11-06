@@ -11,7 +11,7 @@ import { runUninstall } from "../../src/install/uninstall";
 
 const files: SkillFile[] = [{
   path: "SKILL.md",
-  content: "Review language configuration: write public pull request comments and the review summary in English; write private reviewer explanations in English.\n",
+  content: "Review language configuration: write public pull request comments and the review summary in English; write private reviewer explanations in English.\nReview mode configuration: the default review mode is full.\n",
 }];
 const aliasFiles: SkillFile[] = [{ path: "SKILL.md", content: "---\nname: rr\n---\n" }];
 const english = { comments: "English", reviewerNotes: "English" };
@@ -34,8 +34,8 @@ async function uninstallFixture(kind: InstallMethod["kind"] = "script") {
   await writeFile(executablePath, "#!/bin/sh\n");
   await chmod(executablePath, 0o755);
   if (kind === "script") await writeFile(`${executablePath}.reviewonator-managed`, "Installed by Reviewonator\n");
-  await writeSkill(join(claudeRoot, "reviewonator"), files, english, "0.8.0");
-  await writeSkill(join(codexRoot, "reviewonator"), files, english, "0.8.0");
+  await writeSkill(join(claudeRoot, "reviewonator"), files, { languages: english, mode: "full" }, "0.8.0");
+  await writeSkill(join(codexRoot, "reviewonator"), files, { languages: english, mode: "full" }, "0.8.0");
   await writeAlias(join(claudeRoot, "rr"), aliasFiles, "0.8.0");
   await writeAlias(join(codexRoot, "rr"), aliasFiles, "0.8.0");
   await writeConfig({

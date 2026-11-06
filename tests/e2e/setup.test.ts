@@ -115,7 +115,7 @@ describe("reviewonator setup end-to-end", () => {
     });
     let stderr = "";
     child.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
-    child.stdin.write("1,2\nGerman\nFrench\n");
+    child.stdin.write("1,2\nGerman\nFrench\n2\n");
 
     const exitCode = await new Promise<number | null>((resolveExit, reject) => {
       const timer = setTimeout(() => {
@@ -129,9 +129,11 @@ describe("reviewonator setup end-to-end", () => {
     expect(stderr).toContain("Select one or more targets (comma-separated, for example 1,2): ");
     expect(stderr).toContain("Language for comments published to GitHub [English]: ");
     expect(stderr).toContain("Language for private reviewer notes [English]: ");
+    expect(stderr).toContain("Select a mode [1]: ");
     expect(JSON.parse(await readFile(join(root, "config", "config.json"), "utf8"))).toMatchObject({
       targets: ["claude", "codex"],
       languages: { comments: "German", reviewerNotes: "French" },
+      mode: "early",
     });
   }, 15_000);
 
@@ -141,6 +143,7 @@ describe("reviewonator setup end-to-end", () => {
     expect(stdout).toContain("reviewonator setup [--targets claude,codex]");
     expect(stdout).toContain("--claude-skill-dir DIR");
     expect(stdout).toContain("--codex-skill-dir DIR");
+    expect(stdout).toContain("--mode full|early");
     expect(stdout).toContain("reviewonator update [--force]");
     expect(stdout).toContain("reviewonator uninstall [--targets claude,codex]");
   });

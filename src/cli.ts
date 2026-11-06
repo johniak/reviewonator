@@ -32,7 +32,7 @@ Usage:
   reviewonator <PR_URL> --review-file <PATH> [--live] [--no-open] [--port <PORT>]
   reviewonator wait <PR_URL>
   reviewonator respond <PR_URL> --review-file <PATH>
-  reviewonator setup [--targets claude,codex] [--comment-language L] [--reviewer-language L] [--reconfigure]
+  reviewonator setup [--targets claude,codex] [--comment-language L] [--reviewer-language L] [--mode full|early] [--reconfigure]
                      [--claude-skill-dir DIR] [--codex-skill-dir DIR]
   reviewonator update [--force]
   reviewonator uninstall [--targets claude,codex]
@@ -56,6 +56,7 @@ async function main(): Promise<void> {
       targets: { type: "string" },
       "comment-language": { type: "string" },
       "reviewer-language": { type: "string" },
+      mode: { type: "string" },
       "claude-skill-dir": { type: "string" },
       "skill-dir": { type: "string" },
       "codex-skill-dir": { type: "string" },
@@ -84,6 +85,7 @@ async function main(): Promise<void> {
         targets: values.targets,
         commentLanguage: values["comment-language"],
         reviewerLanguage: values["reviewer-language"],
+        mode: values.mode,
         claudeSkillDir: values["claude-skill-dir"] ?? values["skill-dir"],
         codexSkillDir: values["codex-skill-dir"],
         reconfigure: values.reconfigure,

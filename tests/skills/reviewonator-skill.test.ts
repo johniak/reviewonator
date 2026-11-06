@@ -110,6 +110,7 @@ describe("Reviewonator skill", () => {
     expect(skill).toContain(
       "Review language configuration: write public pull request comments and the review summary in English; write private reviewer explanations in English.",
     );
+    expect(skill).toContain("Review mode configuration: the default review mode is full.");
     expect(skill).not.toContain("Read [references/languages.md]");
     expect(skill).toContain("configured comment language");
     expect(skill).toContain("configured reviewer-note language");
