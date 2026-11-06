@@ -241,6 +241,9 @@ describe("Reviewonator skill", () => {
     expect(skill).toContain("If `deliver` prints `cancelled`, report that nothing was published and stop.");
     expect(skill).toContain("connection ended unexpectedly");
     expect(skill).toContain("run the same `deliver` command once more");
+    expect(skill).toContain(
+      'If the retried `deliver` fails with "The AI agent has already delivered its review.", the earlier delivery was accepted, so continue with the next step; after `--final`, that is the `wait` loop of step 13.',
+    );
     expect(skill).not.toContain("Findings in batches");
 
     expect(schema).toContain("## Early review deliveries");
