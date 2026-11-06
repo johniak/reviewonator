@@ -26,7 +26,8 @@ export function ReviewFindingNavigation({
     <>
       <div className="panel-section-heading findings-heading">
         <span><MessagesSquare size={15} /> Review findings</span>
-        <strong>{comments.length}</strong>
+        {/* While the AI reviews, an empty list is not yet a count of zero findings. */}
+        {!(reviewing && comments.length === 0) && <strong>{comments.length}</strong>}
       </div>
       <nav className="finding-list" aria-label="Review findings">
         {comments.length === 0 && !reviewing && <p>No actionable findings.</p>}

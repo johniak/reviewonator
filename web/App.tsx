@@ -689,7 +689,7 @@ export function App() {
               className={panelTab === "review" ? "active" : ""}
               onClick={() => setPanelTab("review")}
             >
-              Proposed review <span>{comments.length}</span>
+              Proposed review{!(reviewing && comments.length === 0) && <> <span>{comments.length}</span></>}
             </button>
             <button
               type="button"

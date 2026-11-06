@@ -753,7 +753,9 @@ describe("an early review", () => {
   }
 
   it("shows that the AI is still reading and reviewing, with the time since it started", async () => {
-    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+    // Only Date is fake: the clock stands still unless the test moves it, and the panel's real
+    // one-second interval shows each new time. Faking timers too would stall the page load.
+    vi.useFakeTimers({ toFake: ["Date"] });
     const started = new Date("2026-11-06T10:00:00Z").getTime();
     vi.setSystemTime(started);
     vi.stubGlobal("EventSource", class { addEventListener() {} close() {} });
@@ -769,10 +771,10 @@ describe("an early review", () => {
     expect(screen.queryByText("Recommended decision")).toBeNull();
     expect(screen.queryByText(/If the agent has stopped/)).toBeNull();
 
-    act(() => vi.advanceTimersByTime(1_000));
-    expect(screen.getByText("4:13")).toBeVisible();
-    act(() => vi.advanceTimersByTime((10 * 60 + 47) * 1_000));
-    expect(screen.getByText("15:00")).toBeVisible();
+    vi.setSystemTime(started + (4 * 60 + 13) * 1_000);
+    expect(await screen.findByText("4:13", undefined, { timeout: 2_000 })).toBeVisible();
+    vi.setSystemTime(started + 15 * 60 * 1_000);
+    expect(await screen.findByText("15:00", undefined, { timeout: 2_000 })).toBeVisible();
     expect(screen.getByText("If the agent has stopped, cancel this review and run the skill again.")).toBeVisible();
     session.cancel();
   });
@@ -786,6 +788,9 @@ describe("an early review", () => {
     expect(screen.getByRole("navigation", { name: "Review findings" }))
       .toHaveTextContent("Findings arrive when the AI finishes its review");
     expect(document.querySelector(".selection-summary")).toBeNull();
+    expect(screen.getByRole("tab", { name: "Proposed review" })).toHaveTextContent(/^Proposed review$/);
+    expect(document.querySelector(".findings-heading strong")).toBeNull();
+    expect(document.querySelector(".findings-heading")).toHaveTextContent(/^Review findings$/);
     session.cancel();
   });
 
@@ -807,6 +812,7 @@ describe("an early review", () => {
 
     const first = await openLineDraft(3);
     fireEvent.change(within(first).getByRole("textbox"), { target: { value: "This branch skips validation." } });
+    expect(screen.getByRole("button", { name: "Queue 1 request for AI" })).toBeEnabled();
     fireEvent.click(within(first).getByRole("button", { name: "Queue for AI" }));
 
     const thread = await waitFor(() => {
@@ -863,6 +869,8 @@ describe("an early review", () => {
     expect(card).toHaveTextContent("Is this name really wrong?");
     expect(within(card).queryByRole("textbox")).toBeNull();
     expect(within(card).getByRole("button", { name: "Queued for AI" })).toBeDisabled();
+    expect(screen.getByRole("tab", { name: "Proposed review 1" })).toBeVisible();
+    expect(document.querySelector(".findings-heading strong")).toHaveTextContent("1");
     expect(screen.getByRole("button", { name: /You Queued 1 discussion messages H1/ })).toBeVisible();
     expect(screen.getByText((_content, element) => Boolean(
       element?.classList.contains("selection-summary")
