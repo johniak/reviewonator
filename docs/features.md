@@ -6,6 +6,19 @@ Reviewonator is a local, human-in-the-loop workspace for pull request reviews cr
 
 The diff opens under **About this PR**: a private note of at most 100 words, written in plain language in your reviewer-note language. The agent builds it from the ticket and the code that actually changed, not from the author's description. It finds the ticket through issues linked to the pull request, ticket keys such as `ABC-123` in the title, branch, description, or commits, and any issue tracker it can read (GitHub Issues, or Jira and Linear through a connected tool). With a ticket, the note says what the ticket asks for, what the pull request really does, and where the two differ. Without one, it only explains what the pull request changes. Above the note, Reviewonator names the author of the pull request, everyone else who authored its commits, and the author of the ticket. Collapse the note to one line once you have read it; Reviewonator remembers that for the pull request. The note is never published to GitHub.
 
+## Start reading before the AI finishes
+
+In the **full** review mode, Reviewonator opens when the agent has finished its review. In the **early** mode, it opens right away with the diff, the file list, the commits, and the PR discussion, while the agent is still reviewing. Choose the default mode in `reviewonator setup`, or name one after the pull request URL for a single review.
+
+While the agent reviews:
+
+- **About this PR** shows a spinner and **The AI is reading the pull request** until the agent sends its note, usually after a moment.
+- The review panel shows a spinner, **The AI is reviewing this pull request** with the time the review has been running, and the header shows **AI reviewing**. After 15 minutes it adds **If the agent has stopped, cancel this review and run the skill again.**
+- You can write your own comments, edit or delete them, include or reject them, and start discussions on diff lines or on your own comments. While the agent reviews, every **Send to AI** button reads **Queue for AI**. A queued message stays on its card with **Queued, sent when the AI finishes its review**, and the sidebar marks it **Queued**.
+- **Review and publish** stays disabled with **Available when the AI finishes its review**. **Cancel review** works as usual and ends the session.
+
+When the agent finishes, its findings appear next to your own comments, sorted as usual. Your queued messages go to the agent at once, and from then on the review works like any other live review. Nothing you did while the agent was reviewing is lost.
+
 ## Review the change in context
 
 The workspace keeps the pull request, changed files, findings, and commits in one place. Each inline finding opens the relevant file and line. Severity borders and labels make bugs, warnings, suggestions, security issues, and nits easy to distinguish.
@@ -84,4 +97,4 @@ Publication requires a separate confirmation checkbox. Closing the dialog or can
 
 ## Use the same workflow with Claude Code or Codex
 
-`reviewonator setup` can target Claude Code, Codex, or both. It also configures the language used for public comments and the separate language used for private reviewer notes; both default to English. `reviewonator update` keeps these choices and refreshes the installed skills. The review schema and human confirmation flow remain the same across supported agents.
+`reviewonator setup` can target Claude Code, Codex, or both. It also configures the language used for public comments, the separate language used for private reviewer notes, both English by default, and the default review mode, full or early. `reviewonator update` keeps these choices, asks once for the review mode when none is saved yet, and refreshes the installed skills. The review schema and human confirmation flow remain the same across supported agents.

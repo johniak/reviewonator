@@ -137,6 +137,35 @@ describe("project documentation", () => {
     expect(readme).not.toContain("uninstall.sh");
   });
 
+  it("documents the full and early review modes", () => {
+    const readme = readFileSync("README.md", "utf8");
+    const guide = readFileSync("docs/features.md", "utf8");
+    const claude = readFileSync("CLAUDE.md", "utf8");
+
+    expect(readme).toContain(
+      "- **Full**: the agent reviews the whole pull request first, and Reviewonator opens when every finding is ready.",
+    );
+    expect(readme).toContain("- **Early**: Reviewonator opens right away with the diff.");
+    expect(readme).toContain("Run `reviewonator setup --reconfigure` to change the default review mode.");
+    expect(readme).toContain("/reviewonator https://github.com/owner/repository/pull/123 early");
+    expect(readme).toContain(
+      "An update asks once for the default review mode when your saved choices do not have one yet.",
+    );
+    expect(readme).not.toContain("the installed skills are refreshed with your saved languages.");
+
+    expect(guide).toContain("## Start reading before the AI finishes");
+    expect(guide).toContain("**About this PR** shows a spinner and **The AI is reading the pull request**");
+    expect(guide).toContain("**The AI is reviewing this pull request** with the time the review has been running");
+    expect(guide).toContain("**If the agent has stopped, cancel this review and run the skill again.**");
+    expect(guide).toContain("the header shows **AI reviewing**");
+    expect(guide).toContain("every **Send to AI** button reads **Queue for AI**");
+    expect(guide).toContain("**Queued, sent when the AI finishes its review**");
+    expect(guide).toContain("**Review and publish** stays disabled with **Available when the AI finishes its review**");
+
+    expect(claude).toContain("- **Reviewing** (`--early`, which implies `--live`)");
+    expect(claude).not.toContain("adopts a v0.7 install (managed skills, no config) without asking");
+  });
+
   it.each([mainAsset, overviewAsset, discussionAsset, liveDiscussionAsset])("ships a substantial PNG at %s", (asset) => {
     const image = readFileSync(asset);
 

@@ -7,4 +7,4 @@ description: Short alias for the reviewonator skill. Use only when the user invo
 
 `rr` is the short name of the `reviewonator` skill. Reviewonator installs both skills side by side.
 
-Read `../reviewonator/SKILL.md`, relative to this skill's directory, in full and follow it exactly with the same pull request URL. Resolve every relative path it mentions, such as `references/review-schema.md`, from the `reviewonator` skill directory.
+Read `../reviewonator/SKILL.md`, relative to this skill's directory, in full and follow it exactly with the same pull request URL and mode word, if the user gave one. Resolve every relative path it mentions, such as `references/review-schema.md`, from the `reviewonator` skill directory.

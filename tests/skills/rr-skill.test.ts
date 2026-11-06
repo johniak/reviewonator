@@ -9,5 +9,6 @@ describe("rr alias skill", () => {
     expect(skill).toContain("Use only when the user invokes /rr or $rr");
     expect(skill).toContain("Read `../reviewonator/SKILL.md`");
     expect(skill).toContain("from the `reviewonator` skill directory");
+    expect(skill).toContain("with the same pull request URL and mode word");
   });
 });

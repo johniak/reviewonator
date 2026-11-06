@@ -21,6 +21,7 @@ See the [feature guide](docs/features.md) for a visual walkthrough of the review
 ## Why Reviewonator?
 
 - Start from **About this PR**: a short private note on what the change really does, written from the ticket and the code rather than the author's description.
+- Start reading at once in early mode: the diff opens right away and the AI findings follow when the agent finishes.
 - Review findings appear next to the exact changed lines, with clearly visible severity levels.
 - Read existing conversation comments, submitted reviews, and inline review comments without leaving the diff workspace.
 - Browse one file at a time or scroll through all changed files.
@@ -84,7 +85,7 @@ If Reviewonator is installed with Homebrew, the script removes that installation
 
 ### Setup
 
-`reviewonator setup` first requires an explicit multi-select choice for Claude Code, Codex, or both. It never chooses an agent integration silently. It then asks which language the agent should use for comments published to GitHub and for private reviewer notes. Both language choices default to English. It installs:
+`reviewonator setup` first requires an explicit multi-select choice for Claude Code, Codex, or both. It never chooses an agent integration silently. It then asks which language the agent should use for comments published to GitHub and for private reviewer notes. Both language choices default to English. Last, it asks for the default [review mode](#review-modes), full or early; full is the default. It installs:
 
 - the Claude Code skill in `~/.claude/skills/reviewonator`, when selected;
 - the Codex skill in `~/.agents/skills/reviewonator`, when selected;
@@ -92,9 +93,9 @@ If Reviewonator is installed with Homebrew, the script removes that installation
 
 If you already have your own `rr` skill, setup keeps it and skips the alias.
 
-Your choices are saved in `~/.config/reviewonator/config.json`. Updates never ask for your targets or languages again. Run `reviewonator setup --reconfigure` to change them.
+Your choices are saved in `~/.config/reviewonator/config.json`. Updates never ask for your targets or languages again. An update asks once for the default review mode when your saved choices do not have one yet. If it cannot ask, the mode stays full and setup prints how to choose it. Run `reviewonator setup --reconfigure` to change your choices.
 
-Non-interactive installation must provide `--targets` or `REVIEWONATOR_TARGETS`; setup never guesses. `--targets` accepts `claude`, `codex`, or a comma-separated selection. `--targets` is the complete selection: setup removes the managed skill of any agent you leave out. `REVIEWONATOR_COMMENT_LANGUAGE`, `REVIEWONATOR_REVIEWER_LANGUAGE`, and `REVIEWONATOR_MODE` (`full` or `early`) provide the remaining non-interactive configuration. Custom skill locations are supported with `--claude-skill-dir` and `--codex-skill-dir`. The install script passes these options to setup:
+Non-interactive installation must provide `--targets` or `REVIEWONATOR_TARGETS`; setup never guesses. `--targets` accepts `claude`, `codex`, or a comma-separated selection. `--targets` is the complete selection: setup removes the managed skill of any agent you leave out. `REVIEWONATOR_COMMENT_LANGUAGE`, `REVIEWONATOR_REVIEWER_LANGUAGE`, and `REVIEWONATOR_MODE` (`full` or `early`, also `--mode`) provide the remaining non-interactive configuration. Custom skill locations are supported with `--claude-skill-dir` and `--codex-skill-dir`. The install script passes these options to setup:
 
 ```sh
 sh -c "$(curl -fsSL https://github.com/johniak/reviewonator/releases/latest/download/install.sh)" "" --targets claude,codex \
@@ -139,7 +140,24 @@ The shorter `rr` alias runs the same skill: `/rr https://github.com/owner/reposi
 > [!TIP]
 > Add a `review` skill to your repository to make every review follow your project's own rules. See [Project review rules](#project-review-rules).
 
-The agent completes the review first, then launches one live Reviewonator workspace. In the application:
+### Review modes
+
+Reviewonator has two review modes:
+
+- **Full**: the agent reviews the whole pull request first, and Reviewonator opens when every finding is ready.
+- **Early**: Reviewonator opens right away with the diff. **About this PR** appears after a moment and the AI findings when the agent finishes. Meanwhile you can read the code and write your own comments; questions to the AI wait until it finishes, and so does publishing.
+
+Setup asks for your default mode. Run `reviewonator setup --reconfigure` to change the default review mode. To pick a mode for one review, add `full` or `early` after the URL:
+
+```text
+/reviewonator https://github.com/owner/repository/pull/123 early
+```
+
+The agent's review is just as thorough in both modes. See the [feature guide](docs/features.md#start-reading-before-the-ai-finishes) for what you see during an early review.
+
+### In the workspace
+
+The live Reviewonator workspace opens once for the whole review. In the application:
 
 1. Read **About this PR** above the diff to see what the change is for.
 2. Read the private reviewer explanation for each finding.
@@ -188,7 +206,7 @@ Update to the latest release with:
 reviewonator update
 ```
 
-For a Homebrew installation this runs `brew update` and then `brew upgrade reviewonator`, so a new release is found even when Homebrew has not refreshed the tap yet; otherwise Reviewonator downloads the latest release, verifies its checksum, and replaces itself. Either way, the installed skills are refreshed with your saved languages. An update waits until an open live review has finished; `--force` overrides this and, for an install-script installation, also reinstalls or downgrades to the latest release. Running the install script again works too.
+For a Homebrew installation this runs `brew update` and then `brew upgrade reviewonator`, so a new release is found even when Homebrew has not refreshed the tap yet; otherwise Reviewonator downloads the latest release, verifies its checksum, and replaces itself. Either way, the installed skills are refreshed with your saved languages and review mode. An update waits until an open live review has finished; `--force` overrides this and, for an install-script installation, also reinstalls or downgrades to the latest release. Running the install script again works too.
 
 When a newer release exists, the review page shows a small notice with the update command. Set `REVIEWONATOR_NO_UPDATE_CHECK=1` to turn the check off.
 
@@ -220,6 +238,14 @@ For a live development session, add `--live`. Agent-side development commands ca
 bun run dev -- https://github.com/owner/repository/pull/123 --review-file path/to/review.json --live
 reviewonator wait https://github.com/owner/repository/pull/123
 reviewonator respond https://github.com/owner/repository/pull/123 --review-file path/to/updated-review.json
+```
+
+For an early session, start with `--early` and a review file without findings, then deliver the agent's work before the first `wait`:
+
+```sh
+bun run dev -- https://github.com/owner/repository/pull/123 --review-file path/to/start.json --early
+reviewonator deliver https://github.com/owner/repository/pull/123 --review-file path/to/briefing.json
+reviewonator deliver https://github.com/owner/repository/pull/123 --review-file path/to/review.json --final
 ```
 
 Useful commands:

@@ -114,3 +114,31 @@ Reviewonator validates the schema and diff locations before opening the browser.
 Comments the user wrote or edited stay exactly as the user left them unless the user discussed that comment in the round. The user may also add, edit, or delete comments while you work; Reviewonator keeps the user's version, restores user comments missing from your response, and drops ones the user deleted.
 
 Submit the updated document with `reviewonator respond <PR_URL> --review-file <PATH>`. Reviewonator rejects responses that edit or remove user messages, move or create user threads, change user-owned dismissals or finding decisions, or fail to answer a thread whose last message is from the user. A valid response appends exactly one agent message to each waiting thread. The browser receives the accepted document without closing or reopening the session.
+
+## Early review deliveries
+
+An early review starts from a file with the configured `languages`, an empty `summary`, the `COMMENT` recommendation, no `briefing`, and empty `comments` and `userThreads`. Reviewonator opens with it at once and shows the briefing and the findings when they arrive:
+
+```json
+{
+  "version": 2,
+  "prUrl": "https://github.com/acme/widgets/pull/42",
+  "languages": {
+    "comments": "English",
+    "reviewerNotes": "English"
+  },
+  "summary": "",
+  "recommendation": "COMMENT",
+  "comments": [],
+  "userThreads": []
+}
+```
+
+Start it with `reviewonator <PR_URL> --review-file <PATH> --early`. Every later delivery is a full document in the same shape, with the same `prUrl` and `languages`:
+
+- `reviewonator deliver <PR_URL> --review-file <PATH>` sends the About this PR note. The document must have no comments. Reviewonator takes its `briefing`, and its `summary` when not empty.
+- `reviewonator deliver <PR_URL> --review-file <PATH> --final` sends the finished review. Reviewonator takes the `briefing`, the `summary`, the `recommendation`, and every finding, then releases the messages the user queued meanwhile to `reviewonator wait`. A final document without `briefing` keeps the one delivered earlier.
+
+Every comment in a delivery is an agent finding that follows the constraints above and starts pending: no `author: "user"`, no `edited`, no `included` or `rejected`, no `discussion`, and no ID that starts with `H`. Reviewonator keeps the user's comments and threads; leave `userThreads` empty in a delivery. The user's decisions and messages stay too, and the first `wait` after the final delivery returns them in its `review`.
+
+`deliver` prints `{"status":"accepted"}`. When the user cancelled the review, it prints `{"status":"cancelled"}` instead: nothing was published.

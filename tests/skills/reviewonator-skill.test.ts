@@ -217,6 +217,41 @@ describe("Reviewonator skill", () => {
     expect(skill).toContain("Never manufacture a summary merely to justify");
   });
 
+  it("runs an early review that opens Reviewonator before the agent reviews", async () => {
+    const skill = await readFile("skills/reviewonator/SKILL.md", "utf8");
+    const schema = await readFile("skills/reviewonator/references/review-schema.md", "utf8");
+
+    expect(skill).toContain(
+      "Accept an optional mode word, `full` or `early`, after the pull request URL; without one, use the mode in **Review mode configuration**.",
+    );
+    expect(skill).toContain("## Run an early review");
+    expect(skill).toContain("In early mode, deliver the About this PR note before you start the review.");
+    expect(skill).toContain("1. Do steps 1 to 3 of **Run the workflow**.");
+    expect(skill).toContain(
+      "Start `reviewonator <PR_URL> --review-file <JSON_PATH> --early` as a persistent background process, as in step 12, and wait until it prints the ready URL.",
+    );
+    expect(skill).toContain(
+      "Write the About this PR note into `briefing` and run `reviewonator deliver <PR_URL> --review-file <JSON_PATH>`.",
+    );
+    expect(skill).toContain("Do steps 4 to 11 of **Run the workflow** exactly as in full mode");
+    expect(skill).toContain("deliver every finding at once with `--final`");
+    expect(skill).toContain("reviewonator deliver <PR_URL> --review-file <JSON_PATH> --final");
+    expect(skill).toContain("Continue with steps 13 and 14 of **Run the workflow**.");
+    expect(skill).toContain("Never run `reviewonator wait` or `reviewonator respond` before the final delivery.");
+    expect(skill).toContain("If `deliver` prints `cancelled`, report that nothing was published and stop.");
+    expect(skill).toContain("connection ended unexpectedly");
+    expect(skill).toContain("run the same `deliver` command once more");
+    expect(skill).not.toContain("Findings in batches");
+
+    expect(schema).toContain("## Early review deliveries");
+    expect(schema).toContain(
+      "An early review starts from a file with the configured `languages`, an empty `summary`, the `COMMENT` recommendation, no `briefing`, and empty `comments` and `userThreads`.",
+    );
+    expect(schema).toContain("`reviewonator deliver <PR_URL> --review-file <PATH>` sends the About this PR note.");
+    expect(schema).toContain("`reviewonator deliver <PR_URL> --review-file <PATH> --final` sends the finished review.");
+    expect(schema).toContain("Reviewonator keeps the user's comments and threads; leave `userThreads` empty in a delivery.");
+  });
+
   it("keeps comments the user wrote or edited", async () => {
     const skill = await readFile("skills/reviewonator/SKILL.md", "utf8");
     const schema = await readFile("skills/reviewonator/references/review-schema.md", "utf8");

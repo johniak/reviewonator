@@ -8,6 +8,7 @@ description: Review a GitHub pull request with Claude Code or Codex, generate ve
 Accept one GitHub pull request URL as the argument. Require `gh` and the `reviewonator` executable.
 Review language configuration: write public pull request comments and the review summary in English; write private reviewer explanations in English.
 Review mode configuration: the default review mode is full.
+Accept an optional mode word, `full` or `early`, after the pull request URL; without one, use the mode in **Review mode configuration**. In full mode, follow **Run the workflow**. In early mode, follow **Run an early review**, which reuses the steps of **Run the workflow** by number.
 
 ## Run the workflow
 
@@ -33,6 +34,23 @@ Review mode configuration: the default review mode is full.
     - `published`: report the returned GitHub review URL and leave the loop.
     - `cancelled`: report that nothing was published and leave the loop.
 14. Remove temporary worktrees, clones, and review files created by this workflow.
+
+## Run an early review
+
+In early mode, Reviewonator opens right away with the diff, and you deliver your work to it while the human reads the code. In early mode, deliver the About this PR note before you start the review. The review itself is exactly as deep as in full mode; an open browser is never a reason to shorten it.
+
+1. Do steps 1 to 3 of **Run the workflow**.
+2. Write a starting review file as described in **Early review deliveries** in [references/review-schema.md](references/review-schema.md): the configured `languages`, an empty `summary`, the `COMMENT` recommendation, no `briefing`, and empty `comments` and `userThreads`. Start `reviewonator <PR_URL> --review-file <JSON_PATH> --early` as a persistent background process, as in step 12, and wait until it prints the ready URL. `--early` replaces `--live` and implies it. The rest of step 12 applies too, including its rule about chat output, for as long as the browser is open.
+3. Write the About this PR note into `briefing` and run `reviewonator deliver <PR_URL> --review-file <JSON_PATH>`. Follow the `briefing.text` rules in **Review rules** and the language rules of step 11. Keep `comments` empty in this delivery.
+4. Do steps 4 to 11 of **Run the workflow** exactly as in full mode: every review pass, the complete ledger, and every verification. Step 11's check of the completed JSON happens before the final delivery instead of before launching.
+5. Write the summary, the recommendation, and every finding into the file, keep the briefing accurate, and deliver every finding at once with `--final`: run `reviewonator deliver <PR_URL> --review-file <JSON_PATH> --final`. Never deliver findings in parts.
+6. Continue with steps 13 and 14 of **Run the workflow**.
+
+Never run `reviewonator wait` or `reviewonator respond` before the final delivery. Messages the human writes while you review are queued; the first `wait` after the final delivery returns them together with the human's own comments, threads, and decisions.
+
+A delivery contains only your own work: agent findings that start pending, with no discussion, no `"author": "user"`, no `edited`, and no IDs that start with H, plus empty `userThreads`. Reviewonator keeps everything the human did meanwhile, so never copy it into a delivery.
+
+A successful `deliver` prints `{"status":"accepted"}`. If `deliver` prints `cancelled`, report that nothing was published and stop. The human cancelled the review, so skip every remaining step except the cleanup in step 14. If `deliver` fails because the connection ended unexpectedly, run the same `deliver` command once more.
 
 ## Risk analysis
 
