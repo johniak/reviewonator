@@ -615,6 +615,8 @@ textarea:focus { border-color: var(--pc-accent); }
 .finding-status { padding: 0; background: transparent; }
 .finding-status-included { color: var(--pc-success); }
 .finding-status-revision { color: var(--pc-info); }
+.finding-list .finding-list-reviewing { display: flex; align-items: center; gap: 6px; }
+.finding-list-reviewing .spin { flex: none; color: var(--pc-accent); }
 .finding-status-rejected { color: var(--pc-danger); }
 .finding-status-pending { color: var(--pc-fg-muted); }
 .finding-discussion-count { display: inline-flex; align-items: center; gap: 3px; color: var(--pc-fg-muted); font-size: var(--pc-text-small); }
@@ -879,6 +881,8 @@ textarea:focus { border-color: var(--pc-accent); }
 .rejection-button.active { color: var(--pc-danger); background: var(--pc-danger-subtle); border-color: var(--pc-danger); }
 .revision-button.active { color: var(--pc-accent); background: var(--pc-accent-subtle); border-color: var(--pc-accent-border); }
 .revision-button:disabled { color: var(--pc-fg-muted); cursor: wait; }
+/* A queued discussion is not being worked on yet, so it shows no busy cursor. */
+.revision-button.queued:disabled { cursor: default; }
 
 .revision-composer { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .revision-composer > .revision-field { flex: 1 0 100%; }

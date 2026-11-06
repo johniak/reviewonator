@@ -74,4 +74,41 @@ describe("ReviewFindingNavigation", () => {
 
     expect(screen.getByRole("button", { name: /You Pending H1 src\/example\.ts:2/ })).toBeVisible();
   });
+
+  it("says the AI is still reviewing instead of reporting no findings", () => {
+    const { rerender } = render(<ReviewFindingNavigation
+      comments={[]}
+      reviewing
+      activeCommentId={null}
+      selectedIds={new Set()}
+      rejectedIds={new Set()}
+      revisionMessages={{}}
+      onSelect={vi.fn()}
+    />);
+
+    expect(screen.getByRole("navigation", { name: "Review findings" })).toHaveTextContent("Findings arrive when the AI finishes its review");
+    expect(screen.queryByText("No actionable findings.")).not.toBeInTheDocument();
+
+    rerender(<ReviewFindingNavigation
+      comments={[{
+        id: "H1",
+        type: "line",
+        author: "user",
+        path: "src/example.ts",
+        line: 2,
+        side: "LEFT",
+        body: "Mine.",
+        discussion: [{ id: "H1-D1", author: "user", body: "Is this right?" }],
+      }]}
+      reviewing
+      activeCommentId={null}
+      selectedIds={new Set()}
+      rejectedIds={new Set()}
+      revisionMessages={{}}
+      onSelect={vi.fn()}
+    />);
+    expect(screen.getByRole("button", { name: /You Queued 1 discussion messages H1/ })).toBeVisible();
+    expect(screen.queryByText("AI working")).not.toBeInTheDocument();
+    expect(screen.getByText("Findings arrive when the AI finishes its review")).toBeVisible();
+  });
 });

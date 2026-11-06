@@ -38,6 +38,7 @@ export function ReviewCommentCard({
   const revision = revisionMessages[comment.id] ?? "";
   const discussion = comment.discussion ?? [];
   const waitingForAgent = discussion.at(-1)?.author === "user";
+  const queued = waitingForAgent && queueing;
   const fieldLabel = discussion.length > 0 ? "Reply to the AI agent" : "What do you want to discuss with the AI agent?";
 
   return (
@@ -57,7 +58,9 @@ export function ReviewCommentCard({
           <button
             type="button"
             aria-label="Edit comment"
-            title={waitingForAgent ? "The AI agent is checking this comment" : "Edit comment"}
+            title={queued
+              ? "Your message is queued for the AI agent"
+              : waitingForAgent ? "The AI agent is checking this comment" : "Edit comment"}
             disabled={waitingForAgent || editing}
             onClick={() => setEditing(true)}
           >
@@ -132,14 +135,14 @@ export function ReviewCommentCard({
           {rejected ? "Rejected" : "Reject"}
         </button>
         <button
-          className={`revision-button ${showRevision ? "active" : ""}`}
+          className={`revision-button ${showRevision ? "active" : ""} ${queued ? "queued" : ""}`}
           type="button"
           onClick={() => { if (!waitingForAgent) setShowRevision((value) => !value); }}
           aria-expanded={showRevision && !waitingForAgent}
           disabled={waitingForAgent}
         >
-          <RotateCcw aria-hidden="true" size={14} />
-          {waitingForAgent ? "Waiting for AI" : discussion.length > 0 ? "Continue discussion" : "Discuss with AI"}
+          {queued ? <Clock aria-hidden="true" size={14} /> : <RotateCcw aria-hidden="true" size={14} />}
+          {queued ? "Queued for AI" : waitingForAgent ? "Waiting for AI" : discussion.length > 0 ? "Continue discussion" : "Discuss with AI"}
         </button>
       </div>
       {showRevision && !waitingForAgent && (
@@ -171,7 +174,7 @@ export function ReviewCommentCard({
           </button>
         </div>
       )}
-      {waitingForAgent && (queueing ? (
+      {waitingForAgent && (queued ? (
         <QueuedNote className="finding-discussion-waiting" />
       ) : (
         <p className="finding-discussion-waiting"><RotateCcw aria-hidden="true" size={12} /> The AI agent is checking this {byUser ? "comment" : "finding"}.</p>

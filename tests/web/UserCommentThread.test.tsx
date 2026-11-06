@@ -92,6 +92,8 @@ describe("UserCommentThreadCard", () => {
     render(<UserCommentThreadCard thread={{ ...userThread, messages: [userThread.messages[0]] }} {...actions} queueing />);
 
     expect(screen.getByText("Queued, sent when the AI finishes its review")).toBeVisible();
+    expect(screen.getByText("Queued")).toBeVisible();
+    expect(screen.queryByText("Waiting for agent")).not.toBeInTheDocument();
     expect(screen.queryByText("Waiting for the AI agent to respond.")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Reply to the AI agent")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Dismiss discussion" })).not.toBeInTheDocument();
@@ -120,5 +122,7 @@ describe("userThreadStatus", () => {
     expect(userThreadStatus(userThread, "", "No longer relevant").label).toBe("Dismiss queued");
     expect(userThreadStatus({ ...userThread, dismissed: true, dismissalReason: "No issue." }).label).toBe("Dismissed");
     expect(userThreadStatus({ ...userThread, findingId: "S1" }).label).toBe("Finding S1");
+    expect(userThreadStatus({ ...userThread, messages: [userThread.messages[0]] }, "", "", true).label).toBe("Queued");
+    expect(userThreadStatus(userThread, "", "", true).label).toBe("Needs your reply");
   });
 });

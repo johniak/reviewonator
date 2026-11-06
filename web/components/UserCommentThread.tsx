@@ -36,7 +36,7 @@ export function UserCommentThreadCard({
   const reply = replyMessages[thread.id] ?? "";
   const dismissalReason = dismissalReasons[thread.id] ?? "";
   const [showDismissal, setShowDismissal] = useState(Boolean(dismissalReason));
-  const status = userThreadStatus(thread, reply, dismissalReason);
+  const status = userThreadStatus(thread, reply, dismissalReason, queueing);
   const open = !thread.dismissed && !thread.findingId;
   const canReply = open && thread.messages.at(-1)?.author === "agent";
   // While the AI reviews, a discussion with a queued message takes nothing more until the agent replies.
@@ -169,11 +169,16 @@ export function userThreadStatus(
   thread: UserCommentThread,
   reply = "",
   dismissalReason = "",
+  queueing = false,
 ) {
   if (dismissalReason.trim()) return { kind: "dismissing", label: "Dismiss queued" } as const;
   if (thread.dismissed) return { kind: "dismissed", label: "Dismissed" } as const;
   if (thread.findingId) return { kind: "converted", label: `Finding ${thread.findingId}` } as const;
   if (reply.trim()) return { kind: "reply", label: "Reply queued" } as const;
-  if (thread.messages.at(-1)?.author === "user") return { kind: "waiting", label: "Waiting for agent" } as const;
+  if (thread.messages.at(-1)?.author === "user") {
+    return queueing
+      ? { kind: "queued", label: "Queued" } as const
+      : { kind: "waiting", label: "Waiting for agent" } as const;
+  }
   return { kind: "needs-reply", label: "Needs your reply" } as const;
 }

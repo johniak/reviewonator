@@ -51,4 +51,22 @@ describe("MyCommentNavigation", () => {
     );
     expect(screen.getByText(/Click.*beside a line to start a discussion/)).toBeVisible();
   });
+
+  it("marks a discussion queued while the AI reviews as queued, not waiting", () => {
+    render(
+      <MyCommentNavigation
+        threads={[{ ...userThread, messages: [userThread.messages[0]] }]}
+        drafts={[]}
+        queueing
+        activeThreadId={null}
+        replyMessages={{}}
+        dismissalReasons={{}}
+        onSelectThread={() => {}}
+        onSelectDraft={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /Queued.*src\/example\.ts:2/ })).toBeVisible();
+    expect(screen.queryByText("Waiting for agent")).not.toBeInTheDocument();
+  });
 });

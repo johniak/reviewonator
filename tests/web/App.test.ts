@@ -782,6 +782,10 @@ describe("an early review", () => {
 
     expect(screen.getByRole("button", { name: /Review and publish/ })).toBeDisabled();
     expect(screen.getByText("Available when the AI finishes its review")).toBeVisible();
+    expect(screen.queryByText("No actionable findings.")).toBeNull();
+    expect(screen.getByRole("navigation", { name: "Review findings" }))
+      .toHaveTextContent("Findings arrive when the AI finishes its review");
+    expect(document.querySelector(".selection-summary")).toBeNull();
     session.cancel();
   });
 
@@ -822,6 +826,8 @@ describe("an early review", () => {
     await screen.findAllByText("Why is this a constant?");
     await waitFor(() => expect(session.review.userThreads).toHaveLength(2));
     expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("button", { name: /Queued.*src\/example\.ts:3/ })).toBeVisible();
+    expect(screen.queryByText("Waiting for agent")).toBeNull();
 
     session.deliver({ ...starting, summary: "The change looks safe.", comments: review.comments }, true);
     update();
@@ -831,6 +837,7 @@ describe("an early review", () => {
     expect(screen.queryByText("Queued, sent when the AI finishes its review")).toBeNull();
     expect(screen.getAllByText("Waiting for the AI agent to respond.")).toHaveLength(2);
     expect(screen.queryByText("The AI is reviewing this pull request")).toBeNull();
+    expect(screen.queryByText("Findings arrive when the AI finishes its review")).toBeNull();
     expect(screen.queryByText("Available when the AI finishes its review")).toBeNull();
     expect(screen.getByRole("button", { name: /Review and publish/ })).toBeEnabled();
     await expect(session.waitForAgentRequest()).resolves.toMatchObject({
@@ -855,7 +862,12 @@ describe("an early review", () => {
     await waitFor(() => expect(card).toHaveTextContent("Queued, sent when the AI finishes its review"));
     expect(card).toHaveTextContent("Is this name really wrong?");
     expect(within(card).queryByRole("textbox")).toBeNull();
-    expect(within(card).getByRole("button", { name: "Waiting for AI" })).toBeDisabled();
+    expect(within(card).getByRole("button", { name: "Queued for AI" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /You Queued 1 discussion messages H1/ })).toBeVisible();
+    expect(screen.getByText((_content, element) => Boolean(
+      element?.classList.contains("selection-summary")
+      && element.textContent?.replace(/\s+/g, " ").includes("0 of 1 comments selected") === true
+    ))).toBeVisible();
     session.cancel();
   });
 });

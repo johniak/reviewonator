@@ -609,6 +609,7 @@ export function App() {
             threads={userThreads}
             drafts={Object.values(lineCommentDrafts)}
             activeThreadId={focusedThreadId}
+            queueing={Boolean(reviewing)}
             replyMessages={threadReplies}
             dismissalReasons={dismissalReasons}
             onSelectThread={selectUserThread}
@@ -617,6 +618,7 @@ export function App() {
 
           <ReviewFindingNavigation
             comments={comments}
+            reviewing={Boolean(reviewing)}
             activeCommentId={focusedCommentId}
             selectedIds={selectedIds}
             rejectedIds={rejectedIds}
@@ -740,10 +742,12 @@ export function App() {
           </div>
 
           <footer className="review-actions-panel">
-            <div className="selection-summary">
-              <CheckCheck size={17} />
-              <span><strong>{selectedComments.length}</strong> of {comments.length} comments selected</span>
-            </div>
+            {!(reviewing && comments.length === 0) && (
+              <div className="selection-summary">
+                <CheckCheck size={17} />
+                <span><strong>{selectedComments.length}</strong> of {comments.length} comments selected</span>
+              </div>
+            )}
             {actionError && <p className="error-message" role="alert">{actionError}</p>}
             {pendingAgentRequests > 0 && (
               <button

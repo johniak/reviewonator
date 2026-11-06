@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import type { ReviewComment } from "../../src/domain/review";
 import { ReviewCommentCard } from "../../web/components/ReviewCommentCard";
@@ -316,7 +317,13 @@ describe("ReviewCommentCard", () => {
       expect(screen.getByText("Queued, sent when the AI finishes its review")).toBeVisible();
       expect(screen.queryByText("The AI agent is checking this comment.")).not.toBeInTheDocument();
       expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Waiting for AI" })).toBeDisabled();
+      expect(screen.queryByRole("button", { name: "Waiting for AI" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Queued for AI" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Queued for AI" })).toHaveClass("queued");
+      expect(screen.getByRole("button", { name: "Edit comment" })).toHaveAttribute(
+        "title",
+        "Your message is queued for the AI agent",
+      );
     });
 
     it("deletes only hand-written comments", async () => {
@@ -329,5 +336,11 @@ describe("ReviewCommentCard", () => {
       await userEvent.click(screen.getByRole("button", { name: "Delete comment" }));
       expect(cardProps.onDeleteComment).toHaveBeenCalledWith("H1");
     });
+  });
+
+  it("does not show a busy cursor on a discussion that is only queued", () => {
+    const styles = readFileSync("web/styles.css", "utf8");
+
+    expect(styles).toMatch(/\.revision-button\.queued:disabled \{[^}]*cursor: default;/);
   });
 });

@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   CircleDot,
   CircleX,
+  Clock,
   MessageSquarePlus,
   MessagesSquare,
   Send,
@@ -14,6 +15,8 @@ type Props = {
   threads: UserCommentThread[];
   drafts: LineCommentDraft[];
   activeThreadId: string | null;
+  /** True while an early review runs, so a sent message is queued rather than waiting. */
+  queueing?: boolean;
   replyMessages: Record<string, string>;
   dismissalReasons: Record<string, string>;
   onSelectThread: (thread: UserCommentThread) => void;
@@ -24,6 +27,7 @@ export function MyCommentNavigation({
   threads,
   drafts,
   activeThreadId,
+  queueing = false,
   replyMessages,
   dismissalReasons,
   onSelectThread,
@@ -62,6 +66,7 @@ export function MyCommentNavigation({
                 thread,
                 replyMessages[thread.id],
                 dismissalReasons[thread.id],
+                queueing,
               );
               return (
                 <button
@@ -92,5 +97,6 @@ function statusIcon(kind: ReturnType<typeof userThreadStatus>["kind"]) {
   if (kind === "dismissed" || kind === "dismissing") return <CircleX aria-hidden="true" size={12} />;
   if (kind === "reply") return <Send aria-hidden="true" size={12} />;
   if (kind === "needs-reply") return <Bot aria-hidden="true" size={12} />;
+  if (kind === "queued") return <Clock aria-hidden="true" size={12} />;
   return <CircleDot aria-hidden="true" size={12} />;
 }
