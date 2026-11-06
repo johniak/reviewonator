@@ -242,7 +242,7 @@ export class ReviewSession {
           ...(briefing ? { briefing } : {}),
           summary: delivered.summary,
           recommendation: delivered.recommendation,
-          comments: [...this.review.comments.filter(isUserOwned), ...delivered.comments],
+          comments: [...delivered.comments, ...this.review.comments.filter(isUserOwned)],
         }
       : {
           ...this.review,

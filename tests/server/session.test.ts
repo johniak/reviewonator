@@ -768,9 +768,9 @@ describe("an early review", () => {
     session.deliver(review, true);
 
     expect(session.review.comments).toEqual([
+      ...findings,
       { id: "H1", type: "line", author: "user", ...onDeletedLine, included: true },
       { id: "H2", type: "line", author: "user", ...onDeletedLine, body: "Rename this constant.", rejected: true },
-      ...findings,
     ]);
     expect(session.review.userThreads.map(({ id, messages }) => [id, messages.map(({ body }) => body)])).toEqual([
       ["U-a", ["Why is this a constant?"]],
@@ -811,7 +811,7 @@ describe("an early review", () => {
       dismissedThreads: [],
       review: session.review,
     });
-    expect((waiting.value as { review: typeof review }).review.comments.map(({ id }) => id)).toEqual(["H1", "S1", "G1"]);
+    expect((waiting.value as { review: typeof review }).review.comments.map(({ id }) => id)).toEqual(["S1", "G1", "H1"]);
     expect(session.snapshot().agentPending).toBe(true);
     expect(() => session.requestRevision({ newThreads: [newThread("U-c")] }))
       .toThrow("The AI agent is already working on the previous request.");

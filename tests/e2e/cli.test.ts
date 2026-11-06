@@ -582,6 +582,54 @@ describe("Reviewonator CLI end-to-end", () => {
         cwd: process.cwd(),
         env: { ...process.env, REVIEWONATOR_STATE_DIR: join(temp, "state"), PATH: `${fixtureDir}${delimiter}${process.env.PATH}` },
       })).rejects.toMatchObject({ stderr: expect.stringContaining("An early review must start without findings.") });
+
+      const withThread = join(temp, "thread.json");
+      const original = JSON.parse(await readFile(reviewFile, "utf8")) as ReviewDocument;
+      await writeFile(withThread, JSON.stringify({
+        ...original,
+        comments: [],
+        userThreads: [{
+          id: "U1",
+          path: "src/payments/retry.ts",
+          line: 8,
+          side: "RIGHT",
+          messages: [{ id: "M1", author: "user", body: "Why?" }],
+        }],
+      }));
+      await expect(run("bun", ["src/cli.ts", prUrl, "--review-file", withThread, "--early", "--no-open"], {
+        cwd: process.cwd(),
+        env: { ...process.env, REVIEWONATOR_STATE_DIR: join(temp, "state"), PATH: `${fixtureDir}${delimiter}${process.env.PATH}` },
+      })).rejects.toMatchObject({ stderr: expect.stringContaining("An early review must start without findings.") });
+    }, 30_000);
+
+    it("prints the schema error when the delivered file is invalid", async () => {
+      const { temp, early, exit, baseUrl, token, cli } = await startEarly("reviewonator-early-invalid-");
+      const longBriefing = join(temp, "long.json");
+      const text = Array.from({ length: 150 }, (_, index) => `word${index}`).join(" ");
+      await writeFile(longBriefing, JSON.stringify({ ...JSON.parse(await readFile(await writeStartingFile(temp), "utf8")), briefing: { text } }));
+      const failure = await cli("deliver", prUrl, "--review-file", longBriefing).catch((error) => error as { stderr: string; code?: number });
+      expect(failure.stderr).toContain("The briefing must have at most 100 words.");
+      expect(early.output()).toBe("");
+      await authenticatedFetch(baseUrl, token, "/api/cancel", { method: "POST", body: "{}" });
+      await exit;
+    }, 30_000);
+
+    it("refuses a delivery after a published result was saved and keeps the state file", async () => {
+      const temp = await mkdtemp(join(tmpdir(), "reviewonator-early-published-"));
+      const env = { REVIEWONATOR_STATE_DIR: join(temp, "state") };
+      await writeLiveState({
+        prUrl,
+        baseUrl: "http://127.0.0.1:1",
+        token: "old",
+        pid: 999_999,
+        startedAt: new Date().toISOString(),
+        result: { status: "published" } as never,
+      }, env);
+      await expect(run("bun", ["src/cli.ts", "deliver", prUrl, "--review-file", await writeStartingFile(temp)], {
+        cwd: process.cwd(),
+        env: { ...process.env, ...env },
+      })).rejects.toMatchObject({ stderr: expect.stringContaining("This live Reviewonator session has already finished.") });
+      await expect(readFile(liveStatePath(prUrl, env), "utf8")).resolves.toContain("published");
     });
 
     it("lets a new start replace a cancelled leftover but not a published one", async () => {

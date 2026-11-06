@@ -186,7 +186,7 @@ async function main(): Promise<void> {
     throw new Error("The review JSON belongs to a different pull request URL.");
   }
 
-  if (values.early && review.comments.length > 0) throw new Error("An early review must start without findings.");
+  if (values.early && (review.comments.length > 0 || review.userThreads.length > 0)) throw new Error("An early review must start without findings.");
 
   const loaded = await github.loadPullRequest(prUrl);
   validateReviewLocations(review, loaded.patch);
@@ -302,14 +302,15 @@ async function deliverToLiveSession(
 ): Promise<void> {
   const state = await readLiveState(prUrl);
   if (state.result) {
+    if (state.result.status !== "cancelled") throw new Error("This live Reviewonator session has already finished.");
     // The human cancelled while the agent was reviewing; nothing was published and nothing is left to deliver.
     process.stdout.write(`${JSON.stringify(state.result)}\n`);
     await removeLiveState(prUrl);
     return;
   }
   await assertLiveServerReachable(state);
-  const review = await Bun.file(reviewFile).json() as { prUrl?: unknown };
-  if (typeof review.prUrl !== "string" || new URL(review.prUrl).href !== new URL(prUrl).href) {
+  const review = await readReviewFile(reviewFile, sync);
+  if (new URL(review.prUrl).href !== new URL(prUrl).href) {
     throw new Error("The review JSON belongs to a different pull request URL.");
   }
   const result = await withSkillUpdateHint(sync, () => liveRequest(state, "/api/agent/deliver", {
@@ -344,8 +345,12 @@ async function liveRequest(
       + `Retry ${retry}.`,
     );
   }
-  const payload = await response.json() as { error?: string };
-  if (!response.ok) throw new Error(payload.error ?? "The live Reviewonator request failed.");
+  const payload = await response.json() as { error?: string; details?: Array<{ message?: string }> };
+  if (!response.ok) {
+    const details = (payload.details ?? []).map((issue) => issue.message).filter(Boolean).join("; ");
+    const message = payload.error ?? "The live Reviewonator request failed.";
+    throw new Error(details ? `${message}: ${details}` : message);
+  }
   return payload;
 }
 

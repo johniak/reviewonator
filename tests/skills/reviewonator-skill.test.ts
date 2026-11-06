@@ -244,6 +244,13 @@ describe("Reviewonator skill", () => {
     expect(skill).toContain(
       'If the retried `deliver` fails with "The AI agent has already delivered its review.", the earlier delivery was accepted, so continue with the next step; after `--final`, that is the `wait` loop of step 13.',
     );
+    expect(skill).toContain("If `deliver` rejects the file, correct the file and run the same `deliver` command again.");
+    expect(skill).toContain(
+      'If `deliver` fails with "This review session is no longer open.", the human ended the session, so run the same `deliver` command once more; it then prints `cancelled`.',
+    );
+    expect(skill).toContain(
+      "If the background Reviewonator process exits while you review, run `deliver` to read its result, and stop on `cancelled`.",
+    );
     expect(skill).not.toContain("Findings in batches");
 
     expect(schema).toContain("## Early review deliveries");
