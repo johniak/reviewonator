@@ -2,6 +2,18 @@
 
 Each release's notes on GitHub come from its section below. Releases before 0.11.0 are listed on the [releases page](https://github.com/johniak/reviewonator/releases).
 
+## 0.14.0 - 2026-11-09
+
+### Added
+
+- **Early review mode.** Reviewonator opens right away with the diff, before the AI has reviewed the pull request. **About this PR** shows a spinner until the AI sends it, and the findings appear at once when the AI finishes. Meanwhile you can read the code and write your own comments; messages to the AI are queued and clearly labelled, and publishing waits until the findings arrive. The review panel shows how long the AI has been reviewing.
+- `reviewonator setup` asks for a default review mode, **full** or **early**, and `--mode` or `REVIEWONATOR_MODE` answers it without a prompt. Add `full` or `early` after the pull request URL to pick a mode for one review, for example `/rr <PR_URL> early`.
+- **About this PR** names the PR author, the ticket author, and anyone else who wrote commits in the pull request.
+
+### Changed
+
+- The agent keeps the general comment and the review summary for problems with the pull request as a whole, and no longer repeats its inline findings there.
+
 ## 0.13.1 - 2026-11-05
 
 ### Fixed
