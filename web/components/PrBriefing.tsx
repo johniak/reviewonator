@@ -10,11 +10,15 @@ export interface PullRequestPeople {
 }
 
 export function pullRequestPeople(pullRequest: Pick<PullRequest, "author" | "commits">): PullRequestPeople {
-  const author = pullRequest.author.login;
+  // GitHub names an app's account "app/dependabot" as a PR author and "dependabot[bot]" as a commit author.
+  const author = pullRequest.author.login.replace(/^app\//, "");
   const names = pullRequest.commits.flatMap((commit) => commit.authors.map((person) => (
     person.login || (typeof person.name === "string" ? person.name.trim() : "")
   )));
-  return { author, contributors: [...new Set(names)].filter((name) => name && name !== author) };
+  return {
+    author,
+    contributors: [...new Set(names)].filter((name) => name && name.replace(/\[bot\]$/, "") !== author),
+  };
 }
 
 export function PrBriefing({ briefing, people, reviewerLanguage, collapsed, onCollapsedChange }: {

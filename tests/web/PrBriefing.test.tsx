@@ -73,6 +73,18 @@ describe("PrBriefing", () => {
     expect(people).toEqual({ author: "octocat", contributors: ["hubot", "Mona Lisa"] });
   });
 
+  it("treats a GitHub app and its bot commit author as the same account", () => {
+    const people = pullRequestPeople({
+      author: { login: "app/dependabot" },
+      commits: [
+        { oid: "a", messageHeadline: "Bump", committedDate: "2026-11-01T00:00:00Z", authors: [{ login: "dependabot[bot]" }] },
+        { oid: "b", messageHeadline: "Fix", committedDate: "2026-11-02T00:00:00Z", authors: [{ login: "octocat" }] },
+      ],
+    });
+
+    expect(people).toEqual({ author: "dependabot", contributors: ["octocat"] });
+  });
+
   it("names a ticket without a link as plain text", () => {
     render(<Briefed briefing={{ ticket: { key: "OPS-7" }, text: "The PR renames a job." }} />);
 
