@@ -101,7 +101,7 @@ export function PublishDialog({
                   <p className="muted-copy">No inline or general comments are selected.</p>
                 ) : comments.map((comment) => (
                   <div className="publish-comment" key={comment.id}>
-                    <div>
+                    <div className="publish-comment-heading">
                       {comment.author === "user" && <AuthorBadge />}
                       <SeverityBadge severity={comment.severity} />
                       <span className="comment-location">

@@ -1350,7 +1350,7 @@ a.briefing-ticket:hover { background: var(--pc-bg-hover); border-color: var(--pc
 .publish-comment-list > .muted-copy { padding: 12px 14px; }
 .publish-comment { padding: 10px 14px; border-bottom: var(--pc-border-width) solid var(--pc-border-muted); }
 .publish-comment:last-child { border-bottom: 0; }
-.publish-comment > div { display: flex; justify-content: space-between; gap: 10px; }
+.publish-comment-heading { display: flex; justify-content: space-between; gap: 10px; }
 .comment-location { color: var(--pc-fg-muted); font-size: var(--pc-text-small); font-variant-numeric: tabular-nums; }
 .publish-comment .markdown-text { margin: 6px 0 0; }
 
