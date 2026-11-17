@@ -13,22 +13,24 @@ Reviewonator turns an AI-generated pull request review into a focused, local rev
 Reviewonator supports Claude Code and Codex through one shared review workflow.
 
 <p align="center">
-  <img src="docs/assets/reviewonator-diff.png" width="1280" alt="Reviewonator main review workspace showing changed code, inline findings, and the review summary">
+  <img src="docs/assets/reviewonator-diff.png" width="1280" alt="Reviewonator review workspace showing About this PR, changed code, a private discussion, and inline findings">
 </p>
 
 See the [feature guide](docs/features.md) for a visual walkthrough of the review workspace, comment decisions, pull request discussion, and safe publishing flow.
 
 ## Why Reviewonator?
 
-- Start from **About this PR**: a short private note on what the change really does, written from the ticket and the code rather than the author's description.
+- Start from **About this PR**: a short private note on what the change really does, written from the ticket and the code rather than the author's description, with the authors of the pull request, its commits, and the ticket.
 - Start reading at once in early mode: the diff opens right away and the AI findings follow when the agent finishes.
 - Review findings appear next to the exact changed lines, with clearly visible severity levels.
 - Read existing conversation comments, submitted reviews, and inline review comments without leaving the diff workspace.
 - Browse one file at a time or scroll through all changed files.
 - Switch between unified and side-by-side diffs.
+- Choose the **Paper Copper** or **Slate** theme, light or dark. Reviewonator remembers it and your diff layout for the next review.
 - Expand context beyond the patch without exposing a GitHub token to the browser.
 - Review against your project's own rules: add a `review` skill to the repository and every review follows it.
 - Keep private reviewer explanations separate from comments sent to the pull request.
+- Read comments, explanations, and replies rendered as Markdown, with GitHub suggestion blocks labelled **Suggested change**.
 - Discuss any proposed finding with the AI agent live and send a reply directly from its card.
 - Write your own comments on any diff line next to the agent's findings.
 - Mark files **Viewed**, in sync with GitHub, so the ones you understood collapse out of the way.
@@ -40,7 +42,7 @@ See the [feature guide](docs/features.md) for a visual walkthrough of the review
 
 1. The installed Claude Code or Codex skill performs a pull request review and writes a validated JSON document.
 2. The `reviewonator` executable retrieves pull request data through your authenticated GitHub CLI session.
-3. A local loopback-only web application opens in your browser.
+3. A local loopback-only web application opens in your browser. In [early mode](#review-modes) it opens before the agent has finished, and the agent's note and findings arrive when they are ready.
 4. You inspect and edit the proposed review.
 5. Reviewonator publishes only the selected content after an explicit confirmation.
 
@@ -162,14 +164,13 @@ The live Reviewonator workspace opens once for the whole review. In the applicat
 1. Read **About this PR** above the diff to see what the change is for.
 2. Read the private reviewer explanation for each finding.
 3. Edit the public comment with the pencil on its card if needed.
-4. Select only the findings you want to publish.
-5. Add an optional general comment.
-6. Open the publish preview and choose the GitHub review event.
-7. Confirm the exact payload.
+4. Select only the findings and comments you want to publish.
+5. Open the publish preview, choose the GitHub review event, and optionally write a review summary.
+6. Confirm the exact payload.
 
 Click **+** beside a diff line, write your comment, and choose **Add comment** to put it straight into the review, or **Send to AI** to have the agent check it first. Your own comments are marked **You**, start pending like every finding, and the agent never changes them or your edits unless you discuss that comment with it.
 
-You can start a private live discussion either on an AI finding or on any diff line. The open workspace sends your message to the agent, shows its answer in place, and stays open for follow-up rounds. These discussions are never published directly to GitHub.
+You can start a private live discussion either on an AI finding or on any diff line. The open workspace sends your message to the agent, shows its answer in place, and stays open for follow-up rounds. In early mode, your messages wait until the agent's findings arrive. These discussions are never published directly to GitHub.
 
 The review summary is optional for every event, including **Approve** and **Request changes**.
 
