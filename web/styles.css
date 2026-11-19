@@ -1189,6 +1189,14 @@ a.briefing-ticket:hover { background: var(--pc-bg-hover); border-color: var(--pc
 .markdown-text > :last-child { margin-bottom: 0; }
 .markdown-text p, .markdown-text ul, .markdown-text ol, .markdown-text blockquote, .markdown-text pre, .markdown-text .markdown-suggestion { margin: 8px 0; }
 .markdown-text ul, .markdown-text ol { padding-left: 20px; }
+.markdown-text ul { list-style: disc; }
+.markdown-text ol { list-style: decimal; }
+.markdown-text li + li { margin-top: 2px; }
+.markdown-text li::marker { color: var(--pc-fg-muted); }
+.markdown-text :is(h1, h2, h3, h4, h5, h6) { margin: 14px 0 4px; font-size: 14px; line-height: 20px; font-weight: 600; color: var(--pc-fg-default); }
+.markdown-text h1 { font-size: 18px; line-height: 26px; }
+.markdown-text h2 { font-size: 16px; line-height: 24px; }
+.markdown-text :is(h1, h2, h3, h4, h5, h6) + * { margin-top: 0; }
 .markdown-text code {
   padding: 1px 4px;
   background: var(--pc-bg-subtle);

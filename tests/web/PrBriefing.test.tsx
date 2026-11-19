@@ -40,6 +40,21 @@ describe("PrBriefing", () => {
     expect(screen.getByText("Ticket prosi o ponawianie płatności. PR je dodaje, ale bez limitu prób.")).toBeVisible();
   });
 
+  it("separates the parts of a Markdown briefing with headings", () => {
+    render(
+      <Briefed
+        briefing={{
+          ticket: { key: "ACME-142" },
+          text: "### Since your last review\nThe guard checks `note`.\n\n### Gaps against the ticket\nThe ticket leaves out the Mongo write.",
+        }}
+      />,
+    );
+
+    expect(screen.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent))
+      .toEqual(["Since your last review", "Gaps against the ticket"]);
+    expect(screen.getByText("The ticket leaves out the Mongo write.")).toBeVisible();
+  });
+
   it("names the pull request author, the other commit authors, and the ticket author", () => {
     render(
       <Briefed

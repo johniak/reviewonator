@@ -201,6 +201,10 @@ describe("Reviewonator skill", () => {
     expect(skill).toContain("at most 100 words");
     expect(skill).toContain("never on the PR title, description, or the author's summary");
     expect(skill).toContain("With no ticket, only explain what the PR actually changes and do not mention mismatches");
+    expect(skill).toContain("Format it as short Markdown, never as one block of text");
+    expect(skill).toContain("put each part under its own `###` heading");
+    expect(skill).toContain("Write each heading as a short, natural section title in the reviewer-note language");
+    expect(skill).toContain("instead of translating these word for word");
     expect(skill).toContain("`briefing.text`, and agent-authored private message");
     expect(schema).toContain('"briefing": {');
     expect(schema).toContain("`briefing` is a private note for the reviewer and is never published to GitHub");

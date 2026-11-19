@@ -2,6 +2,17 @@
 
 Each release's notes on GitHub come from its section below. Releases before 0.11.0 are listed on the [releases page](https://github.com/johniak/reviewonator/releases).
 
+## Unreleased
+
+### Changed
+
+- **About this PR** is split into short sections with headings in your reviewer-note language, such as the ticket's scope, the changes, gaps against the ticket, or what changed since your earlier review, instead of one block of text.
+
+### Fixed
+
+- In the publish preview, a suggested change sits below the comment text instead of beside it.
+- Headings and bulleted or numbered lists in comments and notes are shown as headings and lists, not as plain text.
+
 ## 0.14.0 - 2026-11-09
 
 ### Added
