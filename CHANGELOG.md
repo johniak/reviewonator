@@ -2,7 +2,7 @@
 
 Each release's notes on GitHub come from its section below. Releases before 0.11.0 are listed on the [releases page](https://github.com/johniak/reviewonator/releases).
 
-## Unreleased
+## 0.14.1 - 2026-11-23
 
 ### Changed
 
